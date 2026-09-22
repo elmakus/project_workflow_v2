@@ -147,3 +147,75 @@ def reconcile_issue_readback(
     if automatic_close_available:
         return "reconcile_missing_automatic_close"
     return "explicit_close_allowed"
+
+
+def verify_target_side_recovery(
+    *,
+    source_branch: str,
+    source_head: str,
+    merged_source_head: str,
+    target_package_subject_head: str,
+    immutable_merge_evidence: bool,
+    required_artifacts: frozenset[str],
+    present_artifacts: frozenset[str],
+) -> str:
+    """Prove closure can recover from target truth without a live source ref."""
+
+    if not source_branch.strip() or not source_head.strip():
+        raise CloseContractError("original source provenance must be preserved")
+    if not immutable_merge_evidence:
+        raise CloseContractError("target-side recovery requires immutable merge evidence")
+    if merged_source_head != source_head or target_package_subject_head != source_head:
+        raise CloseContractError("target package does not match the exact merged source head")
+    missing = required_artifacts - present_artifacts
+    if missing:
+        raise CloseContractError(
+            "target package is missing unique recovery artifacts: " + ", ".join(sorted(missing))
+        )
+    return "source_ref_independent_recovery"
+
+def cleanup_branch_action(
+    *,
+    terminal_package_independent: bool,
+    source_ref_exists: bool,
+    current_head: str,
+    cleanup_state: str,
+    verified_head: str,
+) -> str:
+    """Select source-branch cleanup action with exact-head and absence readback."""
+
+    if not terminal_package_independent:
+        raise CloseContractError("cleanup requires recovery truth independent of the source ref")
+    if cleanup_state not in {"none", "safe_to_delete", "deleted"}:
+        raise CloseContractError("invalid cleanup state")
+
+    if not source_ref_exists:
+        if cleanup_state == "none":
+            return "automatic_cleanup_complete"
+        if cleanup_state == "safe_to_delete":
+            return "record_deleted_after_absence_readback"
+        return "deleted_verified_absent"
+
+    if not current_head.strip():
+        raise CloseContractError("existing source ref requires exact current head")
+    if cleanup_state == "deleted":
+        raise CloseContractError("deleted cleanup state contradicts surviving source ref")
+    if cleanup_state == "none":
+        return "mark_safe_to_delete"
+    if not verified_head.strip() or current_head != verified_head:
+        raise CloseContractError("safe_to_delete head is stale; deletion is forbidden")
+    return "delete_exact_ref"
+
+def verify_terminal_unmerged_closure(
+    *,
+    closure_package_present: bool,
+    history_artifacts_complete: bool,
+    implementation_content_in_target: bool,
+) -> str:
+    """Preserve terminal-unmerged history without accepting rejected implementation."""
+
+    if not closure_package_present or not history_artifacts_complete:
+        raise CloseContractError("terminal-unmerged recovery package is incomplete")
+    if implementation_content_in_target:
+        raise CloseContractError("terminal-unmerged closure must not import rejected implementation")
+    return "unmerged_history_preserved"

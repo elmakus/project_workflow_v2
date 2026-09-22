@@ -1,6 +1,6 @@
 # Project Workflow V2 — Close and integration
 
-Status: M04-T02 integration-refresh, external-effect and tracker-close contract.
+Status: M04-T03 integration-refresh, external-effect, tracker-close and terminal-recovery contract.
 
 Close reconciles an accepted workstream against current target truth. Textual merge cleanliness, target ancestry, source-branch survival and runtime identity are never substitutes for semantic verification.
 
@@ -52,7 +52,18 @@ GitHub Issue state remains bookkeeping and never authorizes implementation or co
 - When accepted completion is durable but the Issue remains open, explicit close is allowed only when automatic closing is unavailable/disabled. If automatic close was expected, reconcile that discrepancy first.
 - Deployment/live-write status alone does not introduce a user gate; only an explicit accepted authorization boundary does.
 
+## Target-side terminal recovery and cleanup
+
+Before final merge, the exact merge subject must already contain every unique recovery artifact that can be known before merge: workstream identity/provenance, selected board, stable Card contracts, required review/result/evidence and checkpoint/handoff refs. Merge-result-dependent fields may be reconciled afterward only when target-side state plus immutable PR/merge evidence identify the exact merged source head.
+
+After merge, closure correctness depends on the target-side package and immutable merge evidence, not on source-branch survival. Automatic deletion of the merged head is normal success and must not trigger source-ref recreation. Original source branch, creation base and parent/dependency provenance remain unchanged historical identity.
+
+If a source ref survives and later cleanup is needed, use the minimal `safe_to_delete` fallback only after terminal recovery is independent of that ref. Persist the exact verified head, reread the current ref immediately before deletion, forbid deletion when the head moved, and read back ref absence before recording `deleted`. If GitHub already removed the merged head, do not activate fallback state merely to mirror that deletion.
+
+A terminal unmerged/superseded workstream must preserve its recovery/history package independently of the source ref before cleanup, but rejected implementation content must not be imported into the integration target merely to preserve metadata.
+
+Production deterministic helpers in `tools/close_contract.py` verify target-package completeness and exact merge identity, safe-delete head freshness/absence readback, and terminal-unmerged history separation.
+
 ## Deferred M04 slices
 
-M04-T03 adds target-side terminal recovery and cleanup.
 M04-T04 adds trigger-only fork lineage and true end-of-scope behavior.

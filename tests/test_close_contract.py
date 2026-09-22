@@ -6,11 +6,14 @@ from tools.close_contract import (
     CloseContractError,
     RefreshSnapshot,
     classify_review_coverage,
+    cleanup_branch_action,
     external_effect_recovery_action,
     reconcile_issue_readback,
     stacked_integration_path,
     tracker_pr_linkage,
     verify_pre_mutation_target,
+    verify_target_side_recovery,
+    verify_terminal_unmerged_closure,
 )
 
 
@@ -219,6 +222,101 @@ class CloseRefreshTests(unittest.TestCase):
             ),
             "reconcile_missing_automatic_close",
         )
+
+
+    def test_target_side_recovery_does_not_require_live_source_ref(self) -> None:
+        self.assertEqual(
+            verify_target_side_recovery(
+                source_branch="feat/example",
+                source_head="source-head",
+                merged_source_head="source-head",
+                target_package_subject_head="source-head",
+                immutable_merge_evidence=True,
+                required_artifacts=frozenset({"manifest", "board", "evidence"}),
+                present_artifacts=frozenset({"manifest", "board", "evidence", "card"}),
+            ),
+            "source_ref_independent_recovery",
+        )
+
+    def test_target_side_recovery_fails_when_unique_artifact_is_missing(self) -> None:
+        with self.assertRaisesRegex(CloseContractError, "missing unique recovery artifacts"):
+            verify_target_side_recovery(
+                source_branch="feat/example",
+                source_head="source-head",
+                merged_source_head="source-head",
+                target_package_subject_head="source-head",
+                immutable_merge_evidence=True,
+                required_artifacts=frozenset({"manifest", "board", "evidence"}),
+                present_artifacts=frozenset({"manifest", "board"}),
+            )
+
+    def test_cleanup_treats_auto_deleted_source_as_normal_success(self) -> None:
+        self.assertEqual(
+            cleanup_branch_action(
+                terminal_package_independent=True,
+                source_ref_exists=False,
+                current_head="",
+                cleanup_state="none",
+                verified_head="",
+            ),
+            "automatic_cleanup_complete",
+        )
+
+    def test_safe_to_delete_revalidates_exact_head_before_delete(self) -> None:
+        self.assertEqual(
+            cleanup_branch_action(
+                terminal_package_independent=True,
+                source_ref_exists=True,
+                current_head="same-head",
+                cleanup_state="safe_to_delete",
+                verified_head="same-head",
+            ),
+            "delete_exact_ref",
+        )
+        with self.assertRaisesRegex(CloseContractError, "head is stale"):
+            cleanup_branch_action(
+                terminal_package_independent=True,
+                source_ref_exists=True,
+                current_head="moved-head",
+                cleanup_state="safe_to_delete",
+                verified_head="old-head",
+            )
+
+    def test_absence_readback_is_required_before_deleted_state(self) -> None:
+        self.assertEqual(
+            cleanup_branch_action(
+                terminal_package_independent=True,
+                source_ref_exists=False,
+                current_head="",
+                cleanup_state="safe_to_delete",
+                verified_head="old-head",
+            ),
+            "record_deleted_after_absence_readback",
+        )
+        with self.assertRaisesRegex(CloseContractError, "contradicts surviving source ref"):
+            cleanup_branch_action(
+                terminal_package_independent=True,
+                source_ref_exists=True,
+                current_head="old-head",
+                cleanup_state="deleted",
+                verified_head="old-head",
+            )
+
+    def test_terminal_unmerged_closure_preserves_history_without_code(self) -> None:
+        self.assertEqual(
+            verify_terminal_unmerged_closure(
+                closure_package_present=True,
+                history_artifacts_complete=True,
+                implementation_content_in_target=False,
+            ),
+            "unmerged_history_preserved",
+        )
+        with self.assertRaisesRegex(CloseContractError, "must not import rejected implementation"):
+            verify_terminal_unmerged_closure(
+                closure_package_present=True,
+                history_artifacts_complete=True,
+                implementation_content_in_target=True,
+            )
 
 
 if __name__ == "__main__":
