@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Runtime-neutral Project Workflow V2 obligation selector through M03-T01."""
+"""Runtime-neutral Project Workflow V2 obligation selector through M03-T02."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import json
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 
+from tools.execution_contract import ExecutionContractError, parse_card_result
 from tools.state_contract import (
     ValidationError,
     read_project,
@@ -464,11 +465,19 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
         card = active[0]
         try:
             reads.project(card["contract"]["path"]).read_text(encoding="utf-8")
-        except (OSError, ValidationError, KeyError) as exc:
-            return recovery(reads, f"current Card contract invalid: {exc}")
+            if "result" in card:
+                result_text = reads.project(card["result"]["path"]).read_text(encoding="utf-8")
+                parse_card_result(result_text, card["id"], workstream["workstream_id"])
+                return result(
+                    reads, "route", "result_reconciliation",
+                    "A valid semantic result is already durable for the active Card; do not replay implementation",
+                    subject=card["id"], owner_module="workflow/EXECUTION.md",
+                )
+        except (OSError, ValidationError, ExecutionContractError, KeyError) as exc:
+            return recovery(reads, f"current Card execution state invalid: {exc}")
         return result(
-            reads, "unavailable", "execution",
-            "Current Card is identified, but Execution lifecycle semantics are not implemented until M03",
+            reads, "route", "execution",
+            "Current Card owns runtime-neutral implementation; delegated/direct realization stays outside canonical state",
             subject=card["id"], owner_module="workflow/EXECUTION.md",
         )
 
