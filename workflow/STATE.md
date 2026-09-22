@@ -47,6 +47,14 @@ READY means the stable Card has current accepted authority, complete testable sc
 
 Predecessor-dependent downstream work remains a Task Board JIT trigger until its stable Card contract becomes knowable. Simple Cards do not load a second technical contract.
 
+## Execution / semantic result
+
+Exactly one Card remains the canonical execution unit. Runtime-internal zero/one/many worker topology is non-canonical and never creates extra Cards or shared-state writers.
+
+Only Main/coordinator reconciles an accepted implementation into the Card's exact workstream-local `result` locator. The result stores semantic implementation subject, evidence and verified tests/readback, never runtime/provider/model/session/worker/invocation identity. A durable valid result is recovery truth and prevents replay solely because a runtime context disappeared.
+
+An incomplete/incorrect return with a still-valid Card remains `in_progress` for correction. Only a real unresolved blocker moves the Card to `blocked`.
+
 ## Mutation guard / one-Card invariant
 
 Mutable Task Board revision rejects stale expected writes. At most one Project Workflow Card may be in_progress. Runtime-internal topology remains outside canonical state.
