@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Runtime-neutral Project Workflow V2 obligation selector through M03-T03."""
+"""Runtime-neutral Project Workflow V2 obligation selector through M03-T04."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 
 from tools.execution_contract import ExecutionContractError, parse_card_result
+from tools.recovery_contract import RecoveryContractError, classify_resolution, exact_result_subject, review_subject
 from tools.state_contract import (
     ValidationError,
     read_project,
@@ -23,6 +24,7 @@ from tools.state_contract import (
     validate_project,
     validate_research,
     validate_review_history,
+    validate_blocker,
     validate_tracker,
     validate_workstream,
 )
@@ -456,6 +458,42 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
 
         board = read_toml(reads.project(workstream["task_board"]["path"]))
         validate_board(board, workstream)
+
+        if board.get("research_obligation") is not None:
+            research_ref = board["research_obligation"]
+            board_research = read_toml(reads.project(research_ref["path"]))
+            validate_research(board_research, workstream["workstream_id"])
+            if board_research["origin_role"] not in {"execution_prep", "execution", "execution_resolution"}:
+                raise ValidationError("Task Board Research pointer must own implementation/recovery Research")
+            if board_research["state"] == "active":
+                return result(
+                    reads, "route", "research",
+                    "Implementation/recovery Research owns the next factual obligation",
+                    subject=board_research["origin_subject"], owner_module="workflow/RESEARCH.md",
+                )
+            if board_research["state"] == "complete":
+                return_target = board_research["return_target"]
+                if return_target.startswith("execution_resolution:"):
+                    obligation = "execution_resolution"
+                elif return_target.startswith("execution_prep:"):
+                    obligation = "execution_prep"
+                elif return_target.startswith("execution:"):
+                    obligation = "execution"
+                else:
+                    raise ValidationError("Task Board Research has non-execution return target")
+                return result(
+                    reads, "route", obligation,
+                    "Completed implementation Research returns once to its exact durable owner before pointer cleanup",
+                    subject=return_target.split(":", 1)[1],
+                    owner_module="workflow/RECOVERY.md" if obligation == "execution_resolution" else (
+                        "workflow/EXECUTION_PREP.md" if obligation == "execution_prep" else "workflow/EXECUTION.md"
+                    ),
+                )
+            return result(
+                reads, "route", "research_cleanup",
+                "Task Board still points to consumed Research; clear only the stale pointer without replay",
+                subject=board_research["origin_subject"], owner_module="workflow/RECOVERY.md",
+            )
     except (OSError, ValidationError, KeyError) as exc:
         return recovery(reads, f"selected workstream identity invalid: {exc}")
 
@@ -498,7 +536,17 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     expected_card_id=card["id"],
                     workstream_id=workstream["workstream_id"],
                 )
+                current_subject = exact_result_subject(project["repository"], card["result"])
                 verdict = attempts[-1]["verdict"]
+                covered_subject = review_subject(attempts[-1])
+                if covered_subject != current_subject:
+                    if verdict in {"pending", "in_progress"}:
+                        raise ValidationError("active review attempt is stale for the current durable result")
+                    return result(
+                        reads, "route", "review_freeze",
+                        "Current durable result changed after terminal review history; preserve history and freeze a new exact attempt",
+                        subject=card["id"], owner_module="workflow/REVIEW.md",
+                    )
                 if verdict in {"pending", "in_progress"}:
                     return result(
                         reads, "route", "review",
@@ -512,9 +560,9 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                         subject=card["id"], owner_module="workflow/EXECUTION.md",
                     )
                 return result(
-                    reads, "route", "review_correction",
-                    "RED review evidence remains durable and returns to corrective classification",
-                    subject=card["id"], owner_module="workflow/REVIEW.md",
+                    reads, "route", "execution_resolution",
+                    "RED review evidence remains durable; execution resolution classifies bounded correction, Planning, Definition, Research or a real stop",
+                    subject=card["id"], owner_module="workflow/RECOVERY.md",
                 )
         except (OSError, ValidationError, ExecutionContractError, KeyError) as exc:
             return recovery(reads, f"current Card execution state invalid: {exc}")
@@ -522,6 +570,28 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             reads, "route", "execution",
             "Current Card owns runtime-neutral implementation; delegated/direct realization stays outside canonical state",
             subject=card["id"], owner_module="workflow/EXECUTION.md",
+        )
+
+    blocked = [card for card in board["cards"] if card["status"] == "blocked"]
+    if blocked:
+        card = blocked[0]
+        try:
+            blocker_ref = card["blocker"]
+            blocker = read_toml(reads.project(blocker_ref["path"]))
+            validate_blocker(blocker, workstream["workstream_id"], card["id"])
+            route, is_stop = classify_resolution(blocker["class"])
+        except (OSError, ValidationError, RecoveryContractError, KeyError) as exc:
+            return recovery(reads, f"blocked Card recovery invalid: {exc}")
+        if route == "research":
+            return result(
+                reads, "route", "research_handoff",
+                "Blocked Card is missing factual evidence; materialize exact Task-Board-owned Research before continuing",
+                subject=card["id"], owner_module="workflow/RECOVERY.md",
+            )
+        return result(
+            reads, "stop" if is_stop else "route", route,
+            "Blocked Card classification reached an exact durable owner",
+            subject=card["id"], owner_module="workflow/RECOVERY.md",
         )
 
     if len(ready) == 1:
@@ -542,10 +612,6 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             "Multiple READY Cards remain semantically ready; Execution Prep must choose the next deterministic Card from accepted plan/dependency authority",
             owner_module="workflow/EXECUTION_PREP.md",
         )
-
-    if any(card["status"] == "blocked" for card in board["cards"]):
-        return result(reads, "unavailable", "blocked_resolution",
-                      "Blocked-Card resolution belongs to later Research/Execution/Recovery semantics")
 
     if board["cards"] and all(card["status"] == "done" for card in board["cards"]):
         return result(reads, "unavailable", "milestone_finalization",
