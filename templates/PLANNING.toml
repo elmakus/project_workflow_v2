@@ -1,0 +1,23 @@
+# TEMPLATE ONLY — one Strategic Planning premium cycle.
+workstream_id = "example-workstream"
+cycle = 1
+entry_subject = "definition:R1|planning-cycle:1"
+revision = "P1"
+state = "draft"
+planner_audit = "pending"
+plan_path = "planning/MASTER_PLAN.md"
+review_mode = "independent" # independent | editorial_exempt
+review_exemption_basis = ""
+review_exemption_base_subject = ""
+premium_a = "satisfied"
+premium_a_subject = "definition:R1|planning-cycle:1"
+premium_b = "not_due"
+premium_b_subject = ""
+premium_c = "not_due"
+premium_c_subject = ""
+
+[subject]
+repository = ""
+commit = ""
+path = ""
+blob = ""

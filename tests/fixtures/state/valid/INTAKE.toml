@@ -1,0 +1,12 @@
+workstream_id = "sample-workstream"
+kind = "issue"
+state = "complete"
+diagnosis_revision = 2
+repair_subject = "repair:sample:v2"
+diagnosis_prior_art_subject = "repair:sample:v2"
+diagnosis_prior_art_result = "evidence/intake-prior-art.md"
+response_kind = "authorization"
+response_observed = true
+alignment_state = "authorized"
+alignment_subject = "repair:sample:v2"
+micro_fix_candidate = true

@@ -1,0 +1,31 @@
+# TEMPLATE ONLY — one exact Research obligation.
+workstream_id = "example-workstream"
+state = "active"
+origin_role = "brainstorming"
+origin_subject = "scope-example@1"
+return_target = "brainstorming"
+return_reconciliation = "pending"
+return_result = ""
+finding = ""
+limitations = ""
+conflicts = "" # required non-empty summary when state is complete/consumed, including explicit "none"
+
+[[sources]]
+class = "official_upstream"
+status = "pending"
+weight = "primary"
+
+[[sources]]
+class = "project_runtime"
+status = "pending"
+weight = "direct"
+
+[[sources]]
+class = "tracker_discussion"
+status = "pending"
+weight = "supporting"
+
+[[sources]]
+class = "practitioner_community"
+status = "pending"
+weight = "supporting"

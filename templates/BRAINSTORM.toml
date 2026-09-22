@@ -1,0 +1,9 @@
+# TEMPLATE ONLY — one exact exploratory revision.
+workstream_id = "example-workstream"
+scope_id = "scope-example"
+revision = 1
+state = "active"
+challenge_audit = "pending"
+explicit_user_stop = false
+promotion_state = "pending"
+promotion_subject = ""

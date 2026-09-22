@@ -1,0 +1,13 @@
+# TEMPLATE ONLY — exact workstream-local Intake/alignment record.
+workstream_id = "example-workstream"
+kind = "issue"
+state = "active"
+diagnosis_revision = 1
+repair_subject = "repair:example:v1"
+diagnosis_prior_art_subject = ""
+diagnosis_prior_art_result = ""
+response_kind = "none"
+response_observed = false
+alignment_state = "pending"
+alignment_subject = ""
+micro_fix_candidate = false

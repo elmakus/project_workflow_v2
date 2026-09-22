@@ -11,6 +11,30 @@ from typing import Any
 
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 CARD_STATUSES = {"planned", "ready", "in_progress", "blocked", "done"}
+INTAKE_KINDS = {"issue", "feature", "change"}
+INTAKE_STATES = {"active", "complete"}
+RESPONSE_KINDS = {"none", "question", "concern", "alternative", "authorization"}
+ALIGNMENT_STATES = {"not_required", "pending", "authorized"}
+BRAINSTORM_STATES = {"active", "ready_for_definition", "promoted"}
+AUDIT_STATES = {"pending", "green"}
+PROMOTION_STATES = {"pending", "authorized"}
+RESEARCH_STATES = {"active", "complete", "consumed"}
+RESEARCH_RETURN_TARGETS = {"intake", "brainstorming", "definition"}
+RESEARCH_SOURCE_CLASSES = {
+    "official_upstream",
+    "project_runtime",
+    "tracker_discussion",
+    "practitioner_community",
+}
+RESEARCH_SOURCE_STATUSES = {"pending", "checked", "not_relevant", "unavailable"}
+RETURN_RECONCILIATION_STATES = {"pending", "applied"}
+DEFINITION_STATES = {"active", "green"}
+PREMIUM_A_STATES = {"not_due", "due", "satisfied"}
+PLANNING_STATES = {"draft", "frozen", "approved"}
+PLANNING_REVIEW_MODES = {"independent", "editorial_exempt"}
+PREMIUM_GATE_STATES = {"not_due", "due", "satisfied"}
+TRACKER_STATES = {"discovery", "create_pending_readback", "linked", "ambiguous", "unavailable"}
+TRACKER_READBACK_STATES = {"pending", "verified", "uncertain", "not_applicable"}
 PROHIBITED_KEY_PREFIXES = ("runtime_", "model_", "session_", "worker_", "batch_", "lane_", "scheduler_", "context_health_")
 PROHIBITED_KEYS = {
     "execution_policy",
@@ -96,6 +120,19 @@ def validate_locator(
         _require(workstream_id is not None, f"{label}: workstream binding required")
         prefix = f"implementation/workstreams/{workstream_id}/cards/"
         _require(path.startswith(prefix) and path.endswith(".md"), f"{label}: wrong Task Card class/path")
+    elif expected_class in {"intake", "brainstorm", "research", "definition", "planning", "plan_review", "tracker"}:
+        _require(workstream_id is not None, f"{label}: workstream binding required")
+        filenames = {
+            "intake": "INTAKE.toml",
+            "brainstorm": "BRAINSTORM.toml",
+            "research": "RESEARCH.toml",
+            "definition": "DEFINITION.toml",
+            "planning": "PLANNING.toml",
+            "plan_review": "PLAN_REVIEW.toml",
+            "tracker": "TRACKER.toml",
+        }
+        expected = f"implementation/workstreams/{workstream_id}/{filenames[expected_class]}"
+        _require(path == expected, f"{label}: expected exact path {expected!r}")
     elif expected_class in {"evidence", "result"}:
         _require(workstream_id is not None, f"{label}: workstream binding required")
         directory = "evidence" if expected_class == "evidence" else "results"
@@ -127,7 +164,398 @@ def validate_workstream(data: dict[str, Any]) -> None:
     _require(isinstance(authority, list) and authority, "workstream: at least one exact authority locator is required")
     for index, ref in enumerate(authority):
         validate_locator(ref, "authority", f"workstream.authority[{index}]")
-    validate_locator(data.get("task_board"), "task_board", "workstream.task_board", data["workstream_id"])
+    locator_classes = {
+        "task_board": "task_board",
+        "intake": "intake",
+        "brainstorm": "brainstorm",
+        "research": "research",
+        "definition": "definition",
+        "planning": "planning",
+        "plan_review": "plan_review",
+        "tracker": "tracker",
+    }
+    present = [key for key in locator_classes if key in data]
+    _require(present,
+             "workstream: at least one concrete workstream-local state locator is required")
+    for key in present:
+        validate_locator(data[key], locator_classes[key], f"workstream.{key}", data["workstream_id"])
+
+
+def validate_intake(data: dict[str, Any], workstream_id: str) -> None:
+    reject_prohibited_keys(data, "intake")
+    _require(data.get("workstream_id") == workstream_id, "intake: wrong workstream_id")
+    kind = data.get("kind")
+    _require(kind in INTAKE_KINDS, f"intake: invalid kind {kind!r}")
+    state = data.get("state")
+    _require(state in INTAKE_STATES, f"intake: invalid state {state!r}")
+    _require(isinstance(data.get("diagnosis_revision"), int) and data["diagnosis_revision"] >= 0,
+             "intake: diagnosis_revision must be non-negative integer")
+    repair_subject = data.get("repair_subject")
+    _require(isinstance(repair_subject, str), "intake: repair_subject must be a string")
+    diagnosis_prior_art_subject = data.get("diagnosis_prior_art_subject")
+    diagnosis_prior_art_result = data.get("diagnosis_prior_art_result")
+    _require(isinstance(diagnosis_prior_art_subject, str),
+             "intake: diagnosis_prior_art_subject must be a string")
+    _require(isinstance(diagnosis_prior_art_result, str),
+             "intake: diagnosis_prior_art_result must be a string")
+    response_kind = data.get("response_kind")
+    _require(response_kind in RESPONSE_KINDS, f"intake: invalid response_kind {response_kind!r}")
+    response_observed = data.get("response_observed")
+    _require(isinstance(response_observed, bool), "intake: response_observed must be boolean")
+    _require(response_observed == (response_kind != "none"),
+             "intake: response_observed must match response_kind")
+    alignment_state = data.get("alignment_state")
+    _require(alignment_state in ALIGNMENT_STATES, f"intake: invalid alignment_state {alignment_state!r}")
+    alignment_subject = data.get("alignment_subject")
+    _require(isinstance(alignment_subject, str), "intake: alignment_subject must be a string")
+    micro_fix_candidate = data.get("micro_fix_candidate")
+    _require(isinstance(micro_fix_candidate, bool), "intake: micro_fix_candidate must be boolean")
+
+    if kind == "issue":
+        _require(alignment_state != "not_required", "intake: issue alignment cannot be not_required")
+        if diagnosis_prior_art_subject or diagnosis_prior_art_result:
+            _require(bool(diagnosis_prior_art_subject.strip()) and bool(diagnosis_prior_art_result.strip()),
+                     "intake: diagnosis prior-art binding requires exact subject and result")
+            _require(diagnosis_prior_art_subject == repair_subject,
+                     "intake: stale diagnosis prior-art subject for current repair_subject")
+        if alignment_state == "pending":
+            _require(alignment_subject == "", "intake: pending alignment must not retain an authorized subject")
+            _require(not micro_fix_candidate, "intake: micro-fix candidate requires exact issue authorization")
+            _require(state != "complete", "intake: issue cannot complete while alignment is pending")
+        else:
+            _require(response_observed and response_kind == "authorization",
+                     "intake: authorized issue requires an explicit authorization response")
+            _require(bool(repair_subject), "intake: authorized issue requires repair_subject")
+            _require(alignment_subject == repair_subject,
+                     "intake: authorized alignment subject is stale for current repair_subject")
+            _require(
+                diagnosis_prior_art_subject == repair_subject and bool(diagnosis_prior_art_result.strip()),
+                "intake: authorized issue requires exact durable diagnosis prior-art binding",
+            )
+    else:
+        _require(alignment_state == "not_required",
+                 "intake: feature/change discovery must not manufacture issue-repair alignment")
+        _require(alignment_subject == "", "intake: non-issue alignment_subject must be empty")
+        _require(diagnosis_prior_art_subject == "" and diagnosis_prior_art_result == "",
+                 "intake: non-issue must not retain diagnosis prior-art binding")
+        _require(not micro_fix_candidate, "intake: micro-fix candidate is issue-only")
+
+    if state == "complete" and kind == "issue":
+        _require(alignment_state == "authorized", "intake: completed issue requires exact authorization")
+
+
+def validate_brainstorm(data: dict[str, Any], workstream_id: str) -> None:
+    reject_prohibited_keys(data, "brainstorm")
+    _require(data.get("workstream_id") == workstream_id, "brainstorm: wrong workstream_id")
+    _require(isinstance(data.get("scope_id"), str) and data["scope_id"].strip(),
+             "brainstorm: missing scope_id")
+    _require(isinstance(data.get("revision"), int) and data["revision"] >= 1,
+             "brainstorm: revision must be positive integer")
+    state = data.get("state")
+    _require(state in BRAINSTORM_STATES, f"brainstorm: invalid state {state!r}")
+    challenge = data.get("challenge_audit")
+    _require(challenge in AUDIT_STATES, f"brainstorm: invalid challenge_audit {challenge!r}")
+    explicit_user_stop = data.get("explicit_user_stop")
+    _require(isinstance(explicit_user_stop, bool), "brainstorm: explicit_user_stop must be boolean")
+    promotion_state = data.get("promotion_state")
+    _require(promotion_state in PROMOTION_STATES, f"brainstorm: invalid promotion_state {promotion_state!r}")
+    promotion_subject = data.get("promotion_subject")
+    _require(isinstance(promotion_subject, str), "brainstorm: promotion_subject must be a string")
+    exact_subject = f"{data['scope_id']}@{data['revision']}"
+
+    if state in {"ready_for_definition", "promoted"}:
+        _require(challenge == "green", "brainstorm: Definition readiness requires GREEN challenge audit")
+    if promotion_state == "pending":
+        _require(promotion_subject == "", "brainstorm: pending promotion must not retain a subject")
+    else:
+        _require(challenge == "green", "brainstorm: promotion authorization requires GREEN challenge audit")
+        _require(promotion_subject == exact_subject,
+                 "brainstorm: promotion authorization is stale for current scope revision")
+    if state == "promoted":
+        _require(promotion_state == "authorized",
+                 "brainstorm: promoted state requires exact user authorization")
+
+
+def validate_research(data: dict[str, Any], workstream_id: str) -> None:
+    reject_prohibited_keys(data, "research")
+    _require(data.get("workstream_id") == workstream_id, "research: wrong workstream_id")
+    state = data.get("state")
+    _require(state in RESEARCH_STATES, f"research: invalid state {state!r}")
+    _require(data.get("origin_role") in {"intake", "brainstorming", "definition"},
+             "research: invalid origin_role")
+    _require(isinstance(data.get("origin_subject"), str) and data["origin_subject"].strip(),
+             "research: missing origin_subject")
+    return_target = data.get("return_target")
+    _require(return_target in RESEARCH_RETURN_TARGETS, f"research: invalid return_target {return_target!r}")
+    reconciliation = data.get("return_reconciliation")
+    _require(reconciliation in RETURN_RECONCILIATION_STATES,
+             f"research: invalid return_reconciliation {reconciliation!r}")
+    return_result = data.get("return_result")
+    _require(isinstance(return_result, str), "research: return_result must be a string")
+    finding = data.get("finding")
+    limitations = data.get("limitations")
+    conflicts = data.get("conflicts")
+    _require(isinstance(finding, str), "research: finding must be a string")
+    _require(isinstance(limitations, str), "research: limitations must be a string")
+    _require(isinstance(conflicts, str), "research: conflicts must be a string")
+
+    sources = data.get("sources")
+    _require(isinstance(sources, list), "research: sources must be an array")
+    seen: set[str] = set()
+    for index, source in enumerate(sources):
+        label = f"research.sources[{index}]"
+        _require(isinstance(source, dict), f"{label}: source must be table")
+        source_class = source.get("class")
+        _require(source_class in RESEARCH_SOURCE_CLASSES, f"{label}: invalid class {source_class!r}")
+        _require(source_class not in seen, f"{label}: duplicate source class {source_class!r}")
+        seen.add(source_class)
+        _require(source.get("status") in RESEARCH_SOURCE_STATUSES,
+                 f"{label}: invalid status {source.get('status')!r}")
+        _require(isinstance(source.get("weight"), str) and source["weight"].strip(),
+                 f"{label}: weight must be non-empty")
+    _require(seen == RESEARCH_SOURCE_CLASSES,
+             "research: all proportional prior-art source classes must be accounted for")
+
+    if state in {"complete", "consumed"}:
+        _require(bool(finding.strip()), "research: completed Research requires a finding")
+        _require(bool(conflicts.strip()), "research: completed Research requires explicit conflict accounting")
+        _require(all(source["status"] != "pending" for source in sources),
+                 "research: completed Research cannot leave a source class pending")
+    if reconciliation == "applied":
+        _require(bool(return_result.strip()), "research: applied return requires exact return_result")
+    else:
+        _require(return_result == "", "research: pending return reconciliation must not retain result")
+    if state == "active":
+        _require(reconciliation == "pending", "research: active Research cannot have applied return")
+    if state == "consumed":
+        _require(reconciliation == "applied", "research: consumed Research requires applied return")
+
+
+def validate_definition(data: dict[str, Any], workstream_id: str) -> None:
+    reject_prohibited_keys(data, "definition")
+    _require(data.get("workstream_id") == workstream_id, "definition: wrong workstream_id")
+    _require(isinstance(data.get("source_scope_subject"), str) and data["source_scope_subject"].strip(),
+             "definition: missing source_scope_subject")
+    _require(isinstance(data.get("revision"), str) and data["revision"].strip(),
+             "definition: missing revision")
+    state = data.get("state")
+    _require(state in DEFINITION_STATES, f"definition: invalid state {state!r}")
+    audit = data.get("completeness_audit")
+    _require(audit in AUDIT_STATES, f"definition: invalid completeness_audit {audit!r}")
+    premium_a = data.get("premium_a")
+    _require(premium_a in PREMIUM_A_STATES, f"definition: invalid premium_a {premium_a!r}")
+    validate_locator(data.get("requirements"), "authority", "definition.requirements")
+    decisions = data.get("decisions")
+    _require(isinstance(decisions, list), "definition: decisions must be an array")
+    for index, decision in enumerate(decisions):
+        validate_locator(decision, "authority", f"definition.decisions[{index}]")
+
+    if state == "active":
+        _require(premium_a == "not_due", "definition: premium A cannot be due before Definition GREEN")
+    else:
+        _require(audit == "green", "definition: GREEN state requires GREEN completeness audit")
+        _require(decisions, "definition: GREEN state requires accepted decision authority")
+        _require(premium_a in {"due", "satisfied"},
+                 "definition: GREEN state requires premium stop A due or satisfied")
+
+
+def _git_blob_subject_key(subject: Any, label: str) -> str:
+    _require(isinstance(subject, dict), f"{label}: subject must be a table")
+    repository = subject.get("repository")
+    path = subject.get("path")
+    commit = subject.get("commit")
+    blob = subject.get("blob")
+    _require(isinstance(repository, str) and repository.strip(), f"{label}: missing repository")
+    _require(isinstance(path, str) and path.strip(), f"{label}: missing path")
+    _safe_relative_path(path, label)
+    _require(isinstance(commit, str) and SHA40.fullmatch(commit) is not None,
+             f"{label}: commit must be exact 40-hex")
+    _require(isinstance(blob, str) and SHA40.fullmatch(blob) is not None,
+             f"{label}: blob must be exact 40-hex")
+    return f"{repository}@{commit}:{path}@{blob}"
+
+
+def validate_planning(data: dict[str, Any], workstream_id: str) -> None:
+    reject_prohibited_keys(data, "planning")
+    _require(data.get("workstream_id") == workstream_id, "planning: wrong workstream_id")
+    cycle = data.get("cycle")
+    _require(isinstance(cycle, int) and cycle >= 1, "planning: cycle must be positive integer")
+    entry_subject = data.get("entry_subject")
+    _require(isinstance(entry_subject, str) and entry_subject.strip(), "planning: missing entry_subject")
+    revision = data.get("revision")
+    _require(isinstance(revision, str) and revision.strip(), "planning: missing revision")
+    state = data.get("state")
+    _require(state in PLANNING_STATES, f"planning: invalid state {state!r}")
+    audit = data.get("planner_audit")
+    _require(audit in AUDIT_STATES, f"planning: invalid planner_audit {audit!r}")
+    plan_path = _safe_relative_path(data.get("plan_path"), "planning.plan_path")
+    _require(plan_path.startswith("planning/") and plan_path.endswith(".md"),
+             "planning: plan_path must be a planning Markdown artifact")
+
+    review_mode = data.get("review_mode")
+    _require(review_mode in PLANNING_REVIEW_MODES, f"planning: invalid review_mode {review_mode!r}")
+    exemption_basis = data.get("review_exemption_basis")
+    exemption_base_subject = data.get("review_exemption_base_subject")
+    _require(isinstance(exemption_basis, str), "planning: review_exemption_basis must be a string")
+    _require(isinstance(exemption_base_subject, str),
+             "planning: review_exemption_base_subject must be a string")
+    if review_mode == "independent":
+        _require(exemption_basis == "" and exemption_base_subject == "",
+                 "planning: independent review mode must not claim an editorial exemption")
+    else:
+        _require(bool(exemption_basis.strip()),
+                 "planning: editorial exemption requires a bounded semantic basis")
+        _require(bool(exemption_base_subject.strip()),
+                 "planning: editorial exemption requires the prior reviewed subject")
+
+    premium_a = data.get("premium_a")
+    premium_b = data.get("premium_b")
+    premium_c = data.get("premium_c")
+    for name, value in (("premium_a", premium_a), ("premium_b", premium_b), ("premium_c", premium_c)):
+        _require(value in PREMIUM_GATE_STATES, f"planning: invalid {name} {value!r}")
+    premium_a_subject = data.get("premium_a_subject")
+    premium_b_subject = data.get("premium_b_subject")
+    premium_c_subject = data.get("premium_c_subject")
+    for name, value in (
+        ("premium_a_subject", premium_a_subject),
+        ("premium_b_subject", premium_b_subject),
+        ("premium_c_subject", premium_c_subject),
+    ):
+        _require(isinstance(value, str), f"planning: {name} must be a string")
+
+    _require(premium_a in {"due", "satisfied"} and premium_a_subject == entry_subject,
+             "planning: current cycle requires exact premium A gate subject")
+
+    subject = data.get("subject")
+    if state == "draft":
+        _require(review_mode == "independent",
+                 "planning: editorial exemption applies only to a previously approved cycle")
+        _require(isinstance(subject, dict), "planning: draft subject table is required")
+        _require(all(subject.get(key, "") == "" for key in ("repository", "commit", "path", "blob")),
+                 "planning: draft must not claim a frozen immutable subject")
+        _require(premium_b == "not_due" and premium_b_subject == "",
+                 "planning: premium B is not due before freeze")
+        _require(premium_c == "not_due" and premium_c_subject == "",
+                 "planning: premium C is not due before approval")
+        return
+
+    _require(premium_a == "satisfied",
+             "planning: frozen/approved plan requires premium A satisfied for the current cycle")
+    subject_key = _git_blob_subject_key(subject, "planning.subject")
+    _require(subject["path"] == plan_path, "planning: frozen subject path must equal plan_path")
+    _require(audit == "green", "planning: frozen/approved plan requires GREEN planner audit")
+
+    if review_mode == "editorial_exempt":
+        _require(state == "approved",
+                 "planning: editorial exemption is only valid on an already approved planning cycle")
+        _require(subject_key != exemption_base_subject,
+                 "planning: editorial exemption requires a changed plan subject")
+        _require(premium_b == "satisfied" and premium_b_subject == exemption_base_subject,
+                 "planning: editorial exemption must preserve prior reviewed premium B subject")
+        _require(premium_c == "satisfied" and premium_c_subject == exemption_base_subject,
+                 "planning: editorial exemption must preserve prior satisfied premium C subject")
+        return
+
+    _require(premium_b in {"due", "satisfied"} and premium_b_subject == subject_key,
+             "planning: frozen subject requires exact premium B gate subject")
+    if state == "frozen":
+        _require(premium_c == "not_due" and premium_c_subject == "",
+                 "planning: premium C cannot be due before GREEN Plan Review consumption")
+    else:
+        _require(premium_b == "satisfied",
+                 "planning: approved plan requires premium B satisfied")
+        _require(premium_c in {"due", "satisfied"} and premium_c_subject == subject_key,
+                 "planning: approved plan requires exact premium C gate subject")
+
+
+def validate_plan_review(data: dict[str, Any], workstream_id: str, planning: dict[str, Any]) -> None:
+    validate_review(data)
+    _require(data.get("workstream_id") == workstream_id, "plan_review: wrong workstream_id")
+    _require(data.get("plan_revision") == planning.get("revision"),
+             "plan_review: wrong plan_revision")
+    _require(data.get("planning_cycle") == planning.get("cycle"),
+             "plan_review: wrong planning_cycle")
+    _require(planning.get("state") in {"frozen", "approved"},
+             "plan_review: planning subject must be frozen")
+    review_key = _git_blob_subject_key(data.get("subject"), "plan_review.subject")
+    planning_key = _git_blob_subject_key(planning.get("subject"), "planning.subject")
+    if planning.get("review_mode") == "editorial_exempt":
+        _require(data.get("verdict") == "green",
+                 "plan_review: editorial exemption requires prior GREEN review coverage")
+        _require(review_key == planning.get("review_exemption_base_subject"),
+                 "plan_review: editorial exemption base does not match prior reviewed subject")
+    else:
+        _require(review_key == planning_key, "plan_review: subject does not match frozen plan")
+    evidence_path = data.get("evidence_path")
+    _require(isinstance(evidence_path, str), "plan_review: evidence_path must be a string")
+    if data.get("verdict") in {"green", "red"}:
+        _require(bool(evidence_path.strip()), "plan_review: terminal verdict requires evidence_path")
+        _safe_relative_path(evidence_path, "plan_review.evidence_path")
+    else:
+        _require(evidence_path == "", "plan_review: pending attempt must not claim evidence")
+
+
+def validate_tracker(data: dict[str, Any], workstream_id: str) -> None:
+    reject_prohibited_keys(data, "tracker")
+    _require(data.get("workstream_id") == workstream_id, "tracker: wrong workstream_id")
+    _require(data.get("provider") == "github", "tracker: provider must be github")
+    repository = data.get("repository")
+    _require(
+        isinstance(repository, str)
+        and repository.count("/") == 1
+        and all(part.strip() for part in repository.split("/", 1)),
+        "tracker: repository must be exact owner/name",
+    )
+    dedup_key = data.get("dedup_key")
+    _require(isinstance(dedup_key, str) and dedup_key.strip(), "tracker: missing dedup_key")
+    state = data.get("state")
+    _require(state in TRACKER_STATES, f"tracker: invalid state {state!r}")
+    issue_number = data.get("issue_number")
+    _require(isinstance(issue_number, int) and issue_number >= 0,
+             "tracker: issue_number must be non-negative integer")
+    candidates = data.get("candidate_issue_numbers")
+    _require(isinstance(candidates, list), "tracker: candidate_issue_numbers must be an array")
+    _require(
+        all(isinstance(number, int) and number > 0 for number in candidates)
+        and len(set(candidates)) == len(candidates),
+        "tracker: candidate Issue numbers must be unique positive integers",
+    )
+    readback = data.get("readback_state")
+    _require(readback in TRACKER_READBACK_STATES, f"tracker: invalid readback_state {readback!r}")
+    final_pr = data.get("final_pr")
+    _require(isinstance(final_pr, int) and final_pr >= 0,
+             "tracker: final_pr must be non-negative integer")
+
+    forbidden_authority = {
+        "authorization",
+        "repair_authorized",
+        "implementation_authorized",
+        "requirements_approved",
+        "plan_approved",
+    }
+    _require(
+        not (forbidden_authority & set(data)),
+        "tracker: GitHub Issue bookkeeping must not carry workflow authorization/approval",
+    )
+
+    if state == "discovery":
+        _require(issue_number == 0 and not candidates and readback == "pending",
+                 "tracker: discovery must not claim an Issue or completed readback")
+    elif state == "create_pending_readback":
+        _require(issue_number == 0 and not candidates and readback in {"pending", "uncertain"},
+                 "tracker: pending create must require readback before retry")
+    elif state == "linked":
+        _require(issue_number > 0 and not candidates and readback == "verified",
+                 "tracker: linked Issue requires one positive Issue number and verified readback")
+    elif state == "ambiguous":
+        _require(issue_number == 0 and len(candidates) >= 2 and readback == "uncertain",
+                 "tracker: ambiguous recovery requires multiple candidates and uncertain readback")
+    else:
+        _require(issue_number == 0 and not candidates and readback == "not_applicable",
+                 "tracker: unavailable capability must not claim Issue state")
+
+    if final_pr > 0:
+        _require(state == "linked", "tracker: final PR correlation requires a linked Issue")
 
 
 def validate_board(

@@ -10,9 +10,16 @@ from tools.state_contract import (
     read_project,
     reject_prohibited_keys,
     validate_board,
+    validate_brainstorm,
     validate_bundle,
+    validate_definition,
+    validate_intake,
+    validate_plan_review,
+    validate_planning,
     validate_project,
+    validate_research,
     validate_review,
+    validate_tracker,
     validate_workstream,
 )
 
@@ -70,6 +77,405 @@ class StateEnvelopeTests(unittest.TestCase):
             validate_review(read_toml(INVALID / "review-runtime-identity.toml"))
         with self.assertRaisesRegex(ValidationError, "not semantically independent"):
             validate_review(read_toml(INVALID / "review-not-independent.toml"))
+
+
+    def test_issue_intake_alignment_is_exact_and_stale_subject_fails(self) -> None:
+        intake = read_toml(VALID / "INTAKE.toml")
+        validate_intake(intake, "sample-workstream")
+
+        stale = copy.deepcopy(intake)
+        stale["repair_subject"] = "repair:sample:v3"
+        with self.assertRaisesRegex(ValidationError, "stale"):
+            validate_intake(stale, "sample-workstream")
+
+        missing_prior_art = copy.deepcopy(intake)
+        missing_prior_art["diagnosis_prior_art_subject"] = ""
+        missing_prior_art["diagnosis_prior_art_result"] = ""
+        with self.assertRaisesRegex(ValidationError, "diagnosis prior-art"):
+            validate_intake(missing_prior_art, "sample-workstream")
+
+    def test_issue_question_is_response_but_not_authorization(self) -> None:
+        intake = read_toml(VALID / "INTAKE.toml")
+        intake.update({
+            "state": "active",
+            "response_kind": "question",
+            "response_observed": True,
+            "alignment_state": "pending",
+            "alignment_subject": "",
+            "micro_fix_candidate": False,
+        })
+        validate_intake(intake, "sample-workstream")
+
+        intake["micro_fix_candidate"] = True
+        with self.assertRaisesRegex(ValidationError, "micro-fix candidate"):
+            validate_intake(intake, "sample-workstream")
+
+    def test_feature_discovery_does_not_manufacture_issue_alignment(self) -> None:
+        intake = read_toml(VALID / "INTAKE.toml")
+        intake.update({
+            "kind": "feature",
+            "state": "active",
+            "repair_subject": "",
+            "diagnosis_prior_art_subject": "",
+            "diagnosis_prior_art_result": "",
+            "response_kind": "none",
+            "response_observed": False,
+            "alignment_state": "not_required",
+            "alignment_subject": "",
+            "micro_fix_candidate": False,
+        })
+        validate_intake(intake, "sample-workstream")
+        intake["alignment_state"] = "authorized"
+        with self.assertRaisesRegex(ValidationError, "must not manufacture"):
+            validate_intake(intake, "sample-workstream")
+
+
+    def test_pre_execution_workstream_may_have_intake_without_task_board(self) -> None:
+        workstream = copy.deepcopy(self.workstream)
+        workstream.pop("task_board")
+        workstream["intake"] = {
+            "class": "intake",
+            "path": "implementation/workstreams/sample-workstream/INTAKE.toml",
+        }
+        validate_workstream(workstream)
+        workstream.pop("intake")
+        with self.assertRaisesRegex(ValidationError, "workstream-local state locator"):
+            validate_workstream(workstream)
+
+    def test_intake_locator_is_workstream_bound(self) -> None:
+        workstream = copy.deepcopy(self.workstream)
+        workstream["intake"] = {
+            "class": "intake",
+            "path": "implementation/workstreams/sample-workstream/INTAKE.toml",
+        }
+        validate_workstream(workstream)
+        workstream["intake"]["path"] = "implementation/workstreams/other/INTAKE.toml"
+        with self.assertRaises(ValidationError):
+            validate_workstream(workstream)
+
+
+    def test_brainstorm_promotion_binds_exact_revision(self) -> None:
+        data = {
+            "workstream_id": "sample-workstream",
+            "scope_id": "scope-a",
+            "revision": 2,
+            "state": "ready_for_definition",
+            "challenge_audit": "green",
+            "explicit_user_stop": False,
+            "promotion_state": "pending",
+            "promotion_subject": "",
+        }
+        validate_brainstorm(data, "sample-workstream")
+
+        data["promotion_state"] = "authorized"
+        data["promotion_subject"] = "scope-a@2"
+        validate_brainstorm(data, "sample-workstream")
+
+        stale = copy.deepcopy(data)
+        stale["revision"] = 3
+        with self.assertRaisesRegex(ValidationError, "stale"):
+            validate_brainstorm(stale, "sample-workstream")
+
+    def test_research_requires_all_source_classes_and_once_only_return_state(self) -> None:
+        sources = [
+            {"class": "official_upstream", "status": "checked", "weight": "primary"},
+            {"class": "project_runtime", "status": "checked", "weight": "direct"},
+            {"class": "tracker_discussion", "status": "not_relevant", "weight": "supporting"},
+            {"class": "practitioner_community", "status": "unavailable", "weight": "supporting"},
+        ]
+        data = {
+            "workstream_id": "sample-workstream",
+            "state": "complete",
+            "origin_role": "brainstorming",
+            "origin_subject": "scope-a@2",
+            "return_target": "brainstorming",
+            "return_reconciliation": "pending",
+            "return_result": "",
+            "finding": "No conflicting prior art.",
+            "limitations": "Community source unavailable.",
+            "conflicts": "No material conflicts observed across checked source classes.",
+            "sources": sources,
+        }
+        validate_research(data, "sample-workstream")
+
+        no_conflicts = copy.deepcopy(data)
+        no_conflicts["conflicts"] = ""
+        with self.assertRaisesRegex(ValidationError, "conflict accounting"):
+            validate_research(no_conflicts, "sample-workstream")
+
+        missing = copy.deepcopy(data)
+        missing["sources"] = missing["sources"][:-1]
+        with self.assertRaisesRegex(ValidationError, "all proportional"):
+            validate_research(missing, "sample-workstream")
+
+        applied = copy.deepcopy(data)
+        applied["return_reconciliation"] = "applied"
+        with self.assertRaisesRegex(ValidationError, "return_result"):
+            validate_research(applied, "sample-workstream")
+
+        applied["return_result"] = "brainstorm:scope-a@2:reconciled"
+        validate_research(applied, "sample-workstream")
+        applied["state"] = "consumed"
+        validate_research(applied, "sample-workstream")
+
+    def test_definition_green_requires_authority_and_premium_a(self) -> None:
+        active = {
+            "workstream_id": "sample-workstream",
+            "source_scope_subject": "scope-a@2",
+            "revision": "R1",
+            "state": "active",
+            "completeness_audit": "pending",
+            "premium_a": "not_due",
+            "requirements": {"class": "authority", "path": "requirements/REQUIREMENTS.md"},
+            "decisions": [],
+        }
+        validate_definition(active, "sample-workstream")
+
+        green = copy.deepcopy(active)
+        green.update({
+            "state": "green",
+            "completeness_audit": "green",
+            "premium_a": "due",
+            "decisions": [{"class": "authority", "path": "decisions/ADR-001.md"}],
+        })
+        validate_definition(green, "sample-workstream")
+
+        bad = copy.deepcopy(green)
+        bad["premium_a"] = "not_due"
+        with self.assertRaisesRegex(ValidationError, "premium stop A"):
+            validate_definition(bad, "sample-workstream")
+
+    def test_exploration_locators_are_exact_and_workstream_bound(self) -> None:
+        workstream = copy.deepcopy(self.workstream)
+        for key, klass, filename in (
+            ("brainstorm", "brainstorm", "BRAINSTORM.toml"),
+            ("research", "research", "RESEARCH.toml"),
+            ("definition", "definition", "DEFINITION.toml"),
+        ):
+            candidate = copy.deepcopy(workstream)
+            candidate[key] = {
+                "class": klass,
+                "path": f"implementation/workstreams/sample-workstream/{filename}",
+            }
+            validate_workstream(candidate)
+            candidate[key]["path"] = f"implementation/workstreams/other/{filename}"
+            with self.subTest(key=key), self.assertRaises(ValidationError):
+                validate_workstream(candidate)
+
+
+    def planning_record(self, state: str = "draft") -> dict:
+        subject = {"repository": "", "commit": "", "path": "", "blob": ""}
+        data = {
+            "workstream_id": "sample-workstream",
+            "cycle": 1,
+            "entry_subject": "definition:R1|planning-cycle:1",
+            "revision": "P1",
+            "state": state,
+            "planner_audit": "pending",
+            "plan_path": "planning/MASTER_PLAN.md",
+            "review_mode": "independent",
+            "review_exemption_basis": "",
+            "review_exemption_base_subject": "",
+            "premium_a": "satisfied",
+            "premium_a_subject": "definition:R1|planning-cycle:1",
+            "premium_b": "not_due",
+            "premium_b_subject": "",
+            "premium_c": "not_due",
+            "premium_c_subject": "",
+            "subject": subject,
+        }
+        if state in {"frozen", "approved"}:
+            data["planner_audit"] = "green"
+            data["subject"] = {
+                "repository": "owner/repo",
+                "commit": "a" * 40,
+                "path": "planning/MASTER_PLAN.md",
+                "blob": "b" * 40,
+            }
+            key = f"owner/repo@{'a' * 40}:planning/MASTER_PLAN.md@{'b' * 40}"
+            data["premium_b"] = "due" if state == "frozen" else "satisfied"
+            data["premium_b_subject"] = key
+            if state == "approved":
+                data["premium_c"] = "due"
+                data["premium_c_subject"] = key
+        return data
+
+    def test_planning_cycle_rejects_stale_premium_a_and_orders_b_c(self) -> None:
+        draft = self.planning_record()
+        validate_planning(draft, "sample-workstream")
+
+        stale = copy.deepcopy(draft)
+        stale["cycle"] = 2
+        stale["entry_subject"] = "definition:R1|planning-cycle:2"
+        with self.assertRaisesRegex(ValidationError, "premium A"):
+            validate_planning(stale, "sample-workstream")
+
+        reentry = copy.deepcopy(draft)
+        reentry["cycle"] = 2
+        reentry["entry_subject"] = "definition:R1|planning-cycle:2"
+        reentry["revision"] = "P2"
+        reentry["premium_a"] = "due"
+        reentry["premium_a_subject"] = reentry["entry_subject"]
+        validate_planning(reentry, "sample-workstream")
+        reentry["premium_a"] = "satisfied"
+        validate_planning(reentry, "sample-workstream")
+
+        frozen = self.planning_record("frozen")
+        validate_planning(frozen, "sample-workstream")
+        bad_c = copy.deepcopy(frozen)
+        bad_c["premium_c"] = "due"
+        bad_c["premium_c_subject"] = frozen["premium_b_subject"]
+        with self.assertRaisesRegex(ValidationError, "premium C cannot"):
+            validate_planning(bad_c, "sample-workstream")
+
+        approved = self.planning_record("approved")
+        validate_planning(approved, "sample-workstream")
+
+    def test_plan_review_must_match_frozen_subject_and_terminal_evidence(self) -> None:
+        planning = self.planning_record("frozen")
+        planning["premium_b"] = "satisfied"
+        subject = {
+            "class": "git_blob",
+            "repository": "owner/repo",
+            "commit": "a" * 40,
+            "path": "planning/MASTER_PLAN.md",
+            "blob": "b" * 40,
+        }
+        review = {
+            "workstream_id": "sample-workstream",
+            "plan_revision": "P1",
+            "planning_cycle": 1,
+            "attempt": "R01",
+            "verdict": "pending",
+            "evidence_path": "",
+            "subject": subject,
+            "acceptance": {"class": "authority", "path": "requirements/REQUIREMENTS.md"},
+            "independence": {
+                "materially_produced_or_repaired_subject": False,
+                "basis": "Fresh semantic review context.",
+            },
+        }
+        validate_plan_review(review, "sample-workstream", planning)
+
+        mismatch = copy.deepcopy(review)
+        mismatch["subject"]["blob"] = "c" * 40
+        with self.assertRaisesRegex(ValidationError, "does not match"):
+            validate_plan_review(mismatch, "sample-workstream", planning)
+
+        green = copy.deepcopy(review)
+        green["verdict"] = "green"
+        with self.assertRaisesRegex(ValidationError, "evidence_path"):
+            validate_plan_review(green, "sample-workstream", planning)
+        green["evidence_path"] = "evidence/plan-review-R01.md"
+        validate_plan_review(green, "sample-workstream", planning)
+
+    def test_editorial_plan_exemption_preserves_prior_green_subject(self) -> None:
+        planning = self.planning_record("approved")
+        prior = planning["premium_b_subject"]
+        planning["subject"]["blob"] = "c" * 40
+        planning["review_mode"] = "editorial_exempt"
+        planning["review_exemption_basis"] = "Wording only; no strategy, milestones, coverage or gates changed."
+        planning["review_exemption_base_subject"] = prior
+        planning["premium_c"] = "satisfied"
+        planning["premium_b_subject"] = prior
+        planning["premium_c_subject"] = prior
+        validate_planning(planning, "sample-workstream")
+
+        review = {
+            "workstream_id": "sample-workstream",
+            "plan_revision": "P1",
+            "planning_cycle": 1,
+            "attempt": "R01",
+            "verdict": "green",
+            "evidence_path": "evidence/plan-review-R01.md",
+            "subject": {
+                "class": "git_blob",
+                "repository": "owner/repo",
+                "commit": "a" * 40,
+                "path": "planning/MASTER_PLAN.md",
+                "blob": "b" * 40,
+            },
+            "acceptance": {"class": "authority", "path": "requirements/REQUIREMENTS.md"},
+            "independence": {
+                "materially_produced_or_repaired_subject": False,
+                "basis": "Fresh semantic review context.",
+            },
+        }
+        validate_plan_review(review, "sample-workstream", planning)
+
+        bad = copy.deepcopy(planning)
+        bad["review_exemption_basis"] = ""
+        with self.assertRaisesRegex(ValidationError, "bounded semantic basis"):
+            validate_planning(bad, "sample-workstream")
+
+    def test_planning_and_plan_review_locators_are_exact(self) -> None:
+        workstream = copy.deepcopy(self.workstream)
+        for key, klass, filename in (
+            ("planning", "planning", "PLANNING.toml"),
+            ("plan_review", "plan_review", "PLAN_REVIEW.toml"),
+        ):
+            candidate = copy.deepcopy(workstream)
+            candidate[key] = {
+                "class": klass,
+                "path": f"implementation/workstreams/sample-workstream/{filename}",
+            }
+            validate_workstream(candidate)
+            candidate[key]["path"] = f"implementation/workstreams/other/{filename}"
+            with self.subTest(key=key), self.assertRaises(ValidationError):
+                validate_workstream(candidate)
+
+
+    def test_tracker_correlation_states_and_authority_boundary(self) -> None:
+        base = {
+            "workstream_id": "sample-workstream",
+            "provider": "github",
+            "repository": "owner/repo",
+            "dedup_key": "project-workflow:sample-workstream",
+            "state": "discovery",
+            "issue_number": 0,
+            "candidate_issue_numbers": [],
+            "readback_state": "pending",
+            "final_pr": 0,
+        }
+        validate_tracker(base, "sample-workstream")
+
+        pending = copy.deepcopy(base)
+        pending.update({"state": "create_pending_readback", "readback_state": "uncertain"})
+        validate_tracker(pending, "sample-workstream")
+
+        linked = copy.deepcopy(base)
+        linked.update({"state": "linked", "issue_number": 7, "readback_state": "verified"})
+        validate_tracker(linked, "sample-workstream")
+        linked["final_pr"] = 9
+        validate_tracker(linked, "sample-workstream")
+
+        ambiguous = copy.deepcopy(base)
+        ambiguous.update({
+            "state": "ambiguous",
+            "candidate_issue_numbers": [7, 8],
+            "readback_state": "uncertain",
+        })
+        validate_tracker(ambiguous, "sample-workstream")
+
+        unavailable = copy.deepcopy(base)
+        unavailable.update({"state": "unavailable", "readback_state": "not_applicable"})
+        validate_tracker(unavailable, "sample-workstream")
+
+        forbidden = copy.deepcopy(linked)
+        forbidden["repair_authorized"] = True
+        with self.assertRaisesRegex(ValidationError, "must not carry workflow authorization"):
+            validate_tracker(forbidden, "sample-workstream")
+
+    def test_tracker_locator_is_exact_and_workstream_bound(self) -> None:
+        workstream = copy.deepcopy(self.workstream)
+        workstream["tracker"] = {
+            "class": "tracker",
+            "path": "implementation/workstreams/sample-workstream/TRACKER.toml",
+        }
+        validate_workstream(workstream)
+        workstream["tracker"]["path"] = "implementation/workstreams/other/TRACKER.toml"
+        with self.assertRaises(ValidationError):
+            validate_workstream(workstream)
 
     def test_project_contract_is_common_v2_only(self) -> None:
         project = read_project(VALID / "PROJECT.md")
