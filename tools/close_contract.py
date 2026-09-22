@@ -219,3 +219,32 @@ def verify_terminal_unmerged_closure(
     if implementation_content_in_target:
         raise CloseContractError("terminal-unmerged closure must not import rejected implementation")
     return "unmerged_history_preserved"
+
+
+def close_continuation(
+    *,
+    approved_scope_durably_complete: bool,
+    next_authorized_obligation: bool,
+    explicit_authorization_gate_due: bool,
+    deployment_or_live_write: bool = False,
+) -> str:
+    """Choose continuation/stop semantics without treating role or live-write status as a gate."""
+
+    # Deliberately do not branch on deployment_or_live_write. Its presence alone
+    # is not human authority and therefore cannot manufacture a stop.
+    _ = deployment_or_live_write
+
+    if explicit_authorization_gate_due:
+        return "authorization_stop"
+
+    if approved_scope_durably_complete:
+        if next_authorized_obligation:
+            raise CloseContractError(
+                "approved scope cannot be terminal while an authorized in-scope obligation remains"
+            )
+        return "end_of_scope_stop"
+
+    if next_authorized_obligation:
+        return "continue_deterministically"
+
+    return "continue_close_reconciliation"

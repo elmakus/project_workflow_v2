@@ -1,6 +1,6 @@
 # Project Workflow V2 — Close and integration
 
-Status: M04-T03 integration-refresh, external-effect, tracker-close and terminal-recovery contract.
+Status: M04-T04 integration-refresh, external-effect, tracker-close, terminal-recovery, trigger-only fork-lineage and end-of-scope contract.
 
 Close reconciles an accepted workstream against current target truth. Textual merge cleanliness, target ancestry, source-branch survival and runtime identity are never substitutes for semantic verification.
 
@@ -64,6 +64,18 @@ A terminal unmerged/superseded workstream must preserve its recovery/history pac
 
 Production deterministic helpers in `tools/close_contract.py` verify target-package completeness and exact merge identity, safe-delete head freshness/absence readback, and terminal-unmerged history separation.
 
-## Deferred M04 slices
+## Trigger-only downstream fork publication
 
-M04-T04 adds trigger-only fork lineage and true end-of-scope behavior.
+Ordinary Close MUST NOT load fork-release lineage policy. Load `workflow/FORK_RELEASE_VERSIONING.md` only when the exact durable current operation explicitly declares a downstream fork release and supplies the accepted upstream repository/tag/SHA lineage tuple.
+
+That optional module selects/validates lineage only. It never authorizes upstream sync, tag creation, release publication, deployment or another live write. Release quality remains independent of lineage.
+
+## End of approved scope
+
+Finishing a Card, review, milestone or Close sub-step is not itself an end-of-scope stop.
+
+Close reports completion and stops only when durable project/workstream truth proves the approved scope is complete and no already-authorized obligation remains. If another legal obligation remains, continue deterministically. If completion is not yet durable, continue Close reconciliation rather than inventing follow-up work or claiming completion.
+
+Deployment/live-write status alone never creates a human gate. An exact accepted authorization boundary still does and must stop before the gated mutation.
+
+`tools/close_contract.py` owns the deterministic continuation oracle. True end of scope returns `end_of_scope_stop`; it is never inferred merely from an empty current Card queue.

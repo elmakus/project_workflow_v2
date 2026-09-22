@@ -1277,6 +1277,19 @@ class RouterTests(unittest.TestCase):
             finally:
                 temp.cleanup()
 
+    def test_all_terminal_cards_route_to_close_not_directly_to_stop(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "none")
+            board = project / BOARD
+            board.write_text(board.read_text().replace('status = "in_progress"', 'status = "done"', 1))
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "close"))
+            self.assertEqual(routed.owner_module, "workflow/CLOSE.md")
+            self.assertIn("decides whether approved scope is durably complete", routed.reason)
+        finally:
+            temp.cleanup()
+
     def test_priority_and_real_stop_foundations_are_runtime_neutral(self) -> None:
         self.assertEqual(
             PRIORITY_FOUNDATION,

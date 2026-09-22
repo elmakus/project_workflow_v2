@@ -7,6 +7,7 @@ from tools.close_contract import (
     RefreshSnapshot,
     classify_review_coverage,
     cleanup_branch_action,
+    close_continuation,
     external_effect_recovery_action,
     reconcile_issue_readback,
     stacked_integration_path,
@@ -316,6 +317,60 @@ class CloseRefreshTests(unittest.TestCase):
                 closure_package_present=True,
                 history_artifacts_complete=True,
                 implementation_content_in_target=True,
+            )
+
+    def test_end_of_scope_requires_durable_completion(self) -> None:
+        self.assertEqual(
+            close_continuation(
+                approved_scope_durably_complete=True,
+                next_authorized_obligation=False,
+                explicit_authorization_gate_due=False,
+            ),
+            "end_of_scope_stop",
+        )
+        self.assertEqual(
+            close_continuation(
+                approved_scope_durably_complete=False,
+                next_authorized_obligation=True,
+                explicit_authorization_gate_due=False,
+            ),
+            "continue_deterministically",
+        )
+        self.assertEqual(
+            close_continuation(
+                approved_scope_durably_complete=False,
+                next_authorized_obligation=False,
+                explicit_authorization_gate_due=False,
+            ),
+            "continue_close_reconciliation",
+        )
+
+    def test_live_write_alone_does_not_create_stop_but_explicit_gate_does(self) -> None:
+        self.assertEqual(
+            close_continuation(
+                approved_scope_durably_complete=False,
+                next_authorized_obligation=True,
+                explicit_authorization_gate_due=False,
+                deployment_or_live_write=True,
+            ),
+            "continue_deterministically",
+        )
+        self.assertEqual(
+            close_continuation(
+                approved_scope_durably_complete=False,
+                next_authorized_obligation=True,
+                explicit_authorization_gate_due=True,
+                deployment_or_live_write=True,
+            ),
+            "authorization_stop",
+        )
+
+    def test_terminal_scope_cannot_claim_an_authorized_remaining_obligation(self) -> None:
+        with self.assertRaisesRegex(CloseContractError, "cannot be terminal"):
+            close_continuation(
+                approved_scope_durably_complete=True,
+                next_authorized_obligation=True,
+                explicit_authorization_gate_due=False,
             )
 
 
