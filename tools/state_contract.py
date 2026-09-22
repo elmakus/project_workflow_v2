@@ -31,6 +31,7 @@ RETURN_RECONCILIATION_STATES = {"pending", "applied"}
 DEFINITION_STATES = {"active", "green"}
 PREMIUM_A_STATES = {"not_due", "due", "satisfied"}
 PLANNING_STATES = {"draft", "frozen", "approved"}
+PLANNING_REVIEW_MODES = {"independent", "editorial_exempt"}
 PREMIUM_GATE_STATES = {"not_due", "due", "satisfied"}
 TRACKER_STATES = {"discovery", "create_pending_readback", "linked", "ambiguous", "unavailable"}
 TRACKER_READBACK_STATES = {"pending", "verified", "uncertain", "not_applicable"}
@@ -276,8 +277,10 @@ def validate_research(data: dict[str, Any], workstream_id: str) -> None:
     _require(isinstance(return_result, str), "research: return_result must be a string")
     finding = data.get("finding")
     limitations = data.get("limitations")
+    conflicts = data.get("conflicts")
     _require(isinstance(finding, str), "research: finding must be a string")
     _require(isinstance(limitations, str), "research: limitations must be a string")
+    _require(isinstance(conflicts, str), "research: conflicts must be a string")
 
     sources = data.get("sources")
     _require(isinstance(sources, list), "research: sources must be an array")
@@ -298,6 +301,7 @@ def validate_research(data: dict[str, Any], workstream_id: str) -> None:
 
     if state in {"complete", "consumed"}:
         _require(bool(finding.strip()), "research: completed Research requires a finding")
+        _require(bool(conflicts.strip()), "research: completed Research requires explicit conflict accounting")
         _require(all(source["status"] != "pending" for source in sources),
                  "research: completed Research cannot leave a source class pending")
     if reconciliation == "applied":
@@ -371,6 +375,22 @@ def validate_planning(data: dict[str, Any], workstream_id: str) -> None:
     _require(plan_path.startswith("planning/") and plan_path.endswith(".md"),
              "planning: plan_path must be a planning Markdown artifact")
 
+    review_mode = data.get("review_mode")
+    _require(review_mode in PLANNING_REVIEW_MODES, f"planning: invalid review_mode {review_mode!r}")
+    exemption_basis = data.get("review_exemption_basis")
+    exemption_base_subject = data.get("review_exemption_base_subject")
+    _require(isinstance(exemption_basis, str), "planning: review_exemption_basis must be a string")
+    _require(isinstance(exemption_base_subject, str),
+             "planning: review_exemption_base_subject must be a string")
+    if review_mode == "independent":
+        _require(exemption_basis == "" and exemption_base_subject == "",
+                 "planning: independent review mode must not claim an editorial exemption")
+    else:
+        _require(bool(exemption_basis.strip()),
+                 "planning: editorial exemption requires a bounded semantic basis")
+        _require(bool(exemption_base_subject.strip()),
+                 "planning: editorial exemption requires the prior reviewed subject")
+
     premium_a = data.get("premium_a")
     premium_b = data.get("premium_b")
     premium_c = data.get("premium_c")
@@ -386,12 +406,13 @@ def validate_planning(data: dict[str, Any], workstream_id: str) -> None:
     ):
         _require(isinstance(value, str), f"planning: {name} must be a string")
 
-    _require(premium_a == "satisfied" and premium_a_subject == entry_subject,
-             "planning: current cycle requires exact premium A satisfaction")
+    _require(premium_a in {"due", "satisfied"} and premium_a_subject == entry_subject,
+             "planning: current cycle requires exact premium A gate subject")
 
     subject = data.get("subject")
-    subject_key = ""
     if state == "draft":
+        _require(review_mode == "independent",
+                 "planning: editorial exemption applies only to a previously approved cycle")
         _require(isinstance(subject, dict), "planning: draft subject table is required")
         _require(all(subject.get(key, "") == "" for key in ("repository", "commit", "path", "blob")),
                  "planning: draft must not claim a frozen immutable subject")
@@ -401,12 +422,25 @@ def validate_planning(data: dict[str, Any], workstream_id: str) -> None:
                  "planning: premium C is not due before approval")
         return
 
+    _require(premium_a == "satisfied",
+             "planning: frozen/approved plan requires premium A satisfied for the current cycle")
     subject_key = _git_blob_subject_key(subject, "planning.subject")
     _require(subject["path"] == plan_path, "planning: frozen subject path must equal plan_path")
     _require(audit == "green", "planning: frozen/approved plan requires GREEN planner audit")
+
+    if review_mode == "editorial_exempt":
+        _require(state == "approved",
+                 "planning: editorial exemption is only valid on an already approved planning cycle")
+        _require(subject_key != exemption_base_subject,
+                 "planning: editorial exemption requires a changed plan subject")
+        _require(premium_b == "satisfied" and premium_b_subject == exemption_base_subject,
+                 "planning: editorial exemption must preserve prior reviewed premium B subject")
+        _require(premium_c == "satisfied" and premium_c_subject == exemption_base_subject,
+                 "planning: editorial exemption must preserve prior satisfied premium C subject")
+        return
+
     _require(premium_b in {"due", "satisfied"} and premium_b_subject == subject_key,
              "planning: frozen subject requires exact premium B gate subject")
-
     if state == "frozen":
         _require(premium_c == "not_due" and premium_c_subject == "",
                  "planning: premium C cannot be due before GREEN Plan Review consumption")
@@ -428,7 +462,13 @@ def validate_plan_review(data: dict[str, Any], workstream_id: str, planning: dic
              "plan_review: planning subject must be frozen")
     review_key = _git_blob_subject_key(data.get("subject"), "plan_review.subject")
     planning_key = _git_blob_subject_key(planning.get("subject"), "planning.subject")
-    _require(review_key == planning_key, "plan_review: subject does not match frozen plan")
+    if planning.get("review_mode") == "editorial_exempt":
+        _require(data.get("verdict") == "green",
+                 "plan_review: editorial exemption requires prior GREEN review coverage")
+        _require(review_key == planning.get("review_exemption_base_subject"),
+                 "plan_review: editorial exemption base does not match prior reviewed subject")
+    else:
+        _require(review_key == planning_key, "plan_review: subject does not match frozen plan")
     evidence_path = data.get("evidence_path")
     _require(isinstance(evidence_path, str), "plan_review: evidence_path must be a string")
     if data.get("verdict") in {"green", "red"}:
