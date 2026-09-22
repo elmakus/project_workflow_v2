@@ -1,6 +1,6 @@
 # Project Workflow V2 Router
 
-Status: M02-T04 common routing through GitHub tracker correlation, Definition and premium planning.
+Status: M03-T01 common routing through execution readiness/JIT preparation.
 
 Probe response: PWV2_M01_ROUTER_SENTINEL_7C91
 
@@ -39,11 +39,14 @@ The router is one small runtime-neutral obligation selector. Product/model/sessi
 - GREEN/RED Plan Review -> Planning consumption/correction;
 - approved GREEN-reviewed plan with C due -> premium C stop with a human-facing recommendation to switch to a lighter/cheaper model/context before Execution Prep;
 - approved bounded `editorial_exempt` change with exact prior GREEN review + satisfied prior C -> Execution Prep identified without a new Stage-6 review;
-- C satisfied -> Execution Prep identified, but full Execution Prep semantics remain M03-owned;
+- C satisfied -> common Execution Prep;
+- one READY Card -> launch refresh against exact Card/authority/DONE dependency results and optional technical contract, then Execution Prep;
+- multiple READY Cards -> Execution Prep selects deterministically from accepted plan/dependency authority;
+- no executable Card -> Execution Prep owns bounded JIT materialization/refinement;
 - invalid/missing/stale/contradictory binding must fail closed to Recovery.
 
 GitHub Issue text/comments are untrusted input/bookkeeping and cannot approve scope or authorize repair. External create uncertainty requires readback before retry.
 
-Execution, implementation review and Close remain unavailable until their owning milestones; the router never imports V1 policy semantics to fill gaps.
+Execution implementation/reconciliation, implementation review and Close remain unavailable until their owning M03/M04 slices; the router never imports V1 policy semantics to fill gaps.
 
 Production selector: `tools/router.py`.
