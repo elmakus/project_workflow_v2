@@ -192,6 +192,58 @@ class RouterTests(unittest.TestCase):
             'final_pr = 0\n'
         )
 
+    def issue_research_content(self, subject: str) -> str:
+        return (
+            'state = "consumed"\n'
+            'workstream_id = "sample-workstream"\n'
+            'origin_role = "intake"\n'
+            f'origin_subject = "{subject}"\n'
+            'return_target = "intake"\n'
+            'return_reconciliation = "applied"\n'
+            'return_result = "evidence/intake-prior-art.md"\n'
+            'finding = "Proportional issue-diagnosis prior art checked."\n'
+            'limitations = "none"\n'
+            'conflicts = "No material conflicts observed."\n'
+            '[[sources]]\nclass = "official_upstream"\nstatus = "checked"\nweight = "primary"\n'
+            '[[sources]]\nclass = "project_runtime"\nstatus = "checked"\nweight = "direct"\n'
+            '[[sources]]\nclass = "tracker_discussion"\nstatus = "not_relevant"\nweight = "supporting"\n'
+            '[[sources]]\nclass = "practitioner_community"\nstatus = "unavailable"\nweight = "supporting"\n'
+        )
+
+    def test_issue_diagnosis_requires_exact_consumed_prior_art_research(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_intake(project, (
+                'workstream_id = "sample-workstream"\n'
+                'kind = "issue"\n'
+                'state = "active"\n'
+                'diagnosis_revision = 2\n'
+                'repair_subject = "repair:v2"\n'
+                'response_kind = "none"\n'
+                'response_observed = false\n'
+                'alignment_state = "pending"\n'
+                'alignment_subject = ""\n'
+                'micro_fix_candidate = false\n'
+            ))
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "intake"))
+            self.assertIn("prior-art Research", routed.reason)
+
+            self.install_state_record(
+                project, "research", "research", "RESEARCH.toml",
+                self.issue_research_content("repair:v1"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "intake"))
+            self.assertIn("exact current repair subject", routed.reason)
+
+            research_path = project / "implementation/workstreams/sample-workstream/RESEARCH.toml"
+            research_path.write_text(self.issue_research_content("repair:v2"))
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("stop", "issue_alignment"))
+        finally:
+            temp.cleanup()
+
     def test_issue_without_post_diagnosis_response_is_real_alignment_stop(self) -> None:
         temp, project = self.copy_fixture()
         try:
@@ -207,6 +259,10 @@ class RouterTests(unittest.TestCase):
                 'alignment_subject = ""\n'
                 'micro_fix_candidate = false\n'
             ))
+            self.install_state_record(
+                project, "research", "research", "RESEARCH.toml",
+                self.issue_research_content("repair:v1"),
+            )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("stop", "issue_alignment"))
             self.assertEqual(routed.owner_module, "workflow/INTAKE.md")
@@ -229,6 +285,10 @@ class RouterTests(unittest.TestCase):
                 'alignment_subject = ""\n'
                 'micro_fix_candidate = false\n'
             ))
+            self.install_state_record(
+                project, "research", "research", "RESEARCH.toml",
+                self.issue_research_content("repair:v1"),
+            )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("route", "brainstorming"))
             self.assertEqual(routed.owner_module, "workflow/BRAINSTORMING.md")
@@ -251,6 +311,10 @@ class RouterTests(unittest.TestCase):
                 'alignment_subject = "repair:v2"\n'
                 'micro_fix_candidate = true\n'
             ))
+            self.install_state_record(
+                project, "research", "research", "RESEARCH.toml",
+                self.issue_research_content("repair:v2"),
+            )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("unavailable", "execution"))
             self.assertIn("project:implementation/workstreams/sample-workstream/INTAKE.toml", routed.read_set)
@@ -292,6 +356,11 @@ class RouterTests(unittest.TestCase):
             temp, project = self.copy_fixture()
             try:
                 self.install_intake(project, intake_content)
+                if 'kind = "issue"' in intake_content:
+                    self.install_state_record(
+                        project, "research", "research", "RESEARCH.toml",
+                        self.issue_research_content("repair:v2"),
+                    )
                 workstream = project / MANIFEST
                 text = workstream.read_text()
                 text = text.replace(
@@ -320,6 +389,10 @@ class RouterTests(unittest.TestCase):
                 'alignment_subject = "repair:v2"\n'
                 'micro_fix_candidate = true\n'
             ))
+            self.install_state_record(
+                project, "research", "research", "RESEARCH.toml",
+                self.issue_research_content("repair:v3"),
+            )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
         finally:
@@ -442,6 +515,7 @@ class RouterTests(unittest.TestCase):
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_A"))
             self.assertEqual(routed.owner_module, "workflow/DEFINITION.md")
+            self.assertIn("best available model/context", routed.reason)
         finally:
             temp.cleanup()
 
@@ -502,6 +576,7 @@ class RouterTests(unittest.TestCase):
             )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_B"))
+            self.assertIn("best-available", routed.reason)
         finally:
             temp.cleanup()
 
@@ -553,6 +628,7 @@ class RouterTests(unittest.TestCase):
             )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_C"))
+            self.assertIn("lighter/cheaper", routed.reason)
         finally:
             temp.cleanup()
 
@@ -584,6 +660,7 @@ class RouterTests(unittest.TestCase):
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_A"))
             self.assertEqual(routed.subject, "definition:R1|planning-cycle:2")
+            self.assertIn("best available model/context", routed.reason)
 
             planning_path.write_text(
                 self.planning_content(state="draft", cycle=2, revision="P2", premium_a="satisfied")
