@@ -35,7 +35,7 @@ class RouterTests(unittest.TestCase):
             semantic = (routed.disposition, routed.obligation, routed.subject, routed.owner_module)
             expected = expected or semantic
             self.assertEqual(semantic, expected)
-        self.assertEqual(expected, ("unavailable", "execution", "M01-T04", "workflow/EXECUTION.md"))
+        self.assertEqual(expected, ("route", "execution", "M01-T04", "workflow/EXECUTION.md"))
 
     def test_progressive_disclosure_read_set_is_exact(self) -> None:
         routed = select_route(FIXTURE, [MANIFEST], package_root=ROOT)
@@ -459,7 +459,7 @@ class RouterTests(unittest.TestCase):
                 self.issue_research_content("repair:v2"),
             )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
-            self.assertEqual((routed.disposition, routed.obligation), ("unavailable", "execution"))
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution"))
             self.assertIn("project:implementation/workstreams/sample-workstream/INTAKE.toml", routed.read_set)
             self.assertIn(f"project:{BOARD}", routed.read_set)
         finally:
@@ -962,7 +962,7 @@ class RouterTests(unittest.TestCase):
                     self.tracker_content(state),
                 )
                 routed = select_route(project, [MANIFEST], package_root=ROOT)
-                self.assertEqual((routed.disposition, routed.obligation), ("unavailable", "execution"))
+                self.assertEqual((routed.disposition, routed.obligation), ("route", "execution"))
                 self.assertIn(f"project:{BOARD}", routed.read_set)
             finally:
                 temp.cleanup()
@@ -1001,11 +1001,40 @@ class RouterTests(unittest.TestCase):
         finally:
             temp.cleanup()
 
-    def test_future_lifecycle_is_identified_but_not_implemented(self) -> None:
+    def test_active_card_routes_to_runtime_neutral_execution(self) -> None:
         routed = select_route(FIXTURE, [MANIFEST], package_root=ROOT)
-        self.assertEqual(routed.disposition, "unavailable")
-        self.assertIn("not implemented until M03", routed.reason)
+        self.assertEqual((routed.disposition, routed.obligation), ("route", "execution"))
+        self.assertIn("runtime-neutral implementation", routed.reason)
         self.assertNotEqual(routed.disposition, "real_stop")
+
+    def test_durable_semantic_result_routes_to_reconciliation_without_replay(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            result_path = "implementation/workstreams/sample-workstream/results/M01-T04.md"
+            board = project / BOARD
+            board.write_text(
+                board.read_text()
+                + '\n[cards.result]\nclass = "result"\n'
+                + f'path = "{result_path}"\n'
+            )
+            evidence_dir = project / "implementation/workstreams/sample-workstream/evidence"
+            evidence_dir.mkdir(parents=True, exist_ok=True)
+            (evidence_dir / "M01-T04.md").write_text("# Verified evidence\n")
+            result_file = project / result_path
+            result_file.parent.mkdir(parents=True, exist_ok=True)
+            result_file.write_text(
+                "# Card Result\n"
+                "- Card ID: M01-T04\n"
+                "- Implementation subject: owner/repo@commit:" + ("a" * 40) + "\n"
+                "- Evidence refs: implementation/workstreams/sample-workstream/evidence/M01-T04.md\n"
+                "- Tests/readback summary: GREEN\n"
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "result_reconciliation"))
+            self.assertIn("do not replay", routed.reason)
+            self.assertIn(f"project:{result_path}", routed.read_set)
+        finally:
+            temp.cleanup()
 
     def test_priority_and_real_stop_foundations_are_runtime_neutral(self) -> None:
         self.assertEqual(
