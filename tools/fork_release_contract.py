@@ -18,6 +18,7 @@ PRIVATE_RE = re.compile(
 )
 FORK_RELEASE_OPERATION = "downstream_fork_release"
 FORK_RELEASE_MODULE = "workflow/FORK_RELEASE_VERSIONING.md"
+COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
 @dataclass(frozen=True)
@@ -27,10 +28,12 @@ class UpstreamLineage:
     commit: str
 
     def __post_init__(self) -> None:
-        if not self.repository.strip() or not self.commit.strip():
+        if not self.repository.strip():
             raise ForkReleaseContractError("upstream repository/tag/SHA lineage must be complete")
         if parse_upstream_tag(self.tag) is None:
             raise ForkReleaseContractError("accepted upstream tag must be exact vX.Y.Z")
+        if COMMIT_SHA_RE.fullmatch(self.commit) is None:
+            raise ForkReleaseContractError("accepted upstream commit must be exact lowercase 40-hex SHA")
 
 
 def parse_upstream_tag(tag: str) -> tuple[int, int, int] | None:

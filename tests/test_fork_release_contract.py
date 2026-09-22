@@ -33,6 +33,17 @@ class ForkReleaseContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ForkReleaseContractError, "requires accepted upstream"):
             module_for_operation("downstream_fork_release")
 
+    def test_lineage_rejects_malformed_upstream_commit_sha(self) -> None:
+        for malformed in ("", "not-a-sha", "A" * 40, "a" * 39, "a" * 41):
+            with self.subTest(commit=malformed), self.assertRaisesRegex(
+                ForkReleaseContractError, "commit.*40-hex|lineage must be complete"
+            ):
+                UpstreamLineage(
+                    repository="upstream/example",
+                    tag="v5.0.8",
+                    commit=malformed,
+                )
+
     def test_lane_is_baseline_local_and_numeric(self) -> None:
         tags = [
             "v5.0.8",
