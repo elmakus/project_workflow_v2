@@ -107,39 +107,52 @@ class RouterTests(unittest.TestCase):
             '[requirements]\nclass = "authority"\npath = "requirements/REQUIREMENTS.md"\n'
         ))
 
-    def planning_content(self, *, state: str, premium_b: str = "not_due",
-                         premium_c: str = "not_due", cycle: int = 1,
-                         premium_a_subject: str = "definition:R1|planning-cycle:1") -> str:
-        key = f"owner/repo@{'a' * 40}:planning/MASTER_PLAN.md@{'b' * 40}"
+    def planning_content(
+        self, *, state: str, premium_b: str = "not_due", premium_c: str = "not_due",
+        cycle: int = 1, premium_a: str = "satisfied", premium_a_subject: str | None = None,
+        revision: str = "P1", blob: str | None = None, gate_subject: str | None = None,
+        review_mode: str = "independent", exemption_basis: str = "",
+        exemption_base_subject: str = "",
+    ) -> str:
+        blob = blob or ("b" * 40)
+        premium_a_subject = premium_a_subject or f"definition:R1|planning-cycle:{cycle}"
+        key = f"owner/repo@{'a' * 40}:planning/MASTER_PLAN.md@{blob}"
+        gate_key = gate_subject or key
         frozen = state in {"frozen", "approved"}
         return (
             'workstream_id = "sample-workstream"\n'
             f'cycle = {cycle}\n'
             f'entry_subject = "definition:R1|planning-cycle:{cycle}"\n'
-            'revision = "P1"\n'
+            f'revision = "{revision}"\n'
             f'state = "{state}"\n'
             f'planner_audit = "{"green" if frozen else "pending"}"\n'
             'plan_path = "planning/MASTER_PLAN.md"\n'
-            'premium_a = "satisfied"\n'
+            f'review_mode = "{review_mode}"\n'
+            f'review_exemption_basis = "{exemption_basis}"\n'
+            f'review_exemption_base_subject = "{exemption_base_subject}"\n'
+            f'premium_a = "{premium_a}"\n'
             f'premium_a_subject = "{premium_a_subject}"\n'
             f'premium_b = "{premium_b}"\n'
-            f'premium_b_subject = "{key if premium_b != "not_due" else ""}"\n'
+            f'premium_b_subject = "{gate_key if premium_b != "not_due" else ""}"\n'
             f'premium_c = "{premium_c}"\n'
-            f'premium_c_subject = "{key if premium_c != "not_due" else ""}"\n'
+            f'premium_c_subject = "{gate_key if premium_c != "not_due" else ""}"\n'
             '[subject]\n'
             f'repository = "{"owner/repo" if frozen else ""}"\n'
             f'commit = "{"a" * 40 if frozen else ""}"\n'
             f'path = "{"planning/MASTER_PLAN.md" if frozen else ""}"\n'
-            f'blob = "{"b" * 40 if frozen else ""}"\n'
+            f'blob = "{blob if frozen else ""}"\n'
         )
 
-    def plan_review_content(self, verdict: str = "pending", *, blob: str | None = None) -> str:
+    def plan_review_content(
+        self, verdict: str = "pending", *, blob: str | None = None,
+        cycle: int = 1, revision: str = "P1",
+    ) -> str:
         blob = blob or ("b" * 40)
         evidence = "" if verdict == "pending" else "evidence/plan-review-R01.md"
         return (
             'workstream_id = "sample-workstream"\n'
-            'plan_revision = "P1"\n'
-            'planning_cycle = 1\n'
+            f'plan_revision = "{revision}"\n'
+            f'planning_cycle = {cycle}\n'
             'attempt = "R01"\n'
             f'verdict = "{verdict}"\n'
             f'evidence_path = "{evidence}"\n'
@@ -156,7 +169,6 @@ class RouterTests(unittest.TestCase):
             'materially_produced_or_repaired_subject = false\n'
             'basis = "Fresh semantic review context."\n'
         )
-
 
     def tracker_content(self, state: str) -> str:
         issue = 7 if state == "linked" else 0
@@ -324,6 +336,7 @@ class RouterTests(unittest.TestCase):
             'return_result = ""\n'
             'finding = ""\n'
             'limitations = ""\n'
+            'conflicts = ""\n'
             '[[sources]]\nclass = "official_upstream"\nstatus = "pending"\nweight = "primary"\n'
             '[[sources]]\nclass = "project_runtime"\nstatus = "pending"\nweight = "direct"\n'
             '[[sources]]\nclass = "tracker_discussion"\nstatus = "pending"\nweight = "supporting"\n'
@@ -348,6 +361,7 @@ class RouterTests(unittest.TestCase):
             'return_result = ""\n'
             'finding = "bounded finding"\n'
             'limitations = "none"\n'
+            'conflicts = "No material conflicts observed."\n'
             '[[sources]]\nclass = "official_upstream"\nstatus = "checked"\nweight = "primary"\n'
             '[[sources]]\nclass = "project_runtime"\nstatus = "checked"\nweight = "direct"\n'
             '[[sources]]\nclass = "tracker_discussion"\nstatus = "not_relevant"\nweight = "supporting"\n'
@@ -555,6 +569,83 @@ class RouterTests(unittest.TestCase):
             )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("unavailable", "execution_prep"))
+        finally:
+            temp.cleanup()
+
+    def test_material_replan_repeats_a_b_review_c_and_editorial_exemption_skips_new_review(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            planning_path = project / "implementation/workstreams/sample-workstream/PLANNING.toml"
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(state="draft", cycle=2, revision="P2", premium_a="due"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_A"))
+            self.assertEqual(routed.subject, "definition:R1|planning-cycle:2")
+
+            planning_path.write_text(
+                self.planning_content(state="draft", cycle=2, revision="P2", premium_a="satisfied")
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "planning"))
+
+            planning_path.write_text(
+                self.planning_content(
+                    state="frozen", cycle=2, revision="P2",
+                    premium_a="satisfied", premium_b="due",
+                )
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_B"))
+
+            planning_path.write_text(
+                self.planning_content(
+                    state="frozen", cycle=2, revision="P2",
+                    premium_a="satisfied", premium_b="satisfied",
+                )
+            )
+            self.install_state_record(
+                project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                self.plan_review_content("green", cycle=2, revision="P2"),
+            )
+            review_path = project / "implementation/workstreams/sample-workstream/PLAN_REVIEW.toml"
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "planning"))
+
+            planning_path.write_text(
+                self.planning_content(
+                    state="approved", cycle=2, revision="P2",
+                    premium_a="satisfied", premium_b="satisfied", premium_c="due",
+                )
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_C"))
+
+            planning_path.write_text(
+                self.planning_content(
+                    state="approved", cycle=2, revision="P2",
+                    premium_a="satisfied", premium_b="satisfied", premium_c="satisfied",
+                )
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("unavailable", "execution_prep"))
+
+            base = f"owner/repo@{'a' * 40}:planning/MASTER_PLAN.md@{'b' * 40}"
+            planning_path.write_text(
+                self.planning_content(
+                    state="approved", cycle=2, revision="P2", blob="c" * 40,
+                    premium_a="satisfied", premium_b="satisfied", premium_c="satisfied",
+                    gate_subject=base, review_mode="editorial_exempt",
+                    exemption_basis="Wording only; strategy, milestones, coverage and gates unchanged.",
+                    exemption_base_subject=base,
+                )
+            )
+            review_path.write_text(self.plan_review_content("green", cycle=2, revision="P2"))
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("unavailable", "execution_prep"))
+            self.assertIn("Editorial/mechanical-only", routed.reason)
         finally:
             temp.cleanup()
 
