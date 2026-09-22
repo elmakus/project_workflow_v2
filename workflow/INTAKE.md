@@ -17,6 +17,8 @@ A new managed intent must not adopt an unrelated active workstream merely becaus
 The exact workstream-local INTAKE record owns kind/lifecycle, diagnosis revision, current repair subject, semantic user-response class, alignment state/subject and bounded micro-fix candidacy.
 
 For an issue:
+- once diagnosis has a concrete current `repair_subject`, Intake must materialize proportional prior-art Research under `workflow/RESEARCH.md` with `origin_role = intake`, `origin_subject` equal to that exact repair subject and `return_target = intake`; repair alignment may not proceed until that exact Research result is applied and consumed;
+- a changed repair subject makes prior diagnosis Research stale and requires a new exact proportional check before alignment resumes;
 - pending means no implementation authorization;
 - question/concern/alternative is a response but not authorization;
 - authorized requires an explicit authorization response bound to the exact current repair subject;
