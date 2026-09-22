@@ -1021,6 +1021,8 @@ class RouterTests(unittest.TestCase):
                 board.read_text()
                 + '\n[cards.result]\nclass = "result"\n'
                 + f'path = "{result_path}"\n'
+                + f'commit = "{"a" * 40}"\n'
+                + f'blob = "{"b" * 40}"\n'
             )
             evidence_dir = project / "implementation/workstreams/sample-workstream/evidence"
             evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -1093,9 +1095,9 @@ class RouterTests(unittest.TestCase):
             f'evidence_path = "{evidence}"\n'
             '[subject]\n'
             'class = "git_blob"\n'
-            'repository = "owner/repo"\n'
+            'repository = "owner/router-fixture"\n'
             f'commit = "{"a" * 40}"\n'
-            'path = "workflow/STATE.md"\n'
+            'path = "implementation/workstreams/sample-workstream/results/M01-T04.md"\n'
             f'blob = "{"b" * 40}"\n'
             '[acceptance]\n'
             'class = "task_card"\n'
