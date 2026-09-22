@@ -219,6 +219,8 @@ class RouterTests(unittest.TestCase):
                 'state = "active"\n'
                 'diagnosis_revision = 2\n'
                 'repair_subject = "repair:v2"\n'
+                'diagnosis_prior_art_subject = ""\n'
+                'diagnosis_prior_art_result = ""\n'
                 'response_kind = "none"\n'
                 'response_observed = false\n'
                 'alignment_state = "pending"\n'
@@ -240,6 +242,19 @@ class RouterTests(unittest.TestCase):
             research_path = project / "implementation/workstreams/sample-workstream/RESEARCH.toml"
             research_path.write_text(self.issue_research_content("repair:v2"))
             routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "intake"))
+            self.assertIn("persist its exact subject/result binding", routed.reason)
+
+            intake_path = project / "implementation/workstreams/sample-workstream/INTAKE.toml"
+            intake_path.write_text(
+                intake_path.read_text().replace(
+                    'diagnosis_prior_art_subject = ""\n'
+                    'diagnosis_prior_art_result = ""\n',
+                    'diagnosis_prior_art_subject = "repair:v2"\n'
+                    'diagnosis_prior_art_result = "evidence/intake-prior-art.md"\n',
+                )
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("stop", "issue_alignment"))
         finally:
             temp.cleanup()
@@ -253,6 +268,8 @@ class RouterTests(unittest.TestCase):
                 'state = "active"\n'
                 'diagnosis_revision = 1\n'
                 'repair_subject = "repair:v1"\n'
+                'diagnosis_prior_art_subject = "repair:v1"\n'
+                'diagnosis_prior_art_result = "evidence/intake-prior-art.md"\n'
                 'response_kind = "none"\n'
                 'response_observed = false\n'
                 'alignment_state = "pending"\n'
@@ -279,6 +296,8 @@ class RouterTests(unittest.TestCase):
                 'state = "active"\n'
                 'diagnosis_revision = 1\n'
                 'repair_subject = "repair:v1"\n'
+                'diagnosis_prior_art_subject = "repair:v1"\n'
+                'diagnosis_prior_art_result = "evidence/intake-prior-art.md"\n'
                 'response_kind = "question"\n'
                 'response_observed = true\n'
                 'alignment_state = "pending"\n'
@@ -296,6 +315,49 @@ class RouterTests(unittest.TestCase):
         finally:
             temp.cleanup()
 
+    def test_later_brainstorming_research_does_not_erase_issue_diagnosis_prior_art(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_intake(project, (
+                'workstream_id = "sample-workstream"\n'
+                'kind = "issue"\n'
+                'state = "active"\n'
+                'diagnosis_revision = 2\n'
+                'repair_subject = "repair:v2"\n'
+                'diagnosis_prior_art_subject = "repair:v2"\n'
+                'diagnosis_prior_art_result = "evidence/intake-prior-art.md"\n'
+                'response_kind = "question"\n'
+                'response_observed = true\n'
+                'alignment_state = "pending"\n'
+                'alignment_subject = ""\n'
+                'micro_fix_candidate = false\n'
+            ))
+            later_research = (
+                'state = "consumed"\n'
+                'workstream_id = "sample-workstream"\n'
+                'origin_role = "brainstorming"\n'
+                'origin_subject = "repair:v2:question"\n'
+                'return_target = "brainstorming"\n'
+                'return_reconciliation = "applied"\n'
+                'return_result = "evidence/brainstorm-followup.md"\n'
+                'finding = "Follow-up fact checked."\n'
+                'limitations = "none"\n'
+                'conflicts = "No material conflicts observed."\n'
+                '[[sources]]\nclass = "official_upstream"\nstatus = "checked"\nweight = "primary"\n'
+                '[[sources]]\nclass = "project_runtime"\nstatus = "checked"\nweight = "direct"\n'
+                '[[sources]]\nclass = "tracker_discussion"\nstatus = "not_relevant"\nweight = "supporting"\n'
+                '[[sources]]\nclass = "practitioner_community"\nstatus = "unavailable"\nweight = "supporting"\n'
+            )
+            self.install_state_record(
+                project, "research", "research", "RESEARCH.toml", later_research,
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "brainstorming"))
+            self.assertNotIn("diagnosis prior-art Research", routed.reason)
+        finally:
+            temp.cleanup()
+
+
     def test_completed_authorized_issue_continues_to_existing_board(self) -> None:
         temp, project = self.copy_fixture()
         try:
@@ -305,6 +367,8 @@ class RouterTests(unittest.TestCase):
                 'state = "complete"\n'
                 'diagnosis_revision = 2\n'
                 'repair_subject = "repair:v2"\n'
+                'diagnosis_prior_art_subject = "repair:v2"\n'
+                'diagnosis_prior_art_result = "evidence/intake-prior-art.md"\n'
                 'response_kind = "authorization"\n'
                 'response_observed = true\n'
                 'alignment_state = "authorized"\n'
@@ -331,6 +395,8 @@ class RouterTests(unittest.TestCase):
                 'state = "complete"\n'
                 'diagnosis_revision = 0\n'
                 'repair_subject = ""\n'
+                'diagnosis_prior_art_subject = ""\n'
+                'diagnosis_prior_art_result = ""\n'
                 'response_kind = "none"\n'
                 'response_observed = false\n'
                 'alignment_state = "not_required"\n'
@@ -344,6 +410,8 @@ class RouterTests(unittest.TestCase):
                 'state = "complete"\n'
                 'diagnosis_revision = 2\n'
                 'repair_subject = "repair:v2"\n'
+                'diagnosis_prior_art_subject = "repair:v2"\n'
+                'diagnosis_prior_art_result = "evidence/intake-prior-art.md"\n'
                 'response_kind = "authorization"\n'
                 'response_observed = true\n'
                 'alignment_state = "authorized"\n'
@@ -383,6 +451,8 @@ class RouterTests(unittest.TestCase):
                 'state = "complete"\n'
                 'diagnosis_revision = 3\n'
                 'repair_subject = "repair:v3"\n'
+                'diagnosis_prior_art_subject = "repair:v3"\n'
+                'diagnosis_prior_art_result = "evidence/intake-prior-art.md"\n'
                 'response_kind = "authorization"\n'
                 'response_observed = true\n'
                 'alignment_state = "authorized"\n'
