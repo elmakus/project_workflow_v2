@@ -157,6 +157,23 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
         if "intake" in workstream:
             intake = read_toml(reads.project(workstream["intake"]["path"]))
             validate_intake(intake, workstream["workstream_id"])
+            if intake["kind"] == "issue" and intake["repair_subject"]:
+                exact_diagnosis_research = (
+                    research is not None
+                    and research["state"] == "consumed"
+                    and research["origin_role"] == "intake"
+                    and research["origin_subject"] == intake["repair_subject"]
+                    and research["return_target"] == "intake"
+                    and research["return_reconciliation"] == "applied"
+                    and bool(research["return_result"].strip())
+                )
+                if not exact_diagnosis_research:
+                    return result(
+                        reads, "route", "intake",
+                        "Concrete issue diagnosis must materialize and consume proportional prior-art Research "
+                        "for the exact current repair subject before repair alignment can proceed",
+                        subject=intake["repair_subject"], owner_module="workflow/INTAKE.md",
+                    )
             if intake["state"] == "active":
                 if intake["kind"] == "issue" and intake["alignment_state"] == "pending":
                     response = intake["response_kind"]
@@ -234,7 +251,8 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             if definition["premium_a"] == "due":
                 return result(
                     reads, "stop", "premium_A",
-                    "Definition is GREEN; premium stop A is due before material Strategic Planning",
+                    "Definition is GREEN; premium stop A is due before material Strategic Planning; "
+                    "recommend the best available model/context for Strategic Planning without making model identity canonical",
                     subject=definition["revision"], owner_module="workflow/DEFINITION.md",
                 )
 
@@ -253,7 +271,8 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             if planning["premium_a"] == "due":
                 return result(
                     reads, "stop", "premium_A",
-                    "Material planning re-entry has a new exact cycle; premium stop A is due before Planning resumes",
+                    "Material planning re-entry has a new exact cycle; premium stop A is due before Planning resumes; "
+                    "recommend the best available model/context for Strategic Planning without making model identity canonical",
                     subject=planning["entry_subject"], owner_module="workflow/PLANNING.md",
                 )
 
@@ -277,7 +296,7 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                 if planning["premium_b"] == "due":
                     return result(
                         reads, "stop", "premium_B",
-                        "Exact plan subject is frozen; premium stop B requires a fresh independent review context",
+                        "Exact plan subject is frozen; premium stop B requires a fresh independent best-available review context",
                         subject=subject_key, owner_module="workflow/PLANNING.md",
                     )
                 if plan_review is None:
@@ -314,7 +333,8 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             if planning["premium_c"] == "due":
                 return result(
                     reads, "stop", "premium_C",
-                    "GREEN Plan Review is approved; premium stop C is due before Execution Prep",
+                    "GREEN Plan Review is approved; premium stop C is due before Execution Prep; "
+                    "recommend switching to a lighter/cheaper model/context for Execution Prep",
                     subject=subject_key, owner_module="workflow/PLANNING.md",
                 )
             return result(
