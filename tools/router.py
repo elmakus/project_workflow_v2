@@ -120,6 +120,7 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
         expected_manifest = f"implementation/workstreams/{workstream['workstream_id']}/WORKSTREAM.toml"
         if manifest_rel != expected_manifest:
             raise ValidationError(f"selected manifest must be exact path {expected_manifest!r}")
+        intake = None
         if "intake" in workstream:
             intake = read_toml(reads.project(workstream["intake"]["path"]))
             validate_intake(intake, workstream["workstream_id"])
@@ -148,6 +149,22 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     "Selected workstream has active Intake/discovery state",
                     subject=intake["kind"], owner_module="workflow/INTAKE.md",
                 )
+
+        if "task_board" not in workstream:
+            if intake is None:
+                raise ValidationError("selected workstream has neither Intake nor Task Board")
+            if intake["kind"] == "issue" and intake["micro_fix_candidate"]:
+                return result(
+                    reads, "unavailable", "execution_prep",
+                    "Aligned issue is a bounded micro-fix candidate; Execution Prep semantics arrive in M03",
+                    subject=intake["repair_subject"], owner_module="workflow/EXECUTION_PREP.md",
+                )
+            return result(
+                reads, "unavailable", "brainstorming",
+                "Completed pre-execution Intake continues to Brainstorming; full semantics arrive in M02-T02",
+                subject=intake["kind"], owner_module="workflow/BRAINSTORMING.md",
+            )
+
         board = read_toml(reads.project(workstream["task_board"]["path"]))
         validate_board(board, workstream)
     except (OSError, ValidationError, KeyError) as exc:
