@@ -6,6 +6,8 @@ created_from = "0000000000000000000000000000000000000000"
 integration_target = "main"
 authority = [{ class = "authority", path = "requirements/PROJECT_WORKFLOW_V2.md" }]
 
-[task_board]
-class = "task_board"
-path = "implementation/workstreams/example-workstream/TASK_BOARD.toml"
+[intake]
+class = "intake"
+path = "implementation/workstreams/example-workstream/INTAKE.toml"
+
+# Add [task_board] only when implementation state is materialized by Execution Prep.
