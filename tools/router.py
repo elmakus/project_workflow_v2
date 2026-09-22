@@ -391,7 +391,7 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                 if plan_review is None or plan_review["verdict"] != "green":
                     raise ValidationError("editorial exemption requires prior exact GREEN Plan Review")
                 return result(
-                    reads, "unavailable", "execution_prep",
+                    reads, "route", "execution_prep",
                     "Editorial/mechanical-only plan change preserves prior GREEN review and satisfied C; no new Stage-6 review is due",
                     subject=subject_key, owner_module="workflow/EXECUTION_PREP.md",
                 )
