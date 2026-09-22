@@ -1,0 +1,25 @@
+{
+  "name": "pw",
+  "version": "0.1.0",
+  "description": "Project Workflow V2 thin Codex bootstrap feasibility package.",
+  "author": {
+    "name": "elmakus",
+    "url": "https://github.com/elmakus"
+  },
+  "repository": "https://github.com/elmakus/project_workflow_v2",
+  "keywords": [
+    "project-workflow",
+    "codex",
+    "workflow"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Project Workflow V2",
+    "shortDescription": "Enter the canonical Project Workflow V2 router.",
+    "longDescription": "Thin Codex bootstrap for the canonical bundled Project Workflow V2 workflow tree.",
+    "developerName": "elmakus",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Use Project Workflow V2 for this repository."
+  }
+}
