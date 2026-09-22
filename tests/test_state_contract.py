@@ -88,6 +88,12 @@ class StateEnvelopeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "stale"):
             validate_intake(stale, "sample-workstream")
 
+        missing_prior_art = copy.deepcopy(intake)
+        missing_prior_art["diagnosis_prior_art_subject"] = ""
+        missing_prior_art["diagnosis_prior_art_result"] = ""
+        with self.assertRaisesRegex(ValidationError, "diagnosis prior-art"):
+            validate_intake(missing_prior_art, "sample-workstream")
+
     def test_issue_question_is_response_but_not_authorization(self) -> None:
         intake = read_toml(VALID / "INTAKE.toml")
         intake.update({
@@ -110,6 +116,8 @@ class StateEnvelopeTests(unittest.TestCase):
             "kind": "feature",
             "state": "active",
             "repair_subject": "",
+            "diagnosis_prior_art_subject": "",
+            "diagnosis_prior_art_result": "",
             "response_kind": "none",
             "response_observed": False,
             "alignment_state": "not_required",
