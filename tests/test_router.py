@@ -74,6 +74,16 @@ class RouterTests(unittest.TestCase):
         intake = project / "implementation/workstreams/sample-workstream/INTAKE.toml"
         intake.write_text(content)
 
+
+    def install_state_record(self, project: Path, key: str, klass: str, filename: str, content: str) -> None:
+        workstream = project / MANIFEST
+        workstream.write_text(
+            workstream.read_text()
+            + f'\n[{key}]\nclass = "{klass}"\npath = "implementation/workstreams/sample-workstream/{filename}"\n'
+        )
+        record = project / f"implementation/workstreams/sample-workstream/{filename}"
+        record.write_text(content)
+
     def test_issue_without_post_diagnosis_response_is_real_alignment_stop(self) -> None:
         temp, project = self.copy_fixture()
         try:
@@ -112,7 +122,7 @@ class RouterTests(unittest.TestCase):
                 'micro_fix_candidate = false\n'
             ))
             routed = select_route(project, [MANIFEST], package_root=ROOT)
-            self.assertEqual((routed.disposition, routed.obligation), ("unavailable", "brainstorming"))
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "brainstorming"))
             self.assertEqual(routed.owner_module, "workflow/BRAINSTORMING.md")
             self.assertNotIn(f"project:{BOARD}", routed.read_set)
         finally:
@@ -154,7 +164,7 @@ class RouterTests(unittest.TestCase):
                 'alignment_state = "not_required"\n'
                 'alignment_subject = ""\n'
                 'micro_fix_candidate = false\n',
-                ("unavailable", "brainstorming"),
+                ("route", "brainstorming"),
             ),
             (
                 'workstream_id = "sample-workstream"\n'
@@ -202,6 +212,154 @@ class RouterTests(unittest.TestCase):
                 'alignment_subject = "repair:v2"\n'
                 'micro_fix_candidate = true\n'
             ))
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+        finally:
+            temp.cleanup()
+
+
+    def test_active_and_completed_research_route_to_exact_owner(self) -> None:
+        base = (
+            'workstream_id = "sample-workstream"\n'
+            'origin_role = "brainstorming"\n'
+            'origin_subject = "scope-a@1"\n'
+            'return_target = "brainstorming"\n'
+            'return_reconciliation = "pending"\n'
+            'return_result = ""\n'
+            'finding = ""\n'
+            'limitations = ""\n'
+            '[[sources]]\nclass = "official_upstream"\nstatus = "pending"\nweight = "primary"\n'
+            '[[sources]]\nclass = "project_runtime"\nstatus = "pending"\nweight = "direct"\n'
+            '[[sources]]\nclass = "tracker_discussion"\nstatus = "pending"\nweight = "supporting"\n'
+            '[[sources]]\nclass = "practitioner_community"\nstatus = "pending"\nweight = "supporting"\n'
+        )
+        temp, project = self.copy_fixture()
+        try:
+            self.install_state_record(project, "research", "research", "RESEARCH.toml", 'state = "active"\n' + base)
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "research"))
+            self.assertNotIn(f"project:{BOARD}", routed.read_set)
+        finally:
+            temp.cleanup()
+
+        complete = (
+            'state = "complete"\n'
+            'workstream_id = "sample-workstream"\n'
+            'origin_role = "brainstorming"\n'
+            'origin_subject = "scope-a@1"\n'
+            'return_target = "brainstorming"\n'
+            'return_reconciliation = "pending"\n'
+            'return_result = ""\n'
+            'finding = "bounded finding"\n'
+            'limitations = "none"\n'
+            '[[sources]]\nclass = "official_upstream"\nstatus = "checked"\nweight = "primary"\n'
+            '[[sources]]\nclass = "project_runtime"\nstatus = "checked"\nweight = "direct"\n'
+            '[[sources]]\nclass = "tracker_discussion"\nstatus = "not_relevant"\nweight = "supporting"\n'
+            '[[sources]]\nclass = "practitioner_community"\nstatus = "unavailable"\nweight = "supporting"\n'
+        )
+        temp, project = self.copy_fixture()
+        try:
+            self.install_state_record(project, "research", "research", "RESEARCH.toml", complete)
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "brainstorming"))
+            self.assertIn("reconciled", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_brainstorming_requires_challenge_and_exact_definition_promotion(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            ready = (
+                'workstream_id = "sample-workstream"\n'
+                'scope_id = "scope-a"\n'
+                'revision = 2\n'
+                'state = "ready_for_definition"\n'
+                'challenge_audit = "green"\n'
+                'explicit_user_stop = false\n'
+                'promotion_state = "pending"\n'
+                'promotion_subject = ""\n'
+            )
+            self.install_state_record(project, "brainstorm", "brainstorm", "BRAINSTORM.toml", ready)
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("stop", "definition_promotion"))
+            self.assertEqual(routed.subject, "scope-a@2")
+        finally:
+            temp.cleanup()
+
+        temp, project = self.copy_fixture()
+        try:
+            promoted = (
+                'workstream_id = "sample-workstream"\n'
+                'scope_id = "scope-a"\n'
+                'revision = 2\n'
+                'state = "promoted"\n'
+                'challenge_audit = "green"\n'
+                'explicit_user_stop = false\n'
+                'promotion_state = "authorized"\n'
+                'promotion_subject = "scope-a@2"\n'
+            )
+            self.install_state_record(project, "brainstorm", "brainstorm", "BRAINSTORM.toml", promoted)
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "definition"))
+        finally:
+            temp.cleanup()
+
+    def test_definition_green_stops_at_premium_a_before_planning(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            promoted = (
+                'workstream_id = "sample-workstream"\n'
+                'scope_id = "scope-a"\n'
+                'revision = 2\n'
+                'state = "promoted"\n'
+                'challenge_audit = "green"\n'
+                'explicit_user_stop = false\n'
+                'promotion_state = "authorized"\n'
+                'promotion_subject = "scope-a@2"\n'
+            )
+            self.install_state_record(project, "brainstorm", "brainstorm", "BRAINSTORM.toml", promoted)
+            definition = (
+                'workstream_id = "sample-workstream"\n'
+                'source_scope_subject = "scope-a@2"\n'
+                'revision = "R1"\n'
+                'state = "green"\n'
+                'completeness_audit = "green"\n'
+                'premium_a = "due"\n'
+                'decisions = [{ class = "authority", path = "decisions/ADR-001.md" }]\n'
+                '[requirements]\nclass = "authority"\npath = "requirements/REQUIREMENTS.md"\n'
+            )
+            self.install_state_record(project, "definition", "definition", "DEFINITION.toml", definition)
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_A"))
+            self.assertEqual(routed.owner_module, "workflow/DEFINITION.md")
+        finally:
+            temp.cleanup()
+
+    def test_definition_source_mismatch_fails_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            promoted = (
+                'workstream_id = "sample-workstream"\n'
+                'scope_id = "scope-a"\n'
+                'revision = 2\n'
+                'state = "promoted"\n'
+                'challenge_audit = "green"\n'
+                'explicit_user_stop = false\n'
+                'promotion_state = "authorized"\n'
+                'promotion_subject = "scope-a@2"\n'
+            )
+            self.install_state_record(project, "brainstorm", "brainstorm", "BRAINSTORM.toml", promoted)
+            definition = (
+                'workstream_id = "sample-workstream"\n'
+                'source_scope_subject = "scope-a@1"\n'
+                'revision = "R1"\n'
+                'state = "active"\n'
+                'completeness_audit = "pending"\n'
+                'premium_a = "not_due"\n'
+                'decisions = []\n'
+                '[requirements]\nclass = "authority"\npath = "requirements/REQUIREMENTS.md"\n'
+            )
+            self.install_state_record(project, "definition", "definition", "DEFINITION.toml", definition)
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
         finally:
