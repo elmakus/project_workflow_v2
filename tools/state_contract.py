@@ -11,6 +11,10 @@ from typing import Any
 
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 CARD_STATUSES = {"planned", "ready", "in_progress", "blocked", "done"}
+INTAKE_KINDS = {"issue", "feature", "change"}
+INTAKE_STATES = {"active", "complete"}
+RESPONSE_KINDS = {"none", "question", "concern", "alternative", "authorization"}
+ALIGNMENT_STATES = {"not_required", "pending", "authorized"}
 PROHIBITED_KEY_PREFIXES = ("runtime_", "model_", "session_", "worker_", "batch_", "lane_", "scheduler_", "context_health_")
 PROHIBITED_KEYS = {
     "execution_policy",
@@ -96,6 +100,10 @@ def validate_locator(
         _require(workstream_id is not None, f"{label}: workstream binding required")
         prefix = f"implementation/workstreams/{workstream_id}/cards/"
         _require(path.startswith(prefix) and path.endswith(".md"), f"{label}: wrong Task Card class/path")
+    elif expected_class == "intake":
+        _require(workstream_id is not None, f"{label}: workstream binding required")
+        expected = f"implementation/workstreams/{workstream_id}/INTAKE.toml"
+        _require(path == expected, f"{label}: expected exact path {expected!r}")
     elif expected_class in {"evidence", "result"}:
         _require(workstream_id is not None, f"{label}: workstream binding required")
         directory = "evidence" if expected_class == "evidence" else "results"
@@ -128,6 +136,54 @@ def validate_workstream(data: dict[str, Any]) -> None:
     for index, ref in enumerate(authority):
         validate_locator(ref, "authority", f"workstream.authority[{index}]")
     validate_locator(data.get("task_board"), "task_board", "workstream.task_board", data["workstream_id"])
+    if "intake" in data:
+        validate_locator(data["intake"], "intake", "workstream.intake", data["workstream_id"])
+
+
+def validate_intake(data: dict[str, Any], workstream_id: str) -> None:
+    reject_prohibited_keys(data, "intake")
+    _require(data.get("workstream_id") == workstream_id, "intake: wrong workstream_id")
+    kind = data.get("kind")
+    _require(kind in INTAKE_KINDS, f"intake: invalid kind {kind!r}")
+    state = data.get("state")
+    _require(state in INTAKE_STATES, f"intake: invalid state {state!r}")
+    _require(isinstance(data.get("diagnosis_revision"), int) and data["diagnosis_revision"] >= 0,
+             "intake: diagnosis_revision must be non-negative integer")
+    repair_subject = data.get("repair_subject")
+    _require(isinstance(repair_subject, str), "intake: repair_subject must be a string")
+    response_kind = data.get("response_kind")
+    _require(response_kind in RESPONSE_KINDS, f"intake: invalid response_kind {response_kind!r}")
+    response_observed = data.get("response_observed")
+    _require(isinstance(response_observed, bool), "intake: response_observed must be boolean")
+    _require(response_observed == (response_kind != "none"),
+             "intake: response_observed must match response_kind")
+    alignment_state = data.get("alignment_state")
+    _require(alignment_state in ALIGNMENT_STATES, f"intake: invalid alignment_state {alignment_state!r}")
+    alignment_subject = data.get("alignment_subject")
+    _require(isinstance(alignment_subject, str), "intake: alignment_subject must be a string")
+    micro_fix_candidate = data.get("micro_fix_candidate")
+    _require(isinstance(micro_fix_candidate, bool), "intake: micro_fix_candidate must be boolean")
+
+    if kind == "issue":
+        _require(alignment_state != "not_required", "intake: issue alignment cannot be not_required")
+        if alignment_state == "pending":
+            _require(alignment_subject == "", "intake: pending alignment must not retain an authorized subject")
+            _require(not micro_fix_candidate, "intake: micro-fix candidate requires exact issue authorization")
+            _require(state != "complete", "intake: issue cannot complete while alignment is pending")
+        else:
+            _require(response_observed and response_kind == "authorization",
+                     "intake: authorized issue requires an explicit authorization response")
+            _require(bool(repair_subject), "intake: authorized issue requires repair_subject")
+            _require(alignment_subject == repair_subject,
+                     "intake: authorized alignment subject is stale for current repair_subject")
+    else:
+        _require(alignment_state == "not_required",
+                 "intake: feature/change discovery must not manufacture issue-repair alignment")
+        _require(alignment_subject == "", "intake: non-issue alignment_subject must be empty")
+        _require(not micro_fix_candidate, "intake: micro-fix candidate is issue-only")
+
+    if state == "complete" and kind == "issue":
+        _require(alignment_state == "authorized", "intake: completed issue requires exact authorization")
 
 
 def validate_board(
