@@ -27,4 +27,8 @@ if test -f scripts/test-execution-contract.sh; then
   sh scripts/test-execution-contract.sh
 fi
 
+if test -f scripts/test-review-contract.sh; then
+  sh scripts/test-review-contract.sh
+fi
+
 printf 'M01 baseline checks: PASS\n'
