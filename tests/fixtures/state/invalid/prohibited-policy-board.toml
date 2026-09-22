@@ -1,0 +1,6 @@
+workstream_id = "sample-workstream"
+revision = 7
+execution_policy = "chatgpt_only"
+[execution_ref]
+branch = "feat/sample-workstream"
+cards = []

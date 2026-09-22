@@ -1,0 +1,5 @@
+workstream_id = "sample-workstream"
+revision = 7
+[execution_ref]
+branch = "feat/other-workstream"
+cards = []

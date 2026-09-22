@@ -1,0 +1,9 @@
+kind = "change"
+workstream_id = "sample-workstream"
+branch = "feat/sample-workstream"
+created_from = "1111111111111111111111111111111111111111"
+integration_target = "main"
+authority = [{ class = "authority", path = "requirements/PROJECT_WORKFLOW_V2.md" }]
+[task_board]
+class = "task_board"
+path = "implementation/workstreams/other-workstream/TASK_BOARD.toml"

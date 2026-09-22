@@ -1,0 +1,25 @@
+{
+  "name": "pw",
+  "version": "0.1.0",
+  "description": "Project Workflow V2 bootstrap package.",
+  "author": {
+    "name": "elmakus",
+    "url": "https://github.com/elmakus"
+  },
+  "repository": "https://github.com/elmakus/project_workflow_v2",
+  "keywords": [
+    "project-workflow",
+    "codex",
+    "workflow-v2"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Project Workflow V2",
+    "shortDescription": "Enter Project Workflow V2.",
+    "longDescription": "Thin Codex bootstrap for the canonical Project Workflow V2 semantic core.",
+    "developerName": "elmakus",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Use Project Workflow V2 for this repository."
+  }
+}

@@ -1,0 +1,17 @@
+attempt = "R01"
+verdict = "green"
+
+[subject]
+class = "git_blob"
+repository = "owner/fixture-project"
+commit = "2222222222222222222222222222222222222222"
+path = "workflow/STATE.md"
+blob = "3333333333333333333333333333333333333333"
+
+[acceptance]
+class = "authority"
+path = "requirements/PROJECT_WORKFLOW_V2.md"
+
+[independence]
+materially_produced_or_repaired_subject = false
+basis = "Reviewer did not materially produce or repair this exact subject."

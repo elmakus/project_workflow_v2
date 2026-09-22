@@ -1,0 +1,14 @@
+# TEMPLATE ONLY — mutable state for one selected workstream.
+workstream_id = "example-workstream"
+revision = 0
+
+[execution_ref]
+branch = "feat/example-workstream"
+
+[[cards]]
+id = "M01-T01"
+status = "ready"
+
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/example-workstream/cards/M01-T01.md"

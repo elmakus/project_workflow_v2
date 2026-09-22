@@ -1,0 +1,9 @@
+obligation_id = "M01-T02"
+operation = "write target branch"
+target = "owner/fixture-project:refs/heads/feat/sample-workstream"
+expected_state = "exact committed target bytes"
+readback_state = "verified"
+
+[evidence]
+class = "evidence"
+path = "implementation/workstreams/sample-workstream/evidence/M01-T02-write.md"

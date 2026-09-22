@@ -1,0 +1,16 @@
+workstream_id = "sample-workstream"
+revision = 7
+[execution_ref]
+branch = "feat/sample-workstream"
+[[cards]]
+id = "T1"
+status = "in_progress"
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/sample-workstream/cards/T1.md"
+[[cards]]
+id = "T2"
+status = "in_progress"
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/sample-workstream/cards/T2.md"
