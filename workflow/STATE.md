@@ -11,7 +11,7 @@ M01 established common ownership/binding. M02 extends only concrete pre-executio
 - BRAINSTORM.toml owns one exploratory revision, challenge audit, explicit user stop and exact Definition-promotion authorization.
 - RESEARCH.toml owns one factual obligation, source accounting, exact return owner and once-only reconciliation.
 - DEFINITION.toml owns exact promoted scope, accepted authority, completeness and premium-A state.
-- PLANNING.toml owns one material planning cycle, plan revision/artifact, planner audit, immutable frozen subject and exact premium A/B/C gate subjects.
+- PLANNING.toml owns one material planning cycle, plan revision/artifact, planner audit, immutable frozen subject, exact premium A/B/C gate subjects, and any bounded editorial-review exemption classification/base.
 - PLAN_REVIEW.toml owns one independent Stage-6 attempt for one immutable plan subject.
 - TASK_BOARD.toml is materialized only when implementation state exists and then owns mutable Card/milestone execution state.
 - Stable Task Cards own bounded execution contracts; implementation/final review attempts remain exact-subject records.
@@ -39,7 +39,7 @@ Definition readiness requires GREEN challenge audit and exact `scope_id@revision
 
 ## Planning / Plan Review / premium B/C
 
-Each material Planning entry has an exact cycle/entry subject; stale A cannot authorize a new cycle. GREEN planner audit freezes one exact Git blob for B. Independent Plan Review must match the frozen subject/revision/cycle. GREEN is consumed into approved plan, then C becomes due for the same subject before Execution Prep.
+Each material Planning entry has an exact cycle/entry subject; stale A cannot authorize a new cycle. A material re-entry persists its new draft cycle with exact premium A due before Planning resumes. GREEN planner audit freezes one exact Git blob for B. Independent Plan Review must match the frozen subject/revision/cycle. GREEN is consumed into approved plan, then C becomes due for the same subject before Execution Prep. A later purely editorial/mechanical change may omit a new review only by preserving the same approved cycle, naming the exact prior GREEN-reviewed subject, preserving satisfied B/C on that base, and recording a non-empty bounded semantic basis.
 
 ## Mutation guard / one-Card invariant
 
