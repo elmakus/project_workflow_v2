@@ -1,10 +1,9 @@
-# Project Workflow V2 Router — M01 feasibility stub
+# Project Workflow V2 Router
 
-This file exists only to prove the accepted installed-package delivery shape during M01-T02.
+Status: M01 delivery-feasibility stub only.
 
-- Canonical V2 workflow authority is bundled under this plugin's local `workflow/` tree.
-- The Codex bootstrap Skill and SessionStart hook may locate this router, but must not duplicate its semantics.
-- Ordinary operation must not fetch remote workflow policy to replace this bundled authority.
-- Missing or unreadable bundled authority is a blocking package error and must fail closed.
+Probe response: PWV2_M01_ROUTER_SENTINEL_7C91
 
-The complete obligation router and lifecycle semantics are intentionally deferred to the approved M01-T03/M01-T04 work. This feasibility stub is not production acceptance and must not be treated as the final V2 router.
+This file exists only to prove that the installed pw package can carry and resolve its sibling canonical workflow root before the real common router is implemented.
+
+No lifecycle phase is implemented by this stub. Any non-probe semantic obligation is unavailable and must fail closed rather than fall back to V1, runtime-specific policy, chat memory, or guessed behavior.

@@ -9,10 +9,12 @@ test -f hooks/session-start.py
 test -f workflow/ROUTER.md
 
 grep -q '"name": "pw"' .codex-plugin/plugin.json
+grep -q '"name": "project-workflow-v2"' .agents/plugins/marketplace.json
 grep -q '^name: project_workflow_v2$' skills/project_workflow_v2/SKILL.md
-grep -q '\$pw:project_workflow_v2' skills/project_workflow_v2/SKILL.md
 grep -q 'workflow/ROUTER.md' skills/project_workflow_v2/SKILL.md
 grep -q 'SessionStart' hooks/hooks.json
+grep -q 'PWV2_M01_SESSION_SENTINEL_4D2A' hooks/session-start.py
+grep -q 'PWV2_M01_ROUTER_SENTINEL_7C91' workflow/ROUTER.md
 grep -q 'fail closed' workflow/ROUTER.md
 
 if find workflow -maxdepth 2 -type d \( -name chatgpt_only -o -name codex_only \) | grep -q .; then
