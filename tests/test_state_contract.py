@@ -11,6 +11,7 @@ from tools.state_contract import (
     reject_prohibited_keys,
     validate_board,
     validate_bundle,
+    validate_intake,
     validate_project,
     validate_review,
     validate_workstream,
@@ -70,6 +71,60 @@ class StateEnvelopeTests(unittest.TestCase):
             validate_review(read_toml(INVALID / "review-runtime-identity.toml"))
         with self.assertRaisesRegex(ValidationError, "not semantically independent"):
             validate_review(read_toml(INVALID / "review-not-independent.toml"))
+
+
+    def test_issue_intake_alignment_is_exact_and_stale_subject_fails(self) -> None:
+        intake = read_toml(VALID / "INTAKE.toml")
+        validate_intake(intake, "sample-workstream")
+
+        stale = copy.deepcopy(intake)
+        stale["repair_subject"] = "repair:sample:v3"
+        with self.assertRaisesRegex(ValidationError, "stale"):
+            validate_intake(stale, "sample-workstream")
+
+    def test_issue_question_is_response_but_not_authorization(self) -> None:
+        intake = read_toml(VALID / "INTAKE.toml")
+        intake.update({
+            "state": "active",
+            "response_kind": "question",
+            "response_observed": True,
+            "alignment_state": "pending",
+            "alignment_subject": "",
+            "micro_fix_candidate": False,
+        })
+        validate_intake(intake, "sample-workstream")
+
+        intake["micro_fix_candidate"] = True
+        with self.assertRaisesRegex(ValidationError, "micro-fix candidate"):
+            validate_intake(intake, "sample-workstream")
+
+    def test_feature_discovery_does_not_manufacture_issue_alignment(self) -> None:
+        intake = read_toml(VALID / "INTAKE.toml")
+        intake.update({
+            "kind": "feature",
+            "state": "active",
+            "repair_subject": "",
+            "response_kind": "none",
+            "response_observed": False,
+            "alignment_state": "not_required",
+            "alignment_subject": "",
+            "micro_fix_candidate": False,
+        })
+        validate_intake(intake, "sample-workstream")
+        intake["alignment_state"] = "authorized"
+        with self.assertRaisesRegex(ValidationError, "must not manufacture"):
+            validate_intake(intake, "sample-workstream")
+
+    def test_intake_locator_is_workstream_bound(self) -> None:
+        workstream = copy.deepcopy(self.workstream)
+        workstream["intake"] = {
+            "class": "intake",
+            "path": "implementation/workstreams/sample-workstream/INTAKE.toml",
+        }
+        validate_workstream(workstream)
+        workstream["intake"]["path"] = "implementation/workstreams/other/INTAKE.toml"
+        with self.assertRaises(ValidationError):
+            validate_workstream(workstream)
 
     def test_project_contract_is_common_v2_only(self) -> None:
         project = read_project(VALID / "PROJECT.md")
