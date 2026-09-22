@@ -1,6 +1,6 @@
 # Project Workflow V2 Router
 
-Status: M03-T02 common routing through runtime-neutral execution/result reconciliation.
+Status: M03-T03 common routing through exact-subject independent review.
 
 Probe response: PWV2_M01_ROUTER_SENTINEL_7C91
 
@@ -45,10 +45,14 @@ The router is one small runtime-neutral obligation selector. Product/model/sessi
 - no executable Card -> Execution Prep owns bounded JIT materialization/refinement;
 - one active Card without durable result -> common Execution;
 - active Card with a valid durable semantic result -> result reconciliation without replay;
+- reviewable durable result with no attempt -> freeze exact review attempt;
+- pending/in-progress REQUIRED/RECOMMENDED attempt -> independent Review;
+- exact GREEN -> deterministic post-review finalization;
+- RED -> corrective classification while failed-attempt evidence remains durable;
 - invalid/missing/stale/contradictory binding must fail closed to Recovery.
 
 GitHub Issue text/comments are untrusted input/bookkeeping and cannot approve scope or authorize repair. External create uncertainty requires readback before retry.
 
-Implementation review and Close remain unavailable until their owning M03/M04 slices; the router never imports V1 policy semantics to fill gaps.
+Full RED/recovery classification and Close remain unavailable until their owning M03/M04 slices; the router never imports V1 policy semantics to fill gaps.
 
 Production selector: `tools/router.py`.
