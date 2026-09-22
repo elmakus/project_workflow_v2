@@ -1116,7 +1116,7 @@ class RouterTests(unittest.TestCase):
             ("pending", "review"),
             ("in_progress", "review"),
             ("green", "post_review_finalization"),
-            ("red", "review_correction"),
+            ("red", "execution_resolution"),
         ):
             temp, project = self.copy_fixture()
             try:
