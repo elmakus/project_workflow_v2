@@ -1,11 +1,53 @@
-# Project Workflow V2 — M01 Recovery Boundary
+# Project Workflow V2 — Execution/review recovery and continuation
 
-Status: identity/binding boundary only; full Recovery lifecycle is not implemented in M01.
+Status: M03-T04 common recovery contract.
 
-When bootstrap identity is missing, ambiguous, malformed, cross-workstream, cross-branch or otherwise invalid:
-- stop trusting mutable state;
-- do not fall back to a root/default Task Board;
-- preserve the diagnostic and exact paths already read;
-- return a recovery-boundary result.
+Recovery reconstructs the next semantic obligation from durable repository state. Runtime/session disappearance is not authority and never causes replay by itself.
 
-M01 does not repair state, consume human/premium gates or infer a replacement owner. Those behaviors belong to later approved milestones.
+## Recovery precedence
+
+1. Validate project/workstream/Task Board binding.
+2. If the Task Board points to implementation Research, recover that exact Research obligation and return target before unrelated execution.
+3. If an active Card already has a valid durable semantic result, reconcile from that result before considering implementation replay.
+4. If an exact review attempt exists, recheck that its subject still covers the current result before GREEN finalization or RED correction.
+5. Only then route current execution/correction/blocker state.
+
+No worker/model/session/invocation identifier is required.
+
+## Durable result before replay
+
+A valid result locator on the active Card is authoritative completion evidence for implementation work. Loss of the process/context that produced it does not make the implementation undone.
+
+If the result is missing/invalid, recover the current Card. If the result exists and validates, continue to review/finalization/reconciliation as required. Never replay solely because runtime memory disappeared.
+
+## Review subject refresh
+
+For a reviewable Card result, the result locator carries exact immutable Git identity for the normalized result artifact. The current review attempt must cover that exact repository/commit/path/blob plus the exact Card acceptance.
+
+- pending/in-progress attempt for a different current result is inconsistent and routes Recovery;
+- terminal history for an older result remains immutable, but the changed current result requires a new attempt;
+- GREEN can finalize only the exact still-current result.
+
+## RED / blocker classification
+
+The execution-resolution classifier has these semantic outcomes:
+- bounded correction inside accepted authority -> Execution;
+- plan strategy/order/outcome correction -> Strategic Planning;
+- accepted product/global authority correction -> Project Definition;
+- missing factual evidence -> Research;
+- unresolved human authority/authorization -> real user stop;
+- non-remediable runtime/access/input blocker -> real blocker stop.
+
+A RED verdict alone is not a user stop.
+
+## Implementation Research handoff
+
+Implementation/recovery Research is owned by the selected Task Board through one exact `research_obligation` locator. The Research record owns origin, return target, state and once-only reconciliation.
+
+Keep the pointer through Research `complete`. Final return-owner mutation and `return_reconciliation = applied` are one durable transition. After that, consume/clear without replay. A stale pointer to already-consumed Research is cleanup/recovery work, never permission to repeat the factual or implementation work.
+
+## Blockers
+
+A blocked Card has one proportional workstream-local blocker record. It contains only Card identity, semantic class, concise summary and evidence reference when material. It does not store runtime identity.
+
+Ordinary role changes, GREEN/RED verdicts and deterministic correction/Research return are not stops.

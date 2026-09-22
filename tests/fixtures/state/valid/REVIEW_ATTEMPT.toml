@@ -1,5 +1,6 @@
 attempt = "R01"
 verdict = "green"
+evidence_path = "evidence/review-R01.md"
 
 [subject]
 class = "git_blob"

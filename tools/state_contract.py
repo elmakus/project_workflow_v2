@@ -20,6 +20,8 @@ AUDIT_STATES = {"pending", "green"}
 PROMOTION_STATES = {"pending", "authorized"}
 RESEARCH_STATES = {"active", "complete", "consumed"}
 RESEARCH_RETURN_TARGETS = {"intake", "brainstorming", "definition"}
+EXECUTION_RESEARCH_ORIGIN_ROLES = {"execution_prep", "execution", "execution_resolution"}
+BLOCKER_CLASSES = {"missing_evidence", "human_authority", "runtime_access_input"}
 RESEARCH_SOURCE_CLASSES = {
     "official_upstream",
     "project_runtime",
@@ -35,6 +37,8 @@ PLANNING_REVIEW_MODES = {"independent", "editorial_exempt"}
 PREMIUM_GATE_STATES = {"not_due", "due", "satisfied"}
 TRACKER_STATES = {"discovery", "create_pending_readback", "linked", "ambiguous", "unavailable"}
 TRACKER_READBACK_STATES = {"pending", "verified", "uncertain", "not_applicable"}
+JIT_TRIGGER_STATES = {"waiting", "satisfied", "consumed"}
+TASK_CARD_REVIEW_REQUIREMENTS = {"none", "required", "recommended"}
 PROHIBITED_KEY_PREFIXES = ("runtime_", "model_", "session_", "worker_", "batch_", "lane_", "scheduler_", "context_health_")
 PROHIBITED_KEYS = {
     "execution_policy",
@@ -133,11 +137,27 @@ def validate_locator(
         }
         expected = f"implementation/workstreams/{workstream_id}/{filenames[expected_class]}"
         _require(path == expected, f"{label}: expected exact path {expected!r}")
+    elif expected_class == "review_attempt":
+        _require(workstream_id is not None, f"{label}: workstream binding required")
+        prefix = f"implementation/workstreams/{workstream_id}/reviews/"
+        _require(path.startswith(prefix) and path.endswith(".toml"),
+                 f"{label}: wrong review_attempt class/path")
     elif expected_class in {"evidence", "result"}:
         _require(workstream_id is not None, f"{label}: workstream binding required")
         directory = "evidence" if expected_class == "evidence" else "results"
         prefix = f"implementation/workstreams/{workstream_id}/{directory}/"
         _require(path.startswith(prefix) and path.endswith(".md"), f"{label}: wrong {expected_class} class/path")
+        if expected_class == "result" and ("commit" in ref or "blob" in ref):
+            _require(
+                isinstance(ref.get("commit"), str) and SHA40.fullmatch(ref["commit"]) is not None
+                and isinstance(ref.get("blob"), str) and SHA40.fullmatch(ref["blob"]) is not None,
+                f"{label}: exact result identity requires commit + blob 40-hex",
+            )
+    elif expected_class == "blocker":
+        _require(workstream_id is not None, f"{label}: workstream binding required")
+        prefix = f"implementation/workstreams/{workstream_id}/blockers/"
+        _require(path.startswith(prefix) and path.endswith(".toml"),
+                 f"{label}: wrong blocker class/path")
     elif expected_class == "authority":
         allowed = ("requirements/", "decisions/", "planning/", "workflow/")
         _require(path.startswith(allowed), f"{label}: authority path is outside accepted authority roots")
@@ -281,12 +301,21 @@ def validate_research(data: dict[str, Any], workstream_id: str) -> None:
     _require(data.get("workstream_id") == workstream_id, "research: wrong workstream_id")
     state = data.get("state")
     _require(state in RESEARCH_STATES, f"research: invalid state {state!r}")
-    _require(data.get("origin_role") in {"intake", "brainstorming", "definition"},
-             "research: invalid origin_role")
+    origin_role = data.get("origin_role")
+    _require(
+        origin_role in {"intake", "brainstorming", "definition"} | EXECUTION_RESEARCH_ORIGIN_ROLES,
+        "research: invalid origin_role",
+    )
     _require(isinstance(data.get("origin_subject"), str) and data["origin_subject"].strip(),
              "research: missing origin_subject")
     return_target = data.get("return_target")
-    _require(return_target in RESEARCH_RETURN_TARGETS, f"research: invalid return_target {return_target!r}")
+    execution_return = isinstance(return_target, str) and (
+        return_target.startswith("execution_resolution:")
+        or return_target.startswith("execution_prep:")
+        or return_target.startswith("execution:")
+    )
+    _require(return_target in RESEARCH_RETURN_TARGETS or execution_return,
+             f"research: invalid return_target {return_target!r}")
     reconciliation = data.get("return_reconciliation")
     _require(reconciliation in RETURN_RECONCILIATION_STATES,
              f"research: invalid return_reconciliation {reconciliation!r}")
@@ -558,6 +587,82 @@ def validate_tracker(data: dict[str, Any], workstream_id: str) -> None:
         _require(state == "linked", "tracker: final PR correlation requires a linked Issue")
 
 
+def parse_task_card(text: str, expected_id: str, workstream_id: str) -> dict[str, Any]:
+    """Parse the stable Markdown Task Card fields needed for launch readiness."""
+    wanted = {
+        "card id",
+        "included scope",
+        "excluded scope",
+        "authority refs",
+        "dependencies",
+        "acceptance",
+        "required tests/readback",
+        "review requirement",
+        "technical contract",
+    }
+    fields: dict[str, str] = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line.startswith("- ") or ":" not in line:
+            continue
+        key, value = line[2:].split(":", 1)
+        normalized = key.strip().lower()
+        if normalized in wanted:
+            _require(normalized not in fields, f"task_card: duplicate field {key!r}")
+            fields[normalized] = value.strip()
+
+    missing = sorted(wanted - set(fields))
+    _require(not missing, f"task_card: missing stable field(s): {', '.join(missing)}")
+    for key, value in fields.items():
+        _require(value and "<" not in value and ">" not in value,
+                 f"task_card: unresolved field {key!r}")
+
+    _require(fields["card id"] == expected_id, "task_card: Card ID does not match Task Board")
+
+    authority_refs = [part.strip() for part in fields["authority refs"].split(",") if part.strip()]
+    _require(authority_refs and authority_refs != ["none"], "task_card: at least one authority ref is required")
+    for index, raw in enumerate(authority_refs):
+        path = _safe_relative_path(raw, f"task_card.authority_refs[{index}]")
+        _require(path.startswith(("requirements/", "decisions/", "planning/", "workflow/")),
+                 f"task_card.authority_refs[{index}]: outside accepted authority roots")
+
+    dependencies: list[dict[str, str]] = []
+    if fields["dependencies"].lower() != "none":
+        raw_dependencies = [part.strip() for part in fields["dependencies"].split(",") if part.strip()]
+        _require(raw_dependencies, "task_card: dependencies must be exact result refs or none")
+        expected_prefix = f"implementation/workstreams/{workstream_id}/results/"
+        for index, raw in enumerate(raw_dependencies):
+            matched = re.fullmatch(r"(.+)@([0-9a-f]{40}):([0-9a-f]{40})", raw)
+            _require(matched is not None,
+                     f"task_card.dependencies[{index}]: exact result ref must be path@commit:blob")
+            path = _safe_relative_path(matched.group(1), f"task_card.dependencies[{index}]")
+            _require(path.startswith(expected_prefix) and path.endswith(".md"),
+                     f"task_card.dependencies[{index}]: must be exact workstream result ref")
+            dependencies.append({
+                "path": path,
+                "commit": matched.group(2),
+                "blob": matched.group(3),
+            })
+
+    review_requirement = fields["review requirement"].lower()
+    _require(review_requirement in TASK_CARD_REVIEW_REQUIREMENTS,
+             "task_card: invalid review requirement")
+
+    technical_contract: str | None = None
+    if fields["technical contract"].lower() != "none":
+        technical_contract = _safe_relative_path(fields["technical contract"], "task_card.technical_contract")
+        _require(technical_contract.startswith(("openspec/", "contracts/")),
+                 "task_card: technical contract must use openspec/ or contracts/ when present")
+
+    return {
+        "card_id": expected_id,
+        "authority_refs": authority_refs,
+        "dependencies": dependencies,
+        "review_requirement": review_requirement,
+        "technical_contract": technical_contract,
+    }
+
+
 def validate_board(
     data: dict[str, Any],
     workstream: dict[str, Any],
@@ -590,15 +695,92 @@ def validate_board(
         validate_locator(card.get("contract"), "task_card", f"{label}.contract", workstream["workstream_id"])
         if "result" in card:
             validate_locator(card["result"], "result", f"{label}.result", workstream["workstream_id"])
+        attempts = card.get("review_attempts", [])
+        _require(isinstance(attempts, list), f"{label}: review_attempts must be an array")
+        attempt_paths: set[str] = set()
+        for attempt_index, attempt_ref in enumerate(attempts):
+            attempt_path = validate_locator(
+                attempt_ref,
+                "review_attempt",
+                f"{label}.review_attempts[{attempt_index}]",
+                workstream["workstream_id"],
+            )
+            _require(attempt_path not in attempt_paths,
+                     f"{label}: duplicate review attempt locator {attempt_path!r}")
+            attempt_paths.add(attempt_path)
         if status == "done":
             _require("result" in card, f"{label}: done Card requires an exact result locator")
     _require(active <= 1, "task_board: more than one Project Workflow Card is in_progress")
+
+    research_obligation = data.get("research_obligation")
+    if research_obligation is not None:
+        validate_locator(
+            research_obligation,
+            "research",
+            "task_board.research_obligation",
+            workstream["workstream_id"],
+        )
+
+    for index, card in enumerate(cards):
+        if card["status"] == "blocked":
+            _require("blocker" in card, f"task_board.cards[{index}]: blocked Card requires blocker locator")
+        if "blocker" in card:
+            validate_locator(
+                card["blocker"],
+                "blocker",
+                f"task_board.cards[{index}].blocker",
+                workstream["workstream_id"],
+            )
+
+    triggers = data.get("jit_triggers", [])
+    _require(isinstance(triggers, list), "task_board: jit_triggers must be an array")
+    trigger_ids: set[str] = set()
+    cards_by_id = {card["id"]: card for card in cards}
+    for index, trigger in enumerate(triggers):
+        label = f"task_board.jit_triggers[{index}]"
+        _require(isinstance(trigger, dict), f"{label}: trigger must be table")
+        trigger_id = trigger.get("id")
+        _require(isinstance(trigger_id, str) and trigger_id.strip(), f"{label}: missing id")
+        _require(trigger_id not in trigger_ids, f"{label}: duplicate trigger id {trigger_id!r}")
+        trigger_ids.add(trigger_id)
+        after_card = trigger.get("after_card")
+        _require(after_card in cards_by_id, f"{label}: after_card must name an existing Card")
+        state = trigger.get("state")
+        _require(state in JIT_TRIGGER_STATES, f"{label}: invalid state {state!r}")
+        condition = trigger.get("condition")
+        _require(isinstance(condition, str) and condition.strip(), f"{label}: missing condition")
+        if state in {"satisfied", "consumed"}:
+            predecessor = cards_by_id[after_card]
+            _require(predecessor["status"] == "done" and "result" in predecessor,
+                     f"{label}: satisfied trigger requires DONE predecessor result")
+
+
+def validate_blocker(data: dict[str, Any], workstream_id: str, card_id: str) -> None:
+    reject_prohibited_keys(data, "blocker")
+    _require(data.get("workstream_id") == workstream_id, "blocker: wrong workstream_id")
+    _require(data.get("card_id") == card_id, "blocker: wrong card_id")
+    _require(data.get("class") in BLOCKER_CLASSES, "blocker: invalid class")
+    _require(isinstance(data.get("summary"), str) and data["summary"].strip(),
+             "blocker: missing summary")
+    evidence_path = data.get("evidence_path", "")
+    _require(isinstance(evidence_path, str), "blocker: evidence_path must be a string")
+    if evidence_path:
+        path = _safe_relative_path(evidence_path, "blocker.evidence_path")
+        prefix = f"implementation/workstreams/{workstream_id}/evidence/"
+        _require(path.startswith(prefix) and path.endswith(".md"),
+                 "blocker: evidence must be workstream-local Markdown")
+
+
+def _review_subject_key(data: dict[str, Any]) -> str:
+    subject = data["subject"]
+    return f"{subject['repository']}@{subject['commit']}:{subject['path']}@{subject['blob']}"
 
 
 def validate_review(data: dict[str, Any]) -> None:
     reject_prohibited_keys(data, "review")
     _require(isinstance(data.get("attempt"), str) and data["attempt"], "review: missing attempt")
-    _require(data.get("verdict") in {"pending", "green", "red"}, "review: invalid verdict")
+    verdict = data.get("verdict")
+    _require(verdict in {"pending", "in_progress", "green", "red"}, "review: invalid verdict")
 
     subject = data.get("subject")
     _require(isinstance(subject, dict) and subject.get("class") == "git_blob", "review: subject must be git_blob")
@@ -609,13 +791,65 @@ def validate_review(data: dict[str, Any]) -> None:
                  f"review.subject: {key} must be exact 40-hex")
     _safe_relative_path(subject["path"], "review.subject")
 
-    validate_locator(data.get("acceptance"), "authority", "review.acceptance")
+    acceptance = data.get("acceptance")
+    _require(isinstance(acceptance, dict), "review: missing acceptance identity")
+    acceptance_class = acceptance.get("class")
+    if acceptance_class == "authority":
+        validate_locator(acceptance, "authority", "review.acceptance")
+    elif acceptance_class == "task_card":
+        workstream_id = data.get("workstream_id")
+        _require(isinstance(workstream_id, str) and workstream_id,
+                 "review: task-card acceptance requires workstream_id")
+        path = validate_locator(acceptance, "task_card", "review.acceptance", workstream_id)
+        card_id = data.get("card_id")
+        _require(isinstance(card_id, str) and card_id, "review: task-card acceptance requires card_id")
+        _require(PurePosixPath(path).stem == card_id,
+                 "review: acceptance Task Card does not match card_id")
+    else:
+        raise ValidationError("review: unsupported acceptance identity")
+
     independence = data.get("independence")
     _require(isinstance(independence, dict), "review: missing semantic independence")
     _require(independence.get("materially_produced_or_repaired_subject") is False,
              "review: reviewer is not semantically independent of exact subject")
     _require(isinstance(independence.get("basis"), str) and independence["basis"].strip(),
              "review: independence basis must be durable")
+
+    evidence_path = data.get("evidence_path", "")
+    _require(isinstance(evidence_path, str), "review: evidence_path must be a string")
+    if verdict in {"green", "red"}:
+        _require(bool(evidence_path.strip()), "review: terminal verdict requires evidence_path")
+        _safe_relative_path(evidence_path, "review.evidence_path")
+    else:
+        _require(evidence_path == "", "review: non-terminal attempt must not claim terminal evidence")
+
+
+def validate_review_history(
+    attempts: list[dict[str, Any]],
+    *,
+    expected_card_id: str | None = None,
+    workstream_id: str | None = None,
+) -> None:
+    _require(isinstance(attempts, list) and attempts,
+             "review_history: at least one attempt is required")
+    seen_ids: set[str] = set()
+    nonterminal = 0
+    for index, attempt in enumerate(attempts):
+        validate_review(attempt)
+        attempt_id = attempt["attempt"]
+        _require(attempt_id not in seen_ids, f"review_history: duplicate attempt {attempt_id!r}")
+        seen_ids.add(attempt_id)
+        if expected_card_id is not None:
+            _require(attempt.get("card_id") == expected_card_id,
+                     "review_history: attempt belongs to another Card")
+        if workstream_id is not None:
+            _require(attempt.get("workstream_id") == workstream_id,
+                     "review_history: attempt belongs to another workstream")
+        if attempt["verdict"] in {"pending", "in_progress"}:
+            nonterminal += 1
+            _require(index == len(attempts) - 1,
+                     "review_history: only the latest attempt may be non-terminal")
+    _require(nonterminal <= 1, "review_history: multiple active attempts are forbidden")
 
 
 def validate_external_effect(data: dict[str, Any], workstream_id: str) -> None:

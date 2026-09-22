@@ -1,6 +1,9 @@
-# TEMPLATE ONLY — append a new attempt for a new exact subject/verdict.
+# TEMPLATE ONLY — append a new file for every review attempt.
+workstream_id = "example-workstream"
+card_id = "M03-T01"
 attempt = "R01"
 verdict = "pending"
+evidence_path = ""
 
 [subject]
 class = "git_blob"
@@ -10,9 +13,9 @@ path = "path/to/reviewed/artifact"
 blob = "0000000000000000000000000000000000000000"
 
 [acceptance]
-class = "authority"
-path = "requirements/REQUIREMENTS.md"
+class = "task_card"
+path = "implementation/workstreams/example-workstream/cards/M03-T01.md"
 
 [independence]
 materially_produced_or_repaired_subject = false
-basis = "Semantic independence evidence; no runtime/session identity."
+basis = "Semantic independence evidence only; never runtime/model/session identity."

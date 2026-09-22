@@ -1,0 +1,6 @@
+# TEMPLATE ONLY — proportional blocker for one exact Card.
+workstream_id = "example-workstream"
+card_id = "M03-T01"
+class = "runtime_access_input"
+summary = "Exact unresolved blocker."
+evidence_path = ""

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Runtime-neutral Project Workflow V2 obligation selector through M02-T04."""
+"""Runtime-neutral Project Workflow V2 obligation selector through M03-T04."""
 
 from __future__ import annotations
 
@@ -8,6 +8,8 @@ import json
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 
+from tools.execution_contract import ExecutionContractError, parse_card_result
+from tools.recovery_contract import RecoveryContractError, classify_resolution, exact_result_subject, review_subject
 from tools.state_contract import (
     ValidationError,
     read_project,
@@ -17,9 +19,12 @@ from tools.state_contract import (
     validate_definition,
     validate_intake,
     validate_plan_review,
+    parse_task_card,
     validate_planning,
     validate_project,
     validate_research,
+    validate_review_history,
+    validate_blocker,
     validate_tracker,
     validate_workstream,
 )
@@ -91,6 +96,71 @@ def recovery(reads: Reads, reason: str) -> RouteResult:
         reason += "; recovery module unreadable"
     return result(reads, "recovery", "recovery_boundary", reason,
                   owner_module="workflow/RECOVERY.md")
+
+
+def classify_jit_refinement(change_class: str) -> tuple[str, str]:
+    routes = {
+        "bounded_execution_detail": (
+            "execution_prep",
+            "Bounded L1/L2 refinement stays inside accepted execution authority",
+        ),
+        "strategy": (
+            "planning",
+            "Milestone strategy/order/outcome change belongs to Strategic Planning",
+        ),
+        "product_or_global_intent": (
+            "definition",
+            "Accepted product/global intent change belongs to Project Definition",
+        ),
+        "missing_facts": (
+            "research",
+            "Missing factual evidence must be resolved by Research before preparation continues",
+        ),
+    }
+    if change_class not in routes:
+        raise ValidationError(f"unknown JIT refinement class {change_class!r}")
+    return routes[change_class]
+
+
+def refresh_ready_card(
+    reads: Reads,
+    board: dict,
+    workstream: dict,
+    card: dict,
+) -> dict:
+    contract_path = card["contract"]["path"]
+    text = reads.project(contract_path).read_text(encoding="utf-8")
+    contract = parse_task_card(text, card["id"], workstream["workstream_id"])
+
+    for authority_path in contract["authority_refs"]:
+        reads.project(authority_path).read_text(encoding="utf-8")
+
+    done_results = {
+        (
+            item["result"]["path"],
+            item["result"].get("commit"),
+            item["result"].get("blob"),
+        )
+        for item in board["cards"]
+        if item["status"] == "done" and "result" in item
+    }
+    for dependency in contract["dependencies"]:
+        exact_dependency = (
+            dependency["path"],
+            dependency["commit"],
+            dependency["blob"],
+        )
+        if exact_dependency not in done_results:
+            raise ValidationError(
+                f"ready Card dependency {dependency['path']!r} no longer matches the exact current DONE predecessor result"
+            )
+        reads.project(dependency["path"]).read_text(encoding="utf-8")
+
+    technical_contract = contract["technical_contract"]
+    if technical_contract is not None:
+        reads.project(technical_contract).read_text(encoding="utf-8")
+
+    return contract
 
 
 def select_route(project_root: Path, selected_workstreams: list[str], *,
@@ -334,7 +404,7 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                 if plan_review is None or plan_review["verdict"] != "green":
                     raise ValidationError("editorial exemption requires prior exact GREEN Plan Review")
                 return result(
-                    reads, "unavailable", "execution_prep",
+                    reads, "route", "execution_prep",
                     "Editorial/mechanical-only plan change preserves prior GREEN review and satisfied C; no new Stage-6 review is due",
                     subject=subject_key, owner_module="workflow/EXECUTION_PREP.md",
                 )
@@ -349,8 +419,8 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     subject=subject_key, owner_module="workflow/PLANNING.md",
                 )
             return result(
-                reads, "unavailable", "execution_prep",
-                "Premium stop C is satisfied; Execution Prep semantics arrive in M03",
+                reads, "route", "execution_prep",
+                "Premium stop C is satisfied; common Execution Prep owns Card materialization",
                 subject=subject_key, owner_module="workflow/EXECUTION_PREP.md",
             )
 
@@ -385,8 +455,8 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                 raise ValidationError("selected workstream has no routable pre-execution state or Task Board")
             if intake["kind"] == "issue" and intake["micro_fix_candidate"]:
                 return result(
-                    reads, "unavailable", "execution_prep",
-                    "Aligned issue is a bounded micro-fix candidate; Execution Prep semantics arrive in M03",
+                    reads, "route", "execution_prep",
+                    "Aligned issue is a bounded micro-fix candidate; common Execution Prep owns preparation",
                     subject=intake["repair_subject"], owner_module="workflow/EXECUTION_PREP.md",
                 )
             return result(
@@ -397,6 +467,42 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
 
         board = read_toml(reads.project(workstream["task_board"]["path"]))
         validate_board(board, workstream)
+
+        if board.get("research_obligation") is not None:
+            research_ref = board["research_obligation"]
+            board_research = read_toml(reads.project(research_ref["path"]))
+            validate_research(board_research, workstream["workstream_id"])
+            if board_research["origin_role"] not in {"execution_prep", "execution", "execution_resolution"}:
+                raise ValidationError("Task Board Research pointer must own implementation/recovery Research")
+            if board_research["state"] == "active":
+                return result(
+                    reads, "route", "research",
+                    "Implementation/recovery Research owns the next factual obligation",
+                    subject=board_research["origin_subject"], owner_module="workflow/RESEARCH.md",
+                )
+            if board_research["state"] == "complete":
+                return_target = board_research["return_target"]
+                if return_target.startswith("execution_resolution:"):
+                    obligation = "execution_resolution"
+                elif return_target.startswith("execution_prep:"):
+                    obligation = "execution_prep"
+                elif return_target.startswith("execution:"):
+                    obligation = "execution"
+                else:
+                    raise ValidationError("Task Board Research has non-execution return target")
+                return result(
+                    reads, "route", obligation,
+                    "Completed implementation Research returns once to its exact durable owner before pointer cleanup",
+                    subject=return_target.split(":", 1)[1],
+                    owner_module="workflow/RECOVERY.md" if obligation == "execution_resolution" else (
+                        "workflow/EXECUTION_PREP.md" if obligation == "execution_prep" else "workflow/EXECUTION.md"
+                    ),
+                )
+            return result(
+                reads, "route", "research_cleanup",
+                "Task Board still points to consumed Research; clear only the stale pointer without replay",
+                subject=board_research["origin_subject"], owner_module="workflow/RECOVERY.md",
+            )
     except (OSError, ValidationError, KeyError) as exc:
         return recovery(reads, f"selected workstream identity invalid: {exc}")
 
@@ -407,42 +513,123 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
         card = active[0]
         try:
             reads.project(card["contract"]["path"]).read_text(encoding="utf-8")
-        except (OSError, ValidationError, KeyError) as exc:
-            return recovery(reads, f"current Card contract invalid: {exc}")
+            if "result" in card:
+                result_text = reads.project(card["result"]["path"]).read_text(encoding="utf-8")
+                parse_card_result(result_text, card["id"], workstream["workstream_id"])
+                contract = parse_task_card(
+                    reads.project(card["contract"]["path"]).read_text(encoding="utf-8"),
+                    card["id"],
+                    workstream["workstream_id"],
+                )
+                requirement = contract["review_requirement"]
+                attempts: list[dict] = []
+                for attempt_ref in card.get("review_attempts", []):
+                    attempt = read_toml(reads.project(attempt_ref["path"]))
+                    attempts.append(attempt)
+
+                if requirement == "none":
+                    return result(
+                        reads, "route", "result_reconciliation",
+                        "A valid semantic result is already durable and this Card requires no independent review; do not replay implementation",
+                        subject=card["id"], owner_module="workflow/EXECUTION.md",
+                    )
+                if not attempts:
+                    return result(
+                        reads, "route", "review_freeze",
+                        "Accepted semantic result requires an exact independent review attempt before terminal completion",
+                        subject=card["id"], owner_module="workflow/REVIEW.md",
+                    )
+
+                validate_review_history(
+                    attempts,
+                    expected_card_id=card["id"],
+                    workstream_id=workstream["workstream_id"],
+                )
+                current_subject = exact_result_subject(project["repository"], card["result"])
+                verdict = attempts[-1]["verdict"]
+                covered_subject = review_subject(attempts[-1])
+                if covered_subject != current_subject:
+                    if verdict in {"pending", "in_progress"}:
+                        raise ValidationError("active review attempt is stale for the current durable result")
+                    return result(
+                        reads, "route", "review_freeze",
+                        "Current durable result changed after terminal review history; preserve history and freeze a new exact attempt",
+                        subject=card["id"], owner_module="workflow/REVIEW.md",
+                    )
+                if verdict in {"pending", "in_progress"}:
+                    return result(
+                        reads, "route", "review",
+                        "Exact REQUIRED/RECOMMENDED review attempt blocks terminal Card completion until GREEN",
+                        subject=card["id"], owner_module="workflow/REVIEW.md",
+                    )
+                if verdict == "green":
+                    return result(
+                        reads, "route", "post_review_finalization",
+                        "Exact current review is GREEN; Card finalization is deterministic and is not a verdict-only stop",
+                        subject=card["id"], owner_module="workflow/EXECUTION.md",
+                    )
+                return result(
+                    reads, "route", "execution_resolution",
+                    "RED review evidence remains durable; execution resolution classifies bounded correction, Planning, Definition, Research or a real stop",
+                    subject=card["id"], owner_module="workflow/RECOVERY.md",
+                )
+        except (OSError, ValidationError, ExecutionContractError, KeyError) as exc:
+            return recovery(reads, f"current Card execution state invalid: {exc}")
         return result(
-            reads, "unavailable", "execution",
-            "Current Card is identified, but Execution lifecycle semantics are not implemented until M03",
+            reads, "route", "execution",
+            "Current Card owns runtime-neutral implementation; delegated/direct realization stays outside canonical state",
             subject=card["id"], owner_module="workflow/EXECUTION.md",
+        )
+
+    blocked = [card for card in board["cards"] if card["status"] == "blocked"]
+    if blocked:
+        card = blocked[0]
+        try:
+            blocker_ref = card["blocker"]
+            blocker = read_toml(reads.project(blocker_ref["path"]))
+            validate_blocker(blocker, workstream["workstream_id"], card["id"])
+            route, is_stop = classify_resolution(blocker["class"])
+        except (OSError, ValidationError, RecoveryContractError, KeyError) as exc:
+            return recovery(reads, f"blocked Card recovery invalid: {exc}")
+        if route == "research":
+            return result(
+                reads, "route", "research_handoff",
+                "Blocked Card is missing factual evidence; materialize exact Task-Board-owned Research before continuing",
+                subject=card["id"], owner_module="workflow/RECOVERY.md",
+            )
+        return result(
+            reads, "stop" if is_stop else "route", route,
+            "Blocked Card classification reached an exact durable owner",
+            subject=card["id"], owner_module="workflow/RECOVERY.md",
         )
 
     if len(ready) == 1:
         card = ready[0]
         try:
-            reads.project(card["contract"]["path"]).read_text(encoding="utf-8")
+            refresh_ready_card(reads, board, workstream, card)
         except (OSError, ValidationError, KeyError) as exc:
-            return recovery(reads, f"ready Card contract invalid: {exc}")
+            return recovery(reads, f"ready Card launch refresh failed: {exc}")
         return result(
-            reads, "unavailable", "execution",
-            "Ready Card is identified, but Execution lifecycle semantics are not implemented until M03",
-            subject=card["id"], owner_module="workflow/EXECUTION.md",
+            reads, "route", "execution_prep",
+            "READY Card passed launch refresh against current authority, DONE dependency results and optional technical contract",
+            subject=card["id"], owner_module="workflow/EXECUTION_PREP.md",
         )
 
     if len(ready) > 1:
-        return result(reads, "unavailable", "execution_selection",
-                      "Multiple ready Cards require later dependency semantics; current router does not guess",
-                      owner_module="workflow/EXECUTION.md")
-
-    if any(card["status"] == "blocked" for card in board["cards"]):
-        return result(reads, "unavailable", "blocked_resolution",
-                      "Blocked-Card resolution belongs to later Research/Execution/Recovery semantics")
+        return result(
+            reads, "route", "execution_prep",
+            "Multiple READY Cards remain semantically ready; Execution Prep must choose the next deterministic Card from accepted plan/dependency authority",
+            owner_module="workflow/EXECUTION_PREP.md",
+        )
 
     if board["cards"] and all(card["status"] == "done" for card in board["cards"]):
         return result(reads, "unavailable", "milestone_finalization",
                       "Milestone finalization/Close is not implemented yet",
                       owner_module="workflow/CLOSE.md")
 
-    return result(reads, "unavailable", "card_preparation",
-                  "No executable Card is selected; later Execution Prep/JIT semantics are unavailable until M03")
+    return result(reads, "route", "execution_prep",
+                  "No executable Card is selected; common Execution Prep owns bounded JIT materialization/refinement",
+                  owner_module="workflow/EXECUTION_PREP.md")
 
 
 def main() -> int:

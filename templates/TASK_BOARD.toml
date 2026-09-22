@@ -12,3 +12,10 @@ status = "ready"
 [cards.contract]
 class = "task_card"
 path = "implementation/workstreams/example-workstream/cards/M01-T01.md"
+
+# Optional predecessor-dependent JIT state; do not create placeholder Cards.
+[[jit_triggers]]
+id = "after-M01-T01"
+after_card = "M01-T01"
+state = "waiting"
+condition = "Material predecessor result determines the next stable Card boundary."

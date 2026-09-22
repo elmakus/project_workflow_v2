@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tools.router import PRIORITY_FOUNDATION, REAL_STOP_FOUNDATION, select_route
+from tools.router import PRIORITY_FOUNDATION, REAL_STOP_FOUNDATION, classify_jit_refinement, select_route
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests" / "fixtures" / "router" / "valid-project"
@@ -35,7 +35,7 @@ class RouterTests(unittest.TestCase):
             semantic = (routed.disposition, routed.obligation, routed.subject, routed.owner_module)
             expected = expected or semantic
             self.assertEqual(semantic, expected)
-        self.assertEqual(expected, ("unavailable", "execution", "M01-T04", "workflow/EXECUTION.md"))
+        self.assertEqual(expected, ("route", "execution", "M01-T04", "workflow/EXECUTION.md"))
 
     def test_progressive_disclosure_read_set_is_exact(self) -> None:
         routed = select_route(FIXTURE, [MANIFEST], package_root=ROOT)
@@ -53,6 +53,129 @@ class RouterTests(unittest.TestCase):
         self.assertNotIn("migration/UNRELATED.md", joined)
         self.assertNotIn("untrusted/ISSUE_TEXT.md", joined)
         self.assertNotIn("templates/", joined)
+
+    def task_card_content(
+        self, *, dependencies: str = "none", technical_contract: str = "none",
+        review_requirement: str = "none",
+    ) -> str:
+        return (
+            "# Fixture Card\n"
+            "- Card ID: M01-T04\n"
+            "- Included scope: prove launch readiness\n"
+            "- Excluded scope: runtime-specific orchestration\n"
+            "- Authority refs: requirements/REQUIREMENTS.md\n"
+            f"- Dependencies: {dependencies}\n"
+            "- Acceptance: route only after current launch inputs are valid\n"
+            "- Required tests/readback: production router fixture\n"
+            f"- Review requirement: {review_requirement}\n"
+            f"- Technical contract: {technical_contract}\n"
+        )
+
+    def make_ready_card(self, project: Path, *, dependencies: str = "none",
+                        technical_contract: str = "none") -> None:
+        board = project / BOARD
+        board.write_text(board.read_text().replace('status = "in_progress"', 'status = "ready"'))
+        card = project / CARD
+        card.write_text(self.task_card_content(
+            dependencies=dependencies,
+            technical_contract=technical_contract,
+        ))
+        authority = project / "requirements" / "REQUIREMENTS.md"
+        authority.parent.mkdir(parents=True, exist_ok=True)
+        authority.write_text("# Accepted authority\n")
+
+    def test_ready_card_launch_refresh_is_runtime_neutral_and_progressive(self) -> None:
+        for noise in (
+            {"RUNTIME": "codex", "MODEL_ID": "one", "WORKER_ID": "alpha"},
+            {"RUNTIME": "pi", "MODEL_ID": "two", "WORKER_ID": "beta"},
+        ):
+            temp, project = self.copy_fixture()
+            try:
+                self.make_ready_card(project)
+                with patch.dict(os.environ, noise, clear=False):
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_prep"))
+                self.assertEqual(routed.subject, "M01-T04")
+                self.assertIn("project:requirements/REQUIREMENTS.md", routed.read_set)
+                self.assertFalse(any("openspec/" in item or "contracts/" in item for item in routed.read_set))
+            finally:
+                temp.cleanup()
+
+    def install_done_predecessor(
+        self, project: Path, *, path: str, commit: str, blob: str,
+    ) -> None:
+        board = project / BOARD
+        existing = board.read_text()
+        predecessor = (
+            '[[cards]]\n'
+            'id = "M01-T03"\n'
+            'status = "done"\n'
+            '[cards.contract]\n'
+            'class = "task_card"\n'
+            'path = "implementation/workstreams/sample-workstream/cards/M01-T03.md"\n'
+            '[cards.result]\n'
+            'class = "result"\n'
+            f'path = "{path}"\n'
+            f'commit = "{commit}"\n'
+            f'blob = "{blob}"\n\n'
+        )
+        board.write_text(existing.replace('[[cards]]\n', predecessor + '[[cards]]\n', 1))
+        predecessor_card = project / "implementation/workstreams/sample-workstream/cards/M01-T03.md"
+        predecessor_card.write_text("# predecessor Card\n")
+        result_path = project / path
+        result_path.parent.mkdir(parents=True, exist_ok=True)
+        result_path.write_text("# predecessor result\n")
+
+    def test_ready_card_stale_dependency_fails_closed_before_launch(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            dependency_path = "implementation/workstreams/sample-workstream/results/M01-T03.md"
+            commit = "a" * 40
+            blob = "b" * 40
+            dependency = f"{dependency_path}@{commit}:{blob}"
+            self.install_done_predecessor(project, path=dependency_path, commit=commit, blob=blob)
+            self.make_ready_card(project, dependencies=dependency)
+
+            current = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((current.disposition, current.obligation), ("route", "execution_prep"))
+
+            new_commit = "c" * 40
+            new_blob = "d" * 40
+            board = project / BOARD
+            board.write_text(
+                board.read_text()
+                .replace(f'commit = "{commit}"', f'commit = "{new_commit}"')
+                .replace(f'blob = "{blob}"', f'blob = "{new_blob}"')
+            )
+            (project / dependency_path).write_text("# materially changed predecessor result\n")
+
+            stale = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((stale.disposition, stale.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("no longer matches the exact current DONE predecessor result", stale.reason)
+        finally:
+            temp.cleanup()
+
+    def test_technical_contract_is_loaded_only_when_card_selects_it(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            contract = "contracts/sample-api.md"
+            self.make_ready_card(project, technical_contract=contract)
+            contract_path = project / contract
+            contract_path.parent.mkdir(parents=True, exist_ok=True)
+            contract_path.write_text("# Material API contract\n")
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_prep"))
+            self.assertIn(f"project:{contract}", routed.read_set)
+        finally:
+            temp.cleanup()
+
+    def test_jit_refinement_classification_separates_authority_layers(self) -> None:
+        self.assertEqual(classify_jit_refinement("bounded_execution_detail")[0], "execution_prep")
+        self.assertEqual(classify_jit_refinement("strategy")[0], "planning")
+        self.assertEqual(classify_jit_refinement("product_or_global_intent")[0], "definition")
+        self.assertEqual(classify_jit_refinement("missing_facts")[0], "research")
+        with self.assertRaisesRegex(Exception, "unknown JIT"):
+            classify_jit_refinement("runtime_model_missing")
 
     def test_new_managed_intent_routes_to_common_intake_without_board(self) -> None:
         for entry, subject in (
@@ -380,7 +503,7 @@ class RouterTests(unittest.TestCase):
                 self.issue_research_content("repair:v2"),
             )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
-            self.assertEqual((routed.disposition, routed.obligation), ("unavailable", "execution"))
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution"))
             self.assertIn("project:implementation/workstreams/sample-workstream/INTAKE.toml", routed.read_set)
             self.assertIn(f"project:{BOARD}", routed.read_set)
         finally:
@@ -417,7 +540,7 @@ class RouterTests(unittest.TestCase):
                 'alignment_state = "authorized"\n'
                 'alignment_subject = "repair:v2"\n'
                 'micro_fix_candidate = true\n',
-                ("unavailable", "execution_prep"),
+                ("route", "execution_prep"),
             ),
         )
         for intake_content, expected in cases:
@@ -714,7 +837,7 @@ class RouterTests(unittest.TestCase):
                 self.plan_review_content("green"),
             )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
-            self.assertEqual((routed.disposition, routed.obligation), ("unavailable", "execution_prep"))
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_prep"))
         finally:
             temp.cleanup()
 
@@ -777,7 +900,7 @@ class RouterTests(unittest.TestCase):
                 )
             )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
-            self.assertEqual((routed.disposition, routed.obligation), ("unavailable", "execution_prep"))
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_prep"))
 
             base = f"owner/repo@{'a' * 40}:planning/MASTER_PLAN.md@{'b' * 40}"
             planning_path.write_text(
@@ -791,7 +914,7 @@ class RouterTests(unittest.TestCase):
             )
             review_path.write_text(self.plan_review_content("green", cycle=2, revision="P2"))
             routed = select_route(project, [MANIFEST], package_root=ROOT)
-            self.assertEqual((routed.disposition, routed.obligation), ("unavailable", "execution_prep"))
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_prep"))
             self.assertIn("Editorial/mechanical-only", routed.reason)
         finally:
             temp.cleanup()
@@ -883,7 +1006,7 @@ class RouterTests(unittest.TestCase):
                     self.tracker_content(state),
                 )
                 routed = select_route(project, [MANIFEST], package_root=ROOT)
-                self.assertEqual((routed.disposition, routed.obligation), ("unavailable", "execution"))
+                self.assertEqual((routed.disposition, routed.obligation), ("route", "execution"))
                 self.assertIn(f"project:{BOARD}", routed.read_set)
             finally:
                 temp.cleanup()
@@ -922,11 +1045,237 @@ class RouterTests(unittest.TestCase):
         finally:
             temp.cleanup()
 
-    def test_future_lifecycle_is_identified_but_not_implemented(self) -> None:
+    def test_active_card_routes_to_runtime_neutral_execution(self) -> None:
         routed = select_route(FIXTURE, [MANIFEST], package_root=ROOT)
-        self.assertEqual(routed.disposition, "unavailable")
-        self.assertIn("not implemented until M03", routed.reason)
+        self.assertEqual((routed.disposition, routed.obligation), ("route", "execution"))
+        self.assertIn("runtime-neutral implementation", routed.reason)
         self.assertNotEqual(routed.disposition, "real_stop")
+
+    def test_durable_semantic_result_routes_to_reconciliation_without_replay(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            result_path = "implementation/workstreams/sample-workstream/results/M01-T04.md"
+            (project / CARD).write_text(self.task_card_content())
+            authority = project / "requirements" / "REQUIREMENTS.md"
+            authority.parent.mkdir(parents=True, exist_ok=True)
+            authority.write_text("# Accepted authority\n")
+            board = project / BOARD
+            board.write_text(
+                board.read_text()
+                + '\n[cards.result]\nclass = "result"\n'
+                + f'path = "{result_path}"\n'
+                + f'commit = "{"a" * 40}"\n'
+                + f'blob = "{"b" * 40}"\n'
+            )
+            evidence_dir = project / "implementation/workstreams/sample-workstream/evidence"
+            evidence_dir.mkdir(parents=True, exist_ok=True)
+            (evidence_dir / "M01-T04.md").write_text("# Verified evidence\n")
+            result_file = project / result_path
+            result_file.parent.mkdir(parents=True, exist_ok=True)
+            result_file.write_text(
+                "# Card Result\n"
+                "- Card ID: M01-T04\n"
+                "- Implementation subject: owner/repo@commit:" + ("a" * 40) + "\n"
+                "- Evidence refs: implementation/workstreams/sample-workstream/evidence/M01-T04.md\n"
+                "- Tests/readback summary: GREEN\n"
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "result_reconciliation"))
+            self.assertIn("do not replay", routed.reason)
+            self.assertIn(f"project:{result_path}", routed.read_set)
+        finally:
+            temp.cleanup()
+
+    def install_reviewable_result(self, project: Path, review_requirement: str) -> str:
+        result_path = "implementation/workstreams/sample-workstream/results/M01-T04.md"
+        (project / CARD).write_text(self.task_card_content(review_requirement=review_requirement))
+        authority = project / "requirements" / "REQUIREMENTS.md"
+        authority.parent.mkdir(parents=True, exist_ok=True)
+        authority.write_text("# Accepted authority\n")
+        board = project / BOARD
+        board.write_text(
+            board.read_text()
+            + '\n[cards.result]\nclass = "result"\n'
+            + f'path = "{result_path}"\n'
+            + f'commit = "{"a" * 40}"\n'
+            + f'blob = "{"b" * 40}"\n'
+        )
+        evidence_dir = project / "implementation/workstreams/sample-workstream/evidence"
+        evidence_dir.mkdir(parents=True, exist_ok=True)
+        (evidence_dir / "M01-T04.md").write_text("# Verified evidence\n")
+        result_file = project / result_path
+        result_file.parent.mkdir(parents=True, exist_ok=True)
+        result_file.write_text(
+            "# Card Result\n"
+            "- Card ID: M01-T04\n"
+            "- Implementation subject: owner/repo@commit:" + ("a" * 40) + "\n"
+            "- Evidence refs: implementation/workstreams/sample-workstream/evidence/M01-T04.md\n"
+            "- Tests/readback summary: GREEN\n"
+        )
+        return result_path
+
+    def add_review_attempt(self, project: Path, verdict: str, attempt: str = "R01") -> str:
+        review_path = f"implementation/workstreams/sample-workstream/reviews/M01-T04-{attempt}.toml"
+        board = project / BOARD
+        board.write_text(
+            board.read_text().replace(
+                'status = "in_progress"\n',
+                'status = "in_progress"\n'
+                f'review_attempts = [{{ class = "review_attempt", path = "{review_path}" }}]\n',
+                1,
+            )
+        )
+        path = project / review_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        evidence = "" if verdict in {"pending", "in_progress"} else "implementation/workstreams/sample-workstream/evidence/review-R01.md"
+        if evidence:
+            evidence_path = project / evidence
+            evidence_path.parent.mkdir(parents=True, exist_ok=True)
+            evidence_path.write_text("# Review evidence\n")
+        path.write_text(
+            'workstream_id = "sample-workstream"\n'
+            'card_id = "M01-T04"\n'
+            f'attempt = "{attempt}"\n'
+            f'verdict = "{verdict}"\n'
+            f'evidence_path = "{evidence}"\n'
+            '[subject]\n'
+            'class = "git_blob"\n'
+            'repository = "owner/router-fixture"\n'
+            f'commit = "{"a" * 40}"\n'
+            'path = "implementation/workstreams/sample-workstream/results/M01-T04.md"\n'
+            f'blob = "{"b" * 40}"\n'
+            '[acceptance]\n'
+            'class = "task_card"\n'
+            f'path = "{CARD}"\n'
+            '[independence]\n'
+            'materially_produced_or_repaired_subject = false\n'
+            'basis = "Fresh semantic reviewer context."\n'
+        )
+        return review_path
+
+    def test_required_review_blocks_until_green_then_routes_finalization(self) -> None:
+        for verdict, expected in (
+            (None, "review_freeze"),
+            ("pending", "review"),
+            ("in_progress", "review"),
+            ("green", "post_review_finalization"),
+            ("red", "execution_resolution"),
+        ):
+            temp, project = self.copy_fixture()
+            try:
+                self.install_reviewable_result(project, "required")
+                if verdict is not None:
+                    self.add_review_attempt(project, verdict)
+                routed = select_route(project, [MANIFEST], package_root=ROOT)
+                self.assertEqual((routed.disposition, routed.obligation), ("route", expected))
+            finally:
+                temp.cleanup()
+
+    def test_changed_result_after_terminal_review_requires_new_attempt(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            self.add_review_attempt(project, "green")
+            board = project / BOARD
+            board.write_text(board.read_text().replace('blob = "' + ("b" * 40) + '"', 'blob = "' + ("c" * 40) + '"'))
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "review_freeze"))
+            self.assertIn("changed", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_active_review_for_changed_result_fails_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            self.add_review_attempt(project, "pending")
+            board = project / BOARD
+            board.write_text(board.read_text().replace('blob = "' + ("b" * 40) + '"', 'blob = "' + ("c" * 40) + '"'))
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("stale", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def install_board_research(self, project: Path, *, state: str, reconciliation: str = "pending") -> None:
+        board = project / BOARD
+        board.write_text(
+            board.read_text()
+            + '\n[research_obligation]\nclass = "research"\n'
+            + 'path = "implementation/workstreams/sample-workstream/RESEARCH.toml"\n'
+        )
+        result = "" if reconciliation == "pending" else "implementation/workstreams/sample-workstream/evidence/research-return.md"
+        research = project / "implementation/workstreams/sample-workstream/RESEARCH.toml"
+        research.write_text(
+            f'state = "{state}"\n'
+            'workstream_id = "sample-workstream"\n'
+            'origin_role = "execution_resolution"\n'
+            'origin_subject = "M01-T04"\n'
+            'return_target = "execution_resolution:M01-T04"\n'
+            f'return_reconciliation = "{reconciliation}"\n'
+            f'return_result = "{result}"\n'
+            'finding = "Recovered exact evidence."\n'
+            'limitations = "none"\n'
+            'conflicts = "none"\n'
+            '[[sources]]\nclass = "official_upstream"\nstatus = "not_relevant"\nweight = "primary"\n'
+            '[[sources]]\nclass = "project_runtime"\nstatus = "checked"\nweight = "direct"\n'
+            '[[sources]]\nclass = "tracker_discussion"\nstatus = "not_relevant"\nweight = "supporting"\n'
+            '[[sources]]\nclass = "practitioner_community"\nstatus = "not_relevant"\nweight = "supporting"\n'
+        )
+
+    def test_task_board_research_return_is_recovered_before_execution(self) -> None:
+        for state, reconciliation, expected in (
+            ("active", "pending", "research"),
+            ("complete", "pending", "execution_resolution"),
+            ("complete", "applied", "execution_resolution"),
+            ("consumed", "applied", "research_cleanup"),
+        ):
+            temp, project = self.copy_fixture()
+            try:
+                self.install_board_research(project, state=state, reconciliation=reconciliation)
+                routed = select_route(project, [MANIFEST], package_root=ROOT)
+                self.assertEqual((routed.disposition, routed.obligation), ("route", expected))
+            finally:
+                temp.cleanup()
+
+    def install_blocker(self, project: Path, blocker_class: str) -> None:
+        blocker_path = "implementation/workstreams/sample-workstream/blockers/M01-T04.toml"
+        board = project / BOARD
+        board.write_text(
+            board.read_text()
+            .replace('status = "in_progress"', 'status = "blocked"', 1)
+            .replace(
+                '[cards.contract]\n',
+                f'[cards.blocker]\nclass = "blocker"\npath = "{blocker_path}"\n\n[cards.contract]\n',
+                1,
+            )
+        )
+        path = project / blocker_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            'workstream_id = "sample-workstream"\n'
+            'card_id = "M01-T04"\n'
+            f'class = "{blocker_class}"\n'
+            'summary = "Exact blocker."\n'
+            'evidence_path = ""\n'
+        )
+
+    def test_blocker_classification_does_not_turn_every_blocker_into_user_stop(self) -> None:
+        for blocker_class, expected_disposition, expected_obligation in (
+            ("missing_evidence", "route", "research_handoff"),
+            ("human_authority", "stop", "user_stop"),
+            ("runtime_access_input", "stop", "blocker_stop"),
+        ):
+            temp, project = self.copy_fixture()
+            try:
+                self.install_blocker(project, blocker_class)
+                routed = select_route(project, [MANIFEST], package_root=ROOT)
+                self.assertEqual(
+                    (routed.disposition, routed.obligation),
+                    (expected_disposition, expected_obligation),
+                )
+            finally:
+                temp.cleanup()
 
     def test_priority_and_real_stop_foundations_are_runtime_neutral(self) -> None:
         self.assertEqual(

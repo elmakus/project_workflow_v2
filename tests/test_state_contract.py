@@ -8,6 +8,7 @@ from tools.state_contract import (
     ValidationError,
     read_toml,
     read_project,
+    parse_task_card,
     reject_prohibited_keys,
     validate_board,
     validate_brainstorm,
@@ -19,6 +20,7 @@ from tools.state_contract import (
     validate_project,
     validate_research,
     validate_review,
+    validate_review_history,
     validate_tracker,
     validate_workstream,
 )
@@ -56,6 +58,74 @@ class StateEnvelopeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "more than one"):
             validate_board(read_toml(INVALID / "two-active-board.toml"), self.workstream)
 
+    def test_task_card_parser_requires_complete_stable_launch_contract(self) -> None:
+        text = (
+            "# Task Card\n"
+            "- Card ID: M03-T01\n"
+            "- Included scope: runtime-neutral readiness\n"
+            "- Excluded scope: runtime adapters\n"
+            "- Authority refs: requirements/PROJECT_WORKFLOW_V2.md, decisions/ADR-004.md\n"
+            "- Dependencies: none\n"
+            "- Acceptance: READY is independent of worker availability\n"
+            "- Required tests/readback: production parser and router tests\n"
+            "- Review requirement: none\n"
+            "- Technical contract: none\n"
+        )
+        parsed = parse_task_card(text, "M03-T01", "sample-workstream")
+        self.assertEqual(parsed["dependencies"], [])
+        self.assertIsNone(parsed["technical_contract"])
+
+        unresolved = text.replace(
+            "- Required tests/readback: production parser and router tests",
+            "- Required tests/readback: <checks>",
+        )
+        with self.assertRaisesRegex(ValidationError, "unresolved"):
+            parse_task_card(unresolved, "M03-T01", "sample-workstream")
+
+        wrong_id = text.replace("M03-T01", "M03-T99", 1)
+        with self.assertRaisesRegex(ValidationError, "Card ID"):
+            parse_task_card(wrong_id, "M03-T01", "sample-workstream")
+
+        exact_dependency = (
+            "implementation/workstreams/sample-workstream/results/M03-T00.md@"
+            + ("a" * 40) + ":" + ("b" * 40)
+        )
+        with_dependency = text.replace("- Dependencies: none", f"- Dependencies: {exact_dependency}")
+        parsed_dependency = parse_task_card(with_dependency, "M03-T01", "sample-workstream")
+        self.assertEqual(
+            parsed_dependency["dependencies"],
+            [{
+                "path": "implementation/workstreams/sample-workstream/results/M03-T00.md",
+                "commit": "a" * 40,
+                "blob": "b" * 40,
+            }],
+        )
+
+        path_only = text.replace(
+            "- Dependencies: none",
+            "- Dependencies: implementation/workstreams/sample-workstream/results/M03-T00.md",
+        )
+        with self.assertRaisesRegex(ValidationError, "path@commit:blob"):
+            parse_task_card(path_only, "M03-T01", "sample-workstream")
+
+    def test_jit_trigger_preserves_predecessor_boundary_without_placeholder_card(self) -> None:
+        board = read_toml(VALID / "TASK_BOARD.toml")
+        board["jit_triggers"] = [{
+            "id": "after-M01-T01",
+            "after_card": "M01-T01",
+            "state": "waiting",
+            "condition": "Predecessor result determines exact downstream Card boundary.",
+        }]
+        validate_board(board, self.workstream)
+
+        board["jit_triggers"][0]["state"] = "satisfied"
+        validate_board(board, self.workstream)
+
+        stale = copy.deepcopy(board)
+        stale["jit_triggers"][0]["after_card"] = "M01-T02"
+        with self.assertRaisesRegex(ValidationError, "DONE predecessor result"):
+            validate_board(stale, self.workstream)
+
     def test_prohibited_policy_runtime_scheduler_keys_fail(self) -> None:
         with self.assertRaisesRegex(ValidationError, "execution_policy"):
             validate_board(read_toml(INVALID / "prohibited-policy-board.toml"), self.workstream)
@@ -78,6 +148,61 @@ class StateEnvelopeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "not semantically independent"):
             validate_review(read_toml(INVALID / "review-not-independent.toml"))
 
+
+    def test_review_terminal_evidence_and_append_only_history(self) -> None:
+        base = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        validate_review(base)
+
+        pending = copy.deepcopy(base)
+        pending["attempt"] = "R02"
+        pending["verdict"] = "pending"
+        pending["evidence_path"] = ""
+        pending["subject"]["blob"] = "4" * 40
+        validate_review_history([base, pending])
+
+        bad_order = [pending, base]
+        with self.assertRaisesRegex(ValidationError, "latest attempt"):
+            validate_review_history(bad_order)
+
+        terminal_without_evidence = copy.deepcopy(base)
+        terminal_without_evidence["evidence_path"] = ""
+        with self.assertRaisesRegex(ValidationError, "terminal verdict"):
+            validate_review(terminal_without_evidence)
+
+    def test_task_card_review_acceptance_is_exact_and_semantic(self) -> None:
+        review = {
+            "workstream_id": "sample-workstream",
+            "card_id": "M03-T03",
+            "attempt": "R01",
+            "verdict": "pending",
+            "evidence_path": "",
+            "subject": {
+                "class": "git_blob",
+                "repository": "owner/repo",
+                "commit": "a" * 40,
+                "path": "workflow/STATE.md",
+                "blob": "b" * 40,
+            },
+            "acceptance": {
+                "class": "task_card",
+                "path": "implementation/workstreams/sample-workstream/cards/M03-T03.md",
+            },
+            "independence": {
+                "materially_produced_or_repaired_subject": False,
+                "basis": "Reviewer did not materially produce or repair the exact subject.",
+            },
+        }
+        validate_review(review)
+        validate_review_history(
+            [review],
+            expected_card_id="M03-T03",
+            workstream_id="sample-workstream",
+        )
+
+        self_review = copy.deepcopy(review)
+        self_review["independence"]["materially_produced_or_repaired_subject"] = True
+        with self.assertRaisesRegex(ValidationError, "not semantically independent"):
+            validate_review(self_review)
 
     def test_issue_intake_alignment_is_exact_and_stale_subject_fails(self) -> None:
         intake = read_toml(VALID / "INTAKE.toml")
