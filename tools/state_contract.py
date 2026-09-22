@@ -40,7 +40,7 @@ def _require(condition: bool, message: str) -> None:
         raise ValidationError(message)
 
 
-def _read_toml(path: Path) -> dict[str, Any]:
+def read_toml(path: Path) -> dict[str, Any]:
     with path.open("rb") as handle:
         value = tomllib.load(handle)
     _require(isinstance(value, dict), f"{path}: top-level TOML must be a table")
@@ -208,10 +208,10 @@ def validate_bundle(
     expected_revision: int | None = None,
 ) -> None:
     project = read_project(project_path)
-    workstream = _read_toml(workstream_path)
-    board = _read_toml(board_path)
-    review = _read_toml(review_path)
-    effect = _read_toml(effect_path)
+    workstream = read_toml(workstream_path)
+    board = read_toml(board_path)
+    review = read_toml(review_path)
+    effect = read_toml(effect_path)
 
     validate_project(project)
     validate_workstream(workstream)

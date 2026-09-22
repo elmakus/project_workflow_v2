@@ -19,4 +19,8 @@ if test -f scripts/test-state-envelope.sh; then
   sh scripts/test-state-envelope.sh
 fi
 
+if test -f scripts/test-router.sh; then
+  sh scripts/test-router.sh
+fi
+
 printf 'M01 baseline checks: PASS\n'
