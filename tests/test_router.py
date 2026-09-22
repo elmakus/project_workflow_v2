@@ -1126,6 +1126,112 @@ class RouterTests(unittest.TestCase):
             finally:
                 temp.cleanup()
 
+    def test_changed_result_after_terminal_review_requires_new_attempt(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            self.add_review_attempt(project, "green")
+            board = project / BOARD
+            board.write_text(board.read_text().replace('blob = "' + ("b" * 40) + '"', 'blob = "' + ("c" * 40) + '"'))
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "review_freeze"))
+            self.assertIn("changed", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_active_review_for_changed_result_fails_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            self.add_review_attempt(project, "pending")
+            board = project / BOARD
+            board.write_text(board.read_text().replace('blob = "' + ("b" * 40) + '"', 'blob = "' + ("c" * 40) + '"'))
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("stale", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def install_board_research(self, project: Path, *, state: str, reconciliation: str = "pending") -> None:
+        board = project / BOARD
+        board.write_text(
+            board.read_text()
+            + '\n[research_obligation]\nclass = "research"\n'
+            + 'path = "implementation/workstreams/sample-workstream/RESEARCH.toml"\n'
+        )
+        result = "" if reconciliation == "pending" else "implementation/workstreams/sample-workstream/evidence/research-return.md"
+        research = project / "implementation/workstreams/sample-workstream/RESEARCH.toml"
+        research.write_text(
+            f'state = "{state}"\n'
+            'workstream_id = "sample-workstream"\n'
+            'origin_role = "execution_resolution"\n'
+            'origin_subject = "M01-T04"\n'
+            'return_target = "execution_resolution:M01-T04"\n'
+            f'return_reconciliation = "{reconciliation}"\n'
+            f'return_result = "{result}"\n'
+            'finding = "Recovered exact evidence."\n'
+            'limitations = "none"\n'
+            'conflicts = "none"\n'
+            '[[sources]]\nclass = "official_upstream"\nstatus = "not_relevant"\nweight = "primary"\n'
+            '[[sources]]\nclass = "project_runtime"\nstatus = "checked"\nweight = "direct"\n'
+            '[[sources]]\nclass = "tracker_discussion"\nstatus = "not_relevant"\nweight = "supporting"\n'
+            '[[sources]]\nclass = "practitioner_community"\nstatus = "not_relevant"\nweight = "supporting"\n'
+        )
+
+    def test_task_board_research_return_is_recovered_before_execution(self) -> None:
+        for state, reconciliation, expected in (
+            ("active", "pending", "research"),
+            ("complete", "pending", "execution_resolution"),
+            ("complete", "applied", "execution_resolution"),
+            ("consumed", "applied", "research_cleanup"),
+        ):
+            temp, project = self.copy_fixture()
+            try:
+                self.install_board_research(project, state=state, reconciliation=reconciliation)
+                routed = select_route(project, [MANIFEST], package_root=ROOT)
+                self.assertEqual((routed.disposition, routed.obligation), ("route", expected))
+            finally:
+                temp.cleanup()
+
+    def install_blocker(self, project: Path, blocker_class: str) -> None:
+        blocker_path = "implementation/workstreams/sample-workstream/blockers/M01-T04.toml"
+        board = project / BOARD
+        board.write_text(
+            board.read_text()
+            .replace('status = "in_progress"', 'status = "blocked"', 1)
+            .replace(
+                '[cards.contract]\n',
+                f'[cards.blocker]\nclass = "blocker"\npath = "{blocker_path}"\n\n[cards.contract]\n',
+                1,
+            )
+        )
+        path = project / blocker_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            'workstream_id = "sample-workstream"\n'
+            'card_id = "M01-T04"\n'
+            f'class = "{blocker_class}"\n'
+            'summary = "Exact blocker."\n'
+            'evidence_path = ""\n'
+        )
+
+    def test_blocker_classification_does_not_turn_every_blocker_into_user_stop(self) -> None:
+        for blocker_class, expected_disposition, expected_obligation in (
+            ("missing_evidence", "route", "research_handoff"),
+            ("human_authority", "stop", "user_stop"),
+            ("runtime_access_input", "stop", "blocker_stop"),
+        ):
+            temp, project = self.copy_fixture()
+            try:
+                self.install_blocker(project, blocker_class)
+                routed = select_route(project, [MANIFEST], package_root=ROOT)
+                self.assertEqual(
+                    (routed.disposition, routed.obligation),
+                    (expected_disposition, expected_obligation),
+                )
+            finally:
+                temp.cleanup()
+
     def test_priority_and_real_stop_foundations_are_runtime_neutral(self) -> None:
         self.assertEqual(
             PRIORITY_FOUNDATION,
