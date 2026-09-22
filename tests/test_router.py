@@ -140,6 +140,53 @@ class RouterTests(unittest.TestCase):
         finally:
             temp.cleanup()
 
+
+    def test_completed_preboard_intake_routes_without_manufacturing_board(self) -> None:
+        cases = (
+            (
+                'workstream_id = "sample-workstream"\n'
+                'kind = "feature"\n'
+                'state = "complete"\n'
+                'diagnosis_revision = 0\n'
+                'repair_subject = ""\n'
+                'response_kind = "none"\n'
+                'response_observed = false\n'
+                'alignment_state = "not_required"\n'
+                'alignment_subject = ""\n'
+                'micro_fix_candidate = false\n',
+                ("unavailable", "brainstorming"),
+            ),
+            (
+                'workstream_id = "sample-workstream"\n'
+                'kind = "issue"\n'
+                'state = "complete"\n'
+                'diagnosis_revision = 2\n'
+                'repair_subject = "repair:v2"\n'
+                'response_kind = "authorization"\n'
+                'response_observed = true\n'
+                'alignment_state = "authorized"\n'
+                'alignment_subject = "repair:v2"\n'
+                'micro_fix_candidate = true\n',
+                ("unavailable", "execution_prep"),
+            ),
+        )
+        for intake_content, expected in cases:
+            temp, project = self.copy_fixture()
+            try:
+                self.install_intake(project, intake_content)
+                workstream = project / MANIFEST
+                text = workstream.read_text()
+                text = text.replace(
+                    '\n[task_board]\nclass = "task_board"\npath = "implementation/workstreams/sample-workstream/TASK_BOARD.toml"\n',
+                    '\n',
+                )
+                workstream.write_text(text)
+                routed = select_route(project, [MANIFEST], package_root=ROOT)
+                self.assertEqual((routed.disposition, routed.obligation), expected)
+                self.assertNotIn(f"project:{BOARD}", routed.read_set)
+            finally:
+                temp.cleanup()
+
     def test_stale_issue_alignment_fails_closed_to_recovery(self) -> None:
         temp, project = self.copy_fixture()
         try:
