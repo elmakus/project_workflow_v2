@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Runtime-neutral Project Workflow V2 obligation selector through M02-T03."""
+"""Runtime-neutral Project Workflow V2 obligation selector through M02-T04."""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from tools.state_contract import (
     validate_planning,
     validate_project,
     validate_research,
+    validate_tracker,
     validate_workstream,
 )
 
@@ -180,6 +181,28 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     reads, "route", "intake",
                     "Selected workstream has active Intake/discovery state",
                     subject=intake["kind"], owner_module="workflow/INTAKE.md",
+                )
+
+        tracker = None
+        if "tracker" in workstream:
+            tracker = read_toml(reads.project(workstream["tracker"]["path"]))
+            validate_tracker(tracker, workstream["workstream_id"])
+            if tracker["state"] == "ambiguous":
+                return recovery(
+                    reads,
+                    "GitHub Issue tracker recovery is ambiguous; creating another tracker is forbidden",
+                )
+            if tracker["state"] == "discovery":
+                return result(
+                    reads, "route", "github_issues",
+                    "Tracker discovery/dedup must complete before any create",
+                    subject=tracker["dedup_key"], owner_module="workflow/GITHUB_ISSUES.md",
+                )
+            if tracker["state"] == "create_pending_readback":
+                return result(
+                    reads, "route", "github_issues",
+                    "Interrupted/uncertain Issue create requires exact readback before any retry",
+                    subject=tracker["dedup_key"], owner_module="workflow/GITHUB_ISSUES.md",
                 )
 
         brainstorm = None
