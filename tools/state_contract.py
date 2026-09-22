@@ -30,6 +30,8 @@ RESEARCH_SOURCE_STATUSES = {"pending", "checked", "not_relevant", "unavailable"}
 RETURN_RECONCILIATION_STATES = {"pending", "applied"}
 DEFINITION_STATES = {"active", "green"}
 PREMIUM_A_STATES = {"not_due", "due", "satisfied"}
+PLANNING_STATES = {"draft", "frozen", "approved"}
+PREMIUM_GATE_STATES = {"not_due", "due", "satisfied"}
 PROHIBITED_KEY_PREFIXES = ("runtime_", "model_", "session_", "worker_", "batch_", "lane_", "scheduler_", "context_health_")
 PROHIBITED_KEYS = {
     "execution_policy",
@@ -115,13 +117,15 @@ def validate_locator(
         _require(workstream_id is not None, f"{label}: workstream binding required")
         prefix = f"implementation/workstreams/{workstream_id}/cards/"
         _require(path.startswith(prefix) and path.endswith(".md"), f"{label}: wrong Task Card class/path")
-    elif expected_class in {"intake", "brainstorm", "research", "definition"}:
+    elif expected_class in {"intake", "brainstorm", "research", "definition", "planning", "plan_review"}:
         _require(workstream_id is not None, f"{label}: workstream binding required")
         filenames = {
             "intake": "INTAKE.toml",
             "brainstorm": "BRAINSTORM.toml",
             "research": "RESEARCH.toml",
             "definition": "DEFINITION.toml",
+            "planning": "PLANNING.toml",
+            "plan_review": "PLAN_REVIEW.toml",
         }
         expected = f"implementation/workstreams/{workstream_id}/{filenames[expected_class]}"
         _require(path == expected, f"{label}: expected exact path {expected!r}")
@@ -162,6 +166,8 @@ def validate_workstream(data: dict[str, Any]) -> None:
         "brainstorm": "brainstorm",
         "research": "research",
         "definition": "definition",
+        "planning": "planning",
+        "plan_review": "plan_review",
     }
     present = [key for key in locator_classes if key in data]
     _require(present,
@@ -326,6 +332,106 @@ def validate_definition(data: dict[str, Any], workstream_id: str) -> None:
         _require(decisions, "definition: GREEN state requires accepted decision authority")
         _require(premium_a in {"due", "satisfied"},
                  "definition: GREEN state requires premium stop A due or satisfied")
+
+
+def _git_blob_subject_key(subject: Any, label: str) -> str:
+    _require(isinstance(subject, dict), f"{label}: subject must be a table")
+    repository = subject.get("repository")
+    path = subject.get("path")
+    commit = subject.get("commit")
+    blob = subject.get("blob")
+    _require(isinstance(repository, str) and repository.strip(), f"{label}: missing repository")
+    _require(isinstance(path, str) and path.strip(), f"{label}: missing path")
+    _safe_relative_path(path, label)
+    _require(isinstance(commit, str) and SHA40.fullmatch(commit) is not None,
+             f"{label}: commit must be exact 40-hex")
+    _require(isinstance(blob, str) and SHA40.fullmatch(blob) is not None,
+             f"{label}: blob must be exact 40-hex")
+    return f"{repository}@{commit}:{path}@{blob}"
+
+
+def validate_planning(data: dict[str, Any], workstream_id: str) -> None:
+    reject_prohibited_keys(data, "planning")
+    _require(data.get("workstream_id") == workstream_id, "planning: wrong workstream_id")
+    cycle = data.get("cycle")
+    _require(isinstance(cycle, int) and cycle >= 1, "planning: cycle must be positive integer")
+    entry_subject = data.get("entry_subject")
+    _require(isinstance(entry_subject, str) and entry_subject.strip(), "planning: missing entry_subject")
+    revision = data.get("revision")
+    _require(isinstance(revision, str) and revision.strip(), "planning: missing revision")
+    state = data.get("state")
+    _require(state in PLANNING_STATES, f"planning: invalid state {state!r}")
+    audit = data.get("planner_audit")
+    _require(audit in AUDIT_STATES, f"planning: invalid planner_audit {audit!r}")
+    plan_path = _safe_relative_path(data.get("plan_path"), "planning.plan_path")
+    _require(plan_path.startswith("planning/") and plan_path.endswith(".md"),
+             "planning: plan_path must be a planning Markdown artifact")
+
+    premium_a = data.get("premium_a")
+    premium_b = data.get("premium_b")
+    premium_c = data.get("premium_c")
+    for name, value in (("premium_a", premium_a), ("premium_b", premium_b), ("premium_c", premium_c)):
+        _require(value in PREMIUM_GATE_STATES, f"planning: invalid {name} {value!r}")
+    premium_a_subject = data.get("premium_a_subject")
+    premium_b_subject = data.get("premium_b_subject")
+    premium_c_subject = data.get("premium_c_subject")
+    for name, value in (
+        ("premium_a_subject", premium_a_subject),
+        ("premium_b_subject", premium_b_subject),
+        ("premium_c_subject", premium_c_subject),
+    ):
+        _require(isinstance(value, str), f"planning: {name} must be a string")
+
+    _require(premium_a == "satisfied" and premium_a_subject == entry_subject,
+             "planning: current cycle requires exact premium A satisfaction")
+
+    subject = data.get("subject")
+    subject_key = ""
+    if state == "draft":
+        _require(isinstance(subject, dict), "planning: draft subject table is required")
+        _require(all(subject.get(key, "") == "" for key in ("repository", "commit", "path", "blob")),
+                 "planning: draft must not claim a frozen immutable subject")
+        _require(premium_b == "not_due" and premium_b_subject == "",
+                 "planning: premium B is not due before freeze")
+        _require(premium_c == "not_due" and premium_c_subject == "",
+                 "planning: premium C is not due before approval")
+        return
+
+    subject_key = _git_blob_subject_key(subject, "planning.subject")
+    _require(subject["path"] == plan_path, "planning: frozen subject path must equal plan_path")
+    _require(audit == "green", "planning: frozen/approved plan requires GREEN planner audit")
+    _require(premium_b in {"due", "satisfied"} and premium_b_subject == subject_key,
+             "planning: frozen subject requires exact premium B gate subject")
+
+    if state == "frozen":
+        _require(premium_c == "not_due" and premium_c_subject == "",
+                 "planning: premium C cannot be due before GREEN Plan Review consumption")
+    else:
+        _require(premium_b == "satisfied",
+                 "planning: approved plan requires premium B satisfied")
+        _require(premium_c in {"due", "satisfied"} and premium_c_subject == subject_key,
+                 "planning: approved plan requires exact premium C gate subject")
+
+
+def validate_plan_review(data: dict[str, Any], workstream_id: str, planning: dict[str, Any]) -> None:
+    validate_review(data)
+    _require(data.get("workstream_id") == workstream_id, "plan_review: wrong workstream_id")
+    _require(data.get("plan_revision") == planning.get("revision"),
+             "plan_review: wrong plan_revision")
+    _require(data.get("planning_cycle") == planning.get("cycle"),
+             "plan_review: wrong planning_cycle")
+    _require(planning.get("state") in {"frozen", "approved"},
+             "plan_review: planning subject must be frozen")
+    review_key = _git_blob_subject_key(data.get("subject"), "plan_review.subject")
+    planning_key = _git_blob_subject_key(planning.get("subject"), "planning.subject")
+    _require(review_key == planning_key, "plan_review: subject does not match frozen plan")
+    evidence_path = data.get("evidence_path")
+    _require(isinstance(evidence_path, str), "plan_review: evidence_path must be a string")
+    if data.get("verdict") in {"green", "red"}:
+        _require(bool(evidence_path.strip()), "plan_review: terminal verdict requires evidence_path")
+        _safe_relative_path(evidence_path, "plan_review.evidence_path")
+    else:
+        _require(evidence_path == "", "plan_review: pending attempt must not claim evidence")
 
 
 def validate_board(
