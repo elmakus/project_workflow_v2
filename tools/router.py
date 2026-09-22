@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Runtime-neutral Project Workflow V2 obligation selector through M02-T04."""
+"""Runtime-neutral Project Workflow V2 obligation selector through M03-T01."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from tools.state_contract import (
     validate_definition,
     validate_intake,
     validate_plan_review,
+    parse_task_card,
     validate_planning,
     validate_project,
     validate_research,
@@ -91,6 +92,62 @@ def recovery(reads: Reads, reason: str) -> RouteResult:
         reason += "; recovery module unreadable"
     return result(reads, "recovery", "recovery_boundary", reason,
                   owner_module="workflow/RECOVERY.md")
+
+
+def classify_jit_refinement(change_class: str) -> tuple[str, str]:
+    routes = {
+        "bounded_execution_detail": (
+            "execution_prep",
+            "Bounded L1/L2 refinement stays inside accepted execution authority",
+        ),
+        "strategy": (
+            "planning",
+            "Milestone strategy/order/outcome change belongs to Strategic Planning",
+        ),
+        "product_or_global_intent": (
+            "definition",
+            "Accepted product/global intent change belongs to Project Definition",
+        ),
+        "missing_facts": (
+            "research",
+            "Missing factual evidence must be resolved by Research before preparation continues",
+        ),
+    }
+    if change_class not in routes:
+        raise ValidationError(f"unknown JIT refinement class {change_class!r}")
+    return routes[change_class]
+
+
+def refresh_ready_card(
+    reads: Reads,
+    board: dict,
+    workstream: dict,
+    card: dict,
+) -> dict:
+    contract_path = card["contract"]["path"]
+    text = reads.project(contract_path).read_text(encoding="utf-8")
+    contract = parse_task_card(text, card["id"], workstream["workstream_id"])
+
+    for authority_path in contract["authority_refs"]:
+        reads.project(authority_path).read_text(encoding="utf-8")
+
+    done_results = {
+        item["result"]["path"]
+        for item in board["cards"]
+        if item["status"] == "done" and "result" in item
+    }
+    for dependency_path in contract["dependencies"]:
+        if dependency_path not in done_results:
+            raise ValidationError(
+                f"ready Card dependency {dependency_path!r} is not the current DONE predecessor result"
+            )
+        reads.project(dependency_path).read_text(encoding="utf-8")
+
+    technical_contract = contract["technical_contract"]
+    if technical_contract is not None:
+        reads.project(technical_contract).read_text(encoding="utf-8")
+
+    return contract
 
 
 def select_route(project_root: Path, selected_workstreams: list[str], *,
@@ -349,8 +406,8 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     subject=subject_key, owner_module="workflow/PLANNING.md",
                 )
             return result(
-                reads, "unavailable", "execution_prep",
-                "Premium stop C is satisfied; Execution Prep semantics arrive in M03",
+                reads, "route", "execution_prep",
+                "Premium stop C is satisfied; common Execution Prep owns Card materialization",
                 subject=subject_key, owner_module="workflow/EXECUTION_PREP.md",
             )
 
@@ -385,8 +442,8 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                 raise ValidationError("selected workstream has no routable pre-execution state or Task Board")
             if intake["kind"] == "issue" and intake["micro_fix_candidate"]:
                 return result(
-                    reads, "unavailable", "execution_prep",
-                    "Aligned issue is a bounded micro-fix candidate; Execution Prep semantics arrive in M03",
+                    reads, "route", "execution_prep",
+                    "Aligned issue is a bounded micro-fix candidate; common Execution Prep owns preparation",
                     subject=intake["repair_subject"], owner_module="workflow/EXECUTION_PREP.md",
                 )
             return result(
@@ -418,19 +475,21 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
     if len(ready) == 1:
         card = ready[0]
         try:
-            reads.project(card["contract"]["path"]).read_text(encoding="utf-8")
+            refresh_ready_card(reads, board, workstream, card)
         except (OSError, ValidationError, KeyError) as exc:
-            return recovery(reads, f"ready Card contract invalid: {exc}")
+            return recovery(reads, f"ready Card launch refresh failed: {exc}")
         return result(
-            reads, "unavailable", "execution",
-            "Ready Card is identified, but Execution lifecycle semantics are not implemented until M03",
-            subject=card["id"], owner_module="workflow/EXECUTION.md",
+            reads, "route", "execution_prep",
+            "READY Card passed launch refresh against current authority, DONE dependency results and optional technical contract",
+            subject=card["id"], owner_module="workflow/EXECUTION_PREP.md",
         )
 
     if len(ready) > 1:
-        return result(reads, "unavailable", "execution_selection",
-                      "Multiple ready Cards require later dependency semantics; current router does not guess",
-                      owner_module="workflow/EXECUTION.md")
+        return result(
+            reads, "route", "execution_prep",
+            "Multiple READY Cards remain semantically ready; Execution Prep must choose the next deterministic Card from accepted plan/dependency authority",
+            owner_module="workflow/EXECUTION_PREP.md",
+        )
 
     if any(card["status"] == "blocked" for card in board["cards"]):
         return result(reads, "unavailable", "blocked_resolution",
@@ -441,8 +500,9 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                       "Milestone finalization/Close is not implemented yet",
                       owner_module="workflow/CLOSE.md")
 
-    return result(reads, "unavailable", "card_preparation",
-                  "No executable Card is selected; later Execution Prep/JIT semantics are unavailable until M03")
+    return result(reads, "route", "execution_prep",
+                  "No executable Card is selected; common Execution Prep owns bounded JIT materialization/refinement",
+                  owner_module="workflow/EXECUTION_PREP.md")
 
 
 def main() -> int:
