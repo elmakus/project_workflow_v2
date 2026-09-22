@@ -38,4 +38,11 @@ A GREEN independent Plan Review for the exact frozen subject is consumed by Plan
 
 Premium C must be satisfied before Execution Prep. RED never mutates the failed review subject; material correction creates a new planning cycle/revision and repeats A/B/C. Pure mechanical/editorial correction may remain in the same accepted cycle only when strategy, milestone structure, requirement coverage and gates do not change. It may use `editorial_exempt` only when the cycle already has an exact prior GREEN Plan Review and satisfied C: the new subject is different, the exemption records that prior reviewed subject plus a bounded semantic basis, and prior B/C subjects remain bound to the reviewed base. No new B/Plan Review/C sequence is created for that editorial-only change.
 
-Canonical state stores semantic gates/subjects, never current model/session identity.
+## Human-facing premium recommendations
+
+The premium stops carry recommendation semantics without storing runtime identity:
+- A recommends the best available model/context for Strategic Planning;
+- B requires a fresh independent best-available context for Plan Review;
+- C recommends switching to a lighter/cheaper model/context before Execution Prep.
+
+These recommendations are user-facing guidance only. Canonical state stores semantic gates/subjects, never current model/session identity or a hard-coded product model name.
