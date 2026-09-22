@@ -192,6 +192,12 @@ def validate_intake(data: dict[str, Any], workstream_id: str) -> None:
              "intake: diagnosis_revision must be non-negative integer")
     repair_subject = data.get("repair_subject")
     _require(isinstance(repair_subject, str), "intake: repair_subject must be a string")
+    diagnosis_prior_art_subject = data.get("diagnosis_prior_art_subject")
+    diagnosis_prior_art_result = data.get("diagnosis_prior_art_result")
+    _require(isinstance(diagnosis_prior_art_subject, str),
+             "intake: diagnosis_prior_art_subject must be a string")
+    _require(isinstance(diagnosis_prior_art_result, str),
+             "intake: diagnosis_prior_art_result must be a string")
     response_kind = data.get("response_kind")
     _require(response_kind in RESPONSE_KINDS, f"intake: invalid response_kind {response_kind!r}")
     response_observed = data.get("response_observed")
@@ -207,6 +213,11 @@ def validate_intake(data: dict[str, Any], workstream_id: str) -> None:
 
     if kind == "issue":
         _require(alignment_state != "not_required", "intake: issue alignment cannot be not_required")
+        if diagnosis_prior_art_subject or diagnosis_prior_art_result:
+            _require(bool(diagnosis_prior_art_subject.strip()) and bool(diagnosis_prior_art_result.strip()),
+                     "intake: diagnosis prior-art binding requires exact subject and result")
+            _require(diagnosis_prior_art_subject == repair_subject,
+                     "intake: stale diagnosis prior-art subject for current repair_subject")
         if alignment_state == "pending":
             _require(alignment_subject == "", "intake: pending alignment must not retain an authorized subject")
             _require(not micro_fix_candidate, "intake: micro-fix candidate requires exact issue authorization")
@@ -217,10 +228,16 @@ def validate_intake(data: dict[str, Any], workstream_id: str) -> None:
             _require(bool(repair_subject), "intake: authorized issue requires repair_subject")
             _require(alignment_subject == repair_subject,
                      "intake: authorized alignment subject is stale for current repair_subject")
+            _require(
+                diagnosis_prior_art_subject == repair_subject and bool(diagnosis_prior_art_result.strip()),
+                "intake: authorized issue requires exact durable diagnosis prior-art binding",
+            )
     else:
         _require(alignment_state == "not_required",
                  "intake: feature/change discovery must not manufacture issue-repair alignment")
         _require(alignment_subject == "", "intake: non-issue alignment_subject must be empty")
+        _require(diagnosis_prior_art_subject == "" and diagnosis_prior_art_result == "",
+                 "intake: non-issue must not retain diagnosis prior-art binding")
         _require(not micro_fix_candidate, "intake: micro-fix candidate is issue-only")
 
     if state == "complete" and kind == "issue":
