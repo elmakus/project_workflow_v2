@@ -13,6 +13,7 @@ from tools.state_contract import (
     read_project,
     read_toml,
     validate_board,
+    validate_intake,
     validate_project,
     validate_workstream,
 )
@@ -96,11 +97,16 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
     except (OSError, ValidationError) as exc:
         return recovery(reads, f"bootstrap project identity invalid: {exc}")
 
-    if entry == "new_managed_intent":
+    intake_entries = {
+        "new_managed_intent": "change",
+        "new_issue": "issue",
+        "new_feature": "feature",
+    }
+    if entry in intake_entries:
         return result(
-            reads, "unavailable", "intake",
-            "Intake is the correct owner for new managed intent but is not implemented until M02",
-            owner_module="workflow/INTAKE.md",
+            reads, "route", "intake",
+            "Common Intake owns new managed intent before implementation authority exists",
+            subject=intake_entries[entry], owner_module="workflow/INTAKE.md",
         )
     if entry != "continue":
         return recovery(reads, f"unknown entry kind {entry!r}")
@@ -114,6 +120,34 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
         expected_manifest = f"implementation/workstreams/{workstream['workstream_id']}/WORKSTREAM.toml"
         if manifest_rel != expected_manifest:
             raise ValidationError(f"selected manifest must be exact path {expected_manifest!r}")
+        if "intake" in workstream:
+            intake = read_toml(reads.project(workstream["intake"]["path"]))
+            validate_intake(intake, workstream["workstream_id"])
+            if intake["state"] == "active":
+                if intake["kind"] == "issue" and intake["alignment_state"] == "pending":
+                    response = intake["response_kind"]
+                    if response == "none":
+                        return result(
+                            reads, "stop", "issue_alignment",
+                            "Issue diagnosis has a proposed repair but no subsequent user alignment response yet",
+                            subject=intake["repair_subject"], owner_module="workflow/INTAKE.md",
+                        )
+                    if response in {"question", "concern", "alternative"}:
+                        return result(
+                            reads, "unavailable", "brainstorming",
+                            "User response continues repair alignment; full Brainstorming semantics arrive in M02-T02",
+                            subject=intake["repair_subject"], owner_module="workflow/BRAINSTORMING.md",
+                        )
+                    return result(
+                        reads, "route", "intake",
+                        "Explicit authorization response exists and Intake must reconcile the exact aligned subject",
+                        subject=intake["repair_subject"], owner_module="workflow/INTAKE.md",
+                    )
+                return result(
+                    reads, "route", "intake",
+                    "Selected workstream has active Intake/discovery state",
+                    subject=intake["kind"], owner_module="workflow/INTAKE.md",
+                )
         board = read_toml(reads.project(workstream["task_board"]["path"]))
         validate_board(board, workstream)
     except (OSError, ValidationError, KeyError) as exc:
