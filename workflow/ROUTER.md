@@ -29,14 +29,14 @@ The router is one small runtime-neutral obligation selector. Product/model/sessi
 - ready Brainstorming without exact promotion -> Definition-promotion stop;
 - exact promoted revision -> Definition;
 - active Definition -> Definition;
-- Definition GREEN with A due -> premium A stop;
+- Definition GREEN with A due -> premium A stop with a human-facing recommendation to use the best available model/context for Strategic Planning;
 - A satisfied and no plan -> Planning;
-- draft replan cycle with exact premium A due -> premium A stop;
+- draft replan cycle with exact premium A due -> premium A stop with the same best-available-context recommendation;
 - draft plan with exact premium A satisfied -> Planning;
-- frozen plan with B due -> premium B fresh-context stop;
+- frozen plan with B due -> premium B fresh independent best-available-context stop;
 - B satisfied + exact pending Plan Review -> independent Plan Review;
 - GREEN/RED Plan Review -> Planning consumption/correction;
-- approved GREEN-reviewed plan with C due -> premium C stop;
+- approved GREEN-reviewed plan with C due -> premium C stop with a human-facing recommendation to switch to a lighter/cheaper model/context before Execution Prep;
 - approved bounded `editorial_exempt` change with exact prior GREEN review + satisfied prior C -> Execution Prep identified without a new Stage-6 review;
 - C satisfied -> Execution Prep identified, but full Execution Prep semantics remain M03-owned;
 - invalid/missing/stale/contradictory binding must fail closed to Recovery.
