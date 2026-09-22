@@ -32,6 +32,8 @@ DEFINITION_STATES = {"active", "green"}
 PREMIUM_A_STATES = {"not_due", "due", "satisfied"}
 PLANNING_STATES = {"draft", "frozen", "approved"}
 PREMIUM_GATE_STATES = {"not_due", "due", "satisfied"}
+TRACKER_STATES = {"discovery", "create_pending_readback", "linked", "ambiguous", "unavailable"}
+TRACKER_READBACK_STATES = {"pending", "verified", "uncertain", "not_applicable"}
 PROHIBITED_KEY_PREFIXES = ("runtime_", "model_", "session_", "worker_", "batch_", "lane_", "scheduler_", "context_health_")
 PROHIBITED_KEYS = {
     "execution_policy",
@@ -117,7 +119,7 @@ def validate_locator(
         _require(workstream_id is not None, f"{label}: workstream binding required")
         prefix = f"implementation/workstreams/{workstream_id}/cards/"
         _require(path.startswith(prefix) and path.endswith(".md"), f"{label}: wrong Task Card class/path")
-    elif expected_class in {"intake", "brainstorm", "research", "definition", "planning", "plan_review"}:
+    elif expected_class in {"intake", "brainstorm", "research", "definition", "planning", "plan_review", "tracker"}:
         _require(workstream_id is not None, f"{label}: workstream binding required")
         filenames = {
             "intake": "INTAKE.toml",
@@ -126,6 +128,7 @@ def validate_locator(
             "definition": "DEFINITION.toml",
             "planning": "PLANNING.toml",
             "plan_review": "PLAN_REVIEW.toml",
+            "tracker": "TRACKER.toml",
         }
         expected = f"implementation/workstreams/{workstream_id}/{filenames[expected_class]}"
         _require(path == expected, f"{label}: expected exact path {expected!r}")
@@ -168,6 +171,7 @@ def validate_workstream(data: dict[str, Any]) -> None:
         "definition": "definition",
         "planning": "planning",
         "plan_review": "plan_review",
+        "tracker": "tracker",
     }
     present = [key for key in locator_classes if key in data]
     _require(present,
@@ -432,6 +436,69 @@ def validate_plan_review(data: dict[str, Any], workstream_id: str, planning: dic
         _safe_relative_path(evidence_path, "plan_review.evidence_path")
     else:
         _require(evidence_path == "", "plan_review: pending attempt must not claim evidence")
+
+
+def validate_tracker(data: dict[str, Any], workstream_id: str) -> None:
+    reject_prohibited_keys(data, "tracker")
+    _require(data.get("workstream_id") == workstream_id, "tracker: wrong workstream_id")
+    _require(data.get("provider") == "github", "tracker: provider must be github")
+    repository = data.get("repository")
+    _require(
+        isinstance(repository, str)
+        and repository.count("/") == 1
+        and all(part.strip() for part in repository.split("/", 1)),
+        "tracker: repository must be exact owner/name",
+    )
+    dedup_key = data.get("dedup_key")
+    _require(isinstance(dedup_key, str) and dedup_key.strip(), "tracker: missing dedup_key")
+    state = data.get("state")
+    _require(state in TRACKER_STATES, f"tracker: invalid state {state!r}")
+    issue_number = data.get("issue_number")
+    _require(isinstance(issue_number, int) and issue_number >= 0,
+             "tracker: issue_number must be non-negative integer")
+    candidates = data.get("candidate_issue_numbers")
+    _require(isinstance(candidates, list), "tracker: candidate_issue_numbers must be an array")
+    _require(
+        all(isinstance(number, int) and number > 0 for number in candidates)
+        and len(set(candidates)) == len(candidates),
+        "tracker: candidate Issue numbers must be unique positive integers",
+    )
+    readback = data.get("readback_state")
+    _require(readback in TRACKER_READBACK_STATES, f"tracker: invalid readback_state {readback!r}")
+    final_pr = data.get("final_pr")
+    _require(isinstance(final_pr, int) and final_pr >= 0,
+             "tracker: final_pr must be non-negative integer")
+
+    forbidden_authority = {
+        "authorization",
+        "repair_authorized",
+        "implementation_authorized",
+        "requirements_approved",
+        "plan_approved",
+    }
+    _require(
+        not (forbidden_authority & set(data)),
+        "tracker: GitHub Issue bookkeeping must not carry workflow authorization/approval",
+    )
+
+    if state == "discovery":
+        _require(issue_number == 0 and not candidates and readback == "pending",
+                 "tracker: discovery must not claim an Issue or completed readback")
+    elif state == "create_pending_readback":
+        _require(issue_number == 0 and not candidates and readback in {"pending", "uncertain"},
+                 "tracker: pending create must require readback before retry")
+    elif state == "linked":
+        _require(issue_number > 0 and not candidates and readback == "verified",
+                 "tracker: linked Issue requires one positive Issue number and verified readback")
+    elif state == "ambiguous":
+        _require(issue_number == 0 and len(candidates) >= 2 and readback == "uncertain",
+                 "tracker: ambiguous recovery requires multiple candidates and uncertain readback")
+    else:
+        _require(issue_number == 0 and not candidates and readback == "not_applicable",
+                 "tracker: unavailable capability must not claim Issue state")
+
+    if final_pr > 0:
+        _require(state == "linked", "tracker: final PR correlation requires a linked Issue")
 
 
 def validate_board(
