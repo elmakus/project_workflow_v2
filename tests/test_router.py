@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tools.router import PRIORITY_FOUNDATION, REAL_STOP_FOUNDATION, select_route
+from tools.router import PRIORITY_FOUNDATION, REAL_STOP_FOUNDATION, classify_jit_refinement, select_route
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests" / "fixtures" / "router" / "valid-project"
@@ -53,6 +53,85 @@ class RouterTests(unittest.TestCase):
         self.assertNotIn("migration/UNRELATED.md", joined)
         self.assertNotIn("untrusted/ISSUE_TEXT.md", joined)
         self.assertNotIn("templates/", joined)
+
+    def task_card_content(
+        self, *, dependencies: str = "none", technical_contract: str = "none",
+    ) -> str:
+        return (
+            "# Fixture Card\n"
+            "- Card ID: M01-T04\n"
+            "- Included scope: prove launch readiness\n"
+            "- Excluded scope: runtime-specific orchestration\n"
+            "- Authority refs: requirements/REQUIREMENTS.md\n"
+            f"- Dependencies: {dependencies}\n"
+            "- Acceptance: route only after current launch inputs are valid\n"
+            "- Required tests/readback: production router fixture\n"
+            "- Review requirement: none\n"
+            f"- Technical contract: {technical_contract}\n"
+        )
+
+    def make_ready_card(self, project: Path, *, dependencies: str = "none",
+                        technical_contract: str = "none") -> None:
+        board = project / BOARD
+        board.write_text(board.read_text().replace('status = "in_progress"', 'status = "ready"'))
+        card = project / CARD
+        card.write_text(self.task_card_content(
+            dependencies=dependencies,
+            technical_contract=technical_contract,
+        ))
+        authority = project / "requirements" / "REQUIREMENTS.md"
+        authority.parent.mkdir(parents=True, exist_ok=True)
+        authority.write_text("# Accepted authority\n")
+
+    def test_ready_card_launch_refresh_is_runtime_neutral_and_progressive(self) -> None:
+        for noise in (
+            {"RUNTIME": "codex", "MODEL_ID": "one", "WORKER_ID": "alpha"},
+            {"RUNTIME": "pi", "MODEL_ID": "two", "WORKER_ID": "beta"},
+        ):
+            temp, project = self.copy_fixture()
+            try:
+                self.make_ready_card(project)
+                with patch.dict(os.environ, noise, clear=False):
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_prep"))
+                self.assertEqual(routed.subject, "M01-T04")
+                self.assertIn("project:requirements/REQUIREMENTS.md", routed.read_set)
+                self.assertFalse(any("openspec/" in item or "contracts/" in item for item in routed.read_set))
+            finally:
+                temp.cleanup()
+
+    def test_ready_card_stale_dependency_fails_closed_before_launch(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            dependency = "implementation/workstreams/sample-workstream/results/MISSING.md"
+            self.make_ready_card(project, dependencies=dependency)
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("not the current DONE predecessor result", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_technical_contract_is_loaded_only_when_card_selects_it(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            contract = "contracts/sample-api.md"
+            self.make_ready_card(project, technical_contract=contract)
+            contract_path = project / contract
+            contract_path.parent.mkdir(parents=True, exist_ok=True)
+            contract_path.write_text("# Material API contract\n")
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_prep"))
+            self.assertIn(f"project:{contract}", routed.read_set)
+        finally:
+            temp.cleanup()
+
+    def test_jit_refinement_classification_separates_authority_layers(self) -> None:
+        self.assertEqual(classify_jit_refinement("bounded_execution_detail")[0], "execution_prep")
+        self.assertEqual(classify_jit_refinement("strategy")[0], "planning")
+        self.assertEqual(classify_jit_refinement("product_or_global_intent")[0], "definition")
+        self.assertEqual(classify_jit_refinement("missing_facts")[0], "research")
+        with self.assertRaisesRegex(Exception, "unknown JIT"):
+            classify_jit_refinement("runtime_model_missing")
 
     def test_new_managed_intent_routes_to_common_intake_without_board(self) -> None:
         for entry, subject in (
@@ -714,7 +793,7 @@ class RouterTests(unittest.TestCase):
                 self.plan_review_content("green"),
             )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
-            self.assertEqual((routed.disposition, routed.obligation), ("unavailable", "execution_prep"))
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_prep"))
         finally:
             temp.cleanup()
 
