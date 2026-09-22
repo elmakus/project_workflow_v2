@@ -1,0 +1,11 @@
+# TEMPLATE ONLY — instantiate inside one selected workstream.
+kind = "change"
+workstream_id = "example-workstream"
+branch = "feat/example-workstream"
+created_from = "0000000000000000000000000000000000000000"
+integration_target = "main"
+authority = [{ class = "authority", path = "requirements/PROJECT_WORKFLOW_V2.md" }]
+
+[task_board]
+class = "task_board"
+path = "implementation/workstreams/example-workstream/TASK_BOARD.toml"

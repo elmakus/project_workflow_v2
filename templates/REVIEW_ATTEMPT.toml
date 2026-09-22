@@ -1,0 +1,18 @@
+# TEMPLATE ONLY — append a new attempt for a new exact subject/verdict.
+attempt = "R01"
+verdict = "pending"
+
+[subject]
+class = "git_blob"
+repository = "owner/repository"
+commit = "0000000000000000000000000000000000000000"
+path = "path/to/reviewed/artifact"
+blob = "0000000000000000000000000000000000000000"
+
+[acceptance]
+class = "authority"
+path = "requirements/REQUIREMENTS.md"
+
+[independence]
+materially_produced_or_repaired_subject = false
+basis = "Semantic independence evidence; no runtime/session identity."

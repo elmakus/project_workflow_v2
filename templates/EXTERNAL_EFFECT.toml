@@ -1,0 +1,10 @@
+# TEMPLATE ONLY — obligation-local effect/readback evidence.
+obligation_id = "M00-T00"
+operation = "example write"
+target = "external-object-identity"
+expected_state = "expected durable state"
+readback_state = "pending"
+
+[evidence]
+class = "evidence"
+path = "implementation/workstreams/example-workstream/evidence/M00-T00-effect.md"
