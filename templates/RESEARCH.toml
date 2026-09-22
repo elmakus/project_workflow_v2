@@ -8,6 +8,7 @@ return_reconciliation = "pending"
 return_result = ""
 finding = ""
 limitations = ""
+conflicts = "" # required non-empty summary when state is complete/consumed, including explicit "none"
 
 [[sources]]
 class = "official_upstream"
