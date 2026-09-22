@@ -10,9 +10,12 @@ from tools.state_contract import (
     read_project,
     reject_prohibited_keys,
     validate_board,
+    validate_brainstorm,
     validate_bundle,
+    validate_definition,
     validate_intake,
     validate_project,
+    validate_research,
     validate_review,
     validate_workstream,
 )
@@ -138,6 +141,109 @@ class StateEnvelopeTests(unittest.TestCase):
         workstream["intake"]["path"] = "implementation/workstreams/other/INTAKE.toml"
         with self.assertRaises(ValidationError):
             validate_workstream(workstream)
+
+
+    def test_brainstorm_promotion_binds_exact_revision(self) -> None:
+        data = {
+            "workstream_id": "sample-workstream",
+            "scope_id": "scope-a",
+            "revision": 2,
+            "state": "ready_for_definition",
+            "challenge_audit": "green",
+            "explicit_user_stop": False,
+            "promotion_state": "pending",
+            "promotion_subject": "",
+        }
+        validate_brainstorm(data, "sample-workstream")
+
+        data["promotion_state"] = "authorized"
+        data["promotion_subject"] = "scope-a@2"
+        validate_brainstorm(data, "sample-workstream")
+
+        stale = copy.deepcopy(data)
+        stale["revision"] = 3
+        with self.assertRaisesRegex(ValidationError, "stale"):
+            validate_brainstorm(stale, "sample-workstream")
+
+    def test_research_requires_all_source_classes_and_once_only_return_state(self) -> None:
+        sources = [
+            {"class": "official_upstream", "status": "checked", "weight": "primary"},
+            {"class": "project_runtime", "status": "checked", "weight": "direct"},
+            {"class": "tracker_discussion", "status": "not_relevant", "weight": "supporting"},
+            {"class": "practitioner_community", "status": "unavailable", "weight": "supporting"},
+        ]
+        data = {
+            "workstream_id": "sample-workstream",
+            "state": "complete",
+            "origin_role": "brainstorming",
+            "origin_subject": "scope-a@2",
+            "return_target": "brainstorming",
+            "return_reconciliation": "pending",
+            "return_result": "",
+            "finding": "No conflicting prior art.",
+            "limitations": "Community source unavailable.",
+            "sources": sources,
+        }
+        validate_research(data, "sample-workstream")
+
+        missing = copy.deepcopy(data)
+        missing["sources"] = missing["sources"][:-1]
+        with self.assertRaisesRegex(ValidationError, "all proportional"):
+            validate_research(missing, "sample-workstream")
+
+        applied = copy.deepcopy(data)
+        applied["return_reconciliation"] = "applied"
+        with self.assertRaisesRegex(ValidationError, "return_result"):
+            validate_research(applied, "sample-workstream")
+
+        applied["return_result"] = "brainstorm:scope-a@2:reconciled"
+        validate_research(applied, "sample-workstream")
+        applied["state"] = "consumed"
+        validate_research(applied, "sample-workstream")
+
+    def test_definition_green_requires_authority_and_premium_a(self) -> None:
+        active = {
+            "workstream_id": "sample-workstream",
+            "source_scope_subject": "scope-a@2",
+            "revision": "R1",
+            "state": "active",
+            "completeness_audit": "pending",
+            "premium_a": "not_due",
+            "requirements": {"class": "authority", "path": "requirements/REQUIREMENTS.md"},
+            "decisions": [],
+        }
+        validate_definition(active, "sample-workstream")
+
+        green = copy.deepcopy(active)
+        green.update({
+            "state": "green",
+            "completeness_audit": "green",
+            "premium_a": "due",
+            "decisions": [{"class": "authority", "path": "decisions/ADR-001.md"}],
+        })
+        validate_definition(green, "sample-workstream")
+
+        bad = copy.deepcopy(green)
+        bad["premium_a"] = "not_due"
+        with self.assertRaisesRegex(ValidationError, "premium stop A"):
+            validate_definition(bad, "sample-workstream")
+
+    def test_exploration_locators_are_exact_and_workstream_bound(self) -> None:
+        workstream = copy.deepcopy(self.workstream)
+        for key, klass, filename in (
+            ("brainstorm", "brainstorm", "BRAINSTORM.toml"),
+            ("research", "research", "RESEARCH.toml"),
+            ("definition", "definition", "DEFINITION.toml"),
+        ):
+            candidate = copy.deepcopy(workstream)
+            candidate[key] = {
+                "class": klass,
+                "path": f"implementation/workstreams/sample-workstream/{filename}",
+            }
+            validate_workstream(candidate)
+            candidate[key]["path"] = f"implementation/workstreams/other/{filename}"
+            with self.subTest(key=key), self.assertRaises(ValidationError):
+                validate_workstream(candidate)
 
     def test_project_contract_is_common_v2_only(self) -> None:
         project = read_project(VALID / "PROJECT.md")
