@@ -496,7 +496,7 @@ class RouterTests(unittest.TestCase):
                 'alignment_state = "authorized"\n'
                 'alignment_subject = "repair:v2"\n'
                 'micro_fix_candidate = true\n',
-                ("unavailable", "execution_prep"),
+                ("route", "execution_prep"),
             ),
         )
         for intake_content, expected in cases:
@@ -856,7 +856,7 @@ class RouterTests(unittest.TestCase):
                 )
             )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
-            self.assertEqual((routed.disposition, routed.obligation), ("unavailable", "execution_prep"))
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_prep"))
 
             base = f"owner/repo@{'a' * 40}:planning/MASTER_PLAN.md@{'b' * 40}"
             planning_path.write_text(
@@ -870,7 +870,7 @@ class RouterTests(unittest.TestCase):
             )
             review_path.write_text(self.plan_review_content("green", cycle=2, revision="P2"))
             routed = select_route(project, [MANIFEST], package_root=ROOT)
-            self.assertEqual((routed.disposition, routed.obligation), ("unavailable", "execution_prep"))
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_prep"))
             self.assertIn("Editorial/mechanical-only", routed.reason)
         finally:
             temp.cleanup()
