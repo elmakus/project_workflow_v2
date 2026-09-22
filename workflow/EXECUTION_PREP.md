@@ -10,7 +10,7 @@ A Task Card is stable authority. It must identify:
 - exact Card ID;
 - bounded included and excluded scope;
 - exact authority refs;
-- exact completed-result dependencies, or `none`;
+- exact completed-result dependencies bound as result path + immutable commit/blob identity, or `none`;
 - observable acceptance;
 - required tests/readback;
 - review requirement;
@@ -25,7 +25,7 @@ READY is semantic readiness, not runtime availability.
 Before a READY Card can launch, reread:
 1. the selected Task Board and exact Card contract;
 2. every authority ref named by the Card;
-3. every exact dependency result named by the Card and verify it is still the result of a DONE predecessor;
+3. every exact dependency result named by the Card and verify its path + commit/blob identity is still the result of a DONE predecessor;
 4. the optional technical contract only when the Card names one.
 
 Missing/stale authority, dependency or technical-contract input fails closed before execution. Worker/provider/model availability is not a READY prerequisite.

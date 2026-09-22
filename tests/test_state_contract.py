@@ -86,6 +86,28 @@ class StateEnvelopeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "Card ID"):
             parse_task_card(wrong_id, "M03-T01", "sample-workstream")
 
+        exact_dependency = (
+            "implementation/workstreams/sample-workstream/results/M03-T00.md@"
+            + ("a" * 40) + ":" + ("b" * 40)
+        )
+        with_dependency = text.replace("- Dependencies: none", f"- Dependencies: {exact_dependency}")
+        parsed_dependency = parse_task_card(with_dependency, "M03-T01", "sample-workstream")
+        self.assertEqual(
+            parsed_dependency["dependencies"],
+            [{
+                "path": "implementation/workstreams/sample-workstream/results/M03-T00.md",
+                "commit": "a" * 40,
+                "blob": "b" * 40,
+            }],
+        )
+
+        path_only = text.replace(
+            "- Dependencies: none",
+            "- Dependencies: implementation/workstreams/sample-workstream/results/M03-T00.md",
+        )
+        with self.assertRaisesRegex(ValidationError, "path@commit:blob"):
+            parse_task_card(path_only, "M03-T01", "sample-workstream")
+
     def test_jit_trigger_preserves_predecessor_boundary_without_placeholder_card(self) -> None:
         board = read_toml(VALID / "TASK_BOARD.toml")
         board["jit_triggers"] = [{

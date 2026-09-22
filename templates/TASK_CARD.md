@@ -6,7 +6,7 @@ Stable contract only.
 - Included scope: <bounded scope>
 - Excluded scope: <explicit exclusions>
 - Authority refs: <exact refs>
-- Dependencies: <comma-separated exact completed-result refs | none>
+- Dependencies: <comma-separated result-path@40hex-commit:40hex-blob refs | none>
 - Acceptance: <observable acceptance>
 - Required tests/readback: <checks>
 - Review requirement: <none|required|recommended>

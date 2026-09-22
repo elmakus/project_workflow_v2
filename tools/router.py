@@ -136,16 +136,25 @@ def refresh_ready_card(
         reads.project(authority_path).read_text(encoding="utf-8")
 
     done_results = {
-        item["result"]["path"]
+        (
+            item["result"]["path"],
+            item["result"].get("commit"),
+            item["result"].get("blob"),
+        )
         for item in board["cards"]
         if item["status"] == "done" and "result" in item
     }
-    for dependency_path in contract["dependencies"]:
-        if dependency_path not in done_results:
+    for dependency in contract["dependencies"]:
+        exact_dependency = (
+            dependency["path"],
+            dependency["commit"],
+            dependency["blob"],
+        )
+        if exact_dependency not in done_results:
             raise ValidationError(
-                f"ready Card dependency {dependency_path!r} is not the current DONE predecessor result"
+                f"ready Card dependency {dependency['path']!r} no longer matches the exact current DONE predecessor result"
             )
-        reads.project(dependency_path).read_text(encoding="utf-8")
+        reads.project(dependency["path"]).read_text(encoding="utf-8")
 
     technical_contract = contract["technical_contract"]
     if technical_contract is not None:

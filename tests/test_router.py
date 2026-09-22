@@ -101,14 +101,57 @@ class RouterTests(unittest.TestCase):
             finally:
                 temp.cleanup()
 
+    def install_done_predecessor(
+        self, project: Path, *, path: str, commit: str, blob: str,
+    ) -> None:
+        board = project / BOARD
+        existing = board.read_text()
+        predecessor = (
+            '[[cards]]\n'
+            'id = "M01-T03"\n'
+            'status = "done"\n'
+            '[cards.contract]\n'
+            'class = "task_card"\n'
+            'path = "implementation/workstreams/sample-workstream/cards/M01-T03.md"\n'
+            '[cards.result]\n'
+            'class = "result"\n'
+            f'path = "{path}"\n'
+            f'commit = "{commit}"\n'
+            f'blob = "{blob}"\n\n'
+        )
+        board.write_text(existing.replace('[[cards]]\n', predecessor + '[[cards]]\n', 1))
+        predecessor_card = project / "implementation/workstreams/sample-workstream/cards/M01-T03.md"
+        predecessor_card.write_text("# predecessor Card\n")
+        result_path = project / path
+        result_path.parent.mkdir(parents=True, exist_ok=True)
+        result_path.write_text("# predecessor result\n")
+
     def test_ready_card_stale_dependency_fails_closed_before_launch(self) -> None:
         temp, project = self.copy_fixture()
         try:
-            dependency = "implementation/workstreams/sample-workstream/results/MISSING.md"
+            dependency_path = "implementation/workstreams/sample-workstream/results/M01-T03.md"
+            commit = "a" * 40
+            blob = "b" * 40
+            dependency = f"{dependency_path}@{commit}:{blob}"
+            self.install_done_predecessor(project, path=dependency_path, commit=commit, blob=blob)
             self.make_ready_card(project, dependencies=dependency)
-            routed = select_route(project, [MANIFEST], package_root=ROOT)
-            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
-            self.assertIn("not the current DONE predecessor result", routed.reason)
+
+            current = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((current.disposition, current.obligation), ("route", "execution_prep"))
+
+            new_commit = "c" * 40
+            new_blob = "d" * 40
+            board = project / BOARD
+            board.write_text(
+                board.read_text()
+                .replace(f'commit = "{commit}"', f'commit = "{new_commit}"')
+                .replace(f'blob = "{blob}"', f'blob = "{new_blob}"')
+            )
+            (project / dependency_path).write_text("# materially changed predecessor result\n")
+
+            stale = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((stale.disposition, stale.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("no longer matches the exact current DONE predecessor result", stale.reason)
         finally:
             temp.cleanup()
 

@@ -626,15 +626,23 @@ def parse_task_card(text: str, expected_id: str, workstream_id: str) -> dict[str
         _require(path.startswith(("requirements/", "decisions/", "planning/", "workflow/")),
                  f"task_card.authority_refs[{index}]: outside accepted authority roots")
 
-    dependencies: list[str] = []
+    dependencies: list[dict[str, str]] = []
     if fields["dependencies"].lower() != "none":
-        dependencies = [part.strip() for part in fields["dependencies"].split(",") if part.strip()]
-        _require(dependencies, "task_card: dependencies must be exact result refs or none")
+        raw_dependencies = [part.strip() for part in fields["dependencies"].split(",") if part.strip()]
+        _require(raw_dependencies, "task_card: dependencies must be exact result refs or none")
         expected_prefix = f"implementation/workstreams/{workstream_id}/results/"
-        for index, raw in enumerate(dependencies):
-            path = _safe_relative_path(raw, f"task_card.dependencies[{index}]")
+        for index, raw in enumerate(raw_dependencies):
+            matched = re.fullmatch(r"(.+)@([0-9a-f]{40}):([0-9a-f]{40})", raw)
+            _require(matched is not None,
+                     f"task_card.dependencies[{index}]: exact result ref must be path@commit:blob")
+            path = _safe_relative_path(matched.group(1), f"task_card.dependencies[{index}]")
             _require(path.startswith(expected_prefix) and path.endswith(".md"),
                      f"task_card.dependencies[{index}]: must be exact workstream result ref")
+            dependencies.append({
+                "path": path,
+                "commit": matched.group(2),
+                "blob": matched.group(3),
+            })
 
     review_requirement = fields["review requirement"].lower()
     _require(review_requirement in TASK_CARD_REVIEW_REQUIREMENTS,

@@ -43,7 +43,7 @@ Each material Planning entry has an exact cycle/entry subject; stale A cannot au
 
 ## Execution Prep / readiness
 
-READY means the stable Card has current accepted authority, complete testable scope, and exact dependency results; it does not depend on whether a runtime worker/model/session exists. Launch refresh rereads the exact Card, authority refs, DONE predecessor results and only the optional technical contract named by that Card. Missing/stale inputs fail closed before execution.
+READY means the stable Card has current accepted authority, complete testable scope, and exact dependency results; it does not depend on whether a runtime worker/model/session exists. Each predecessor dependency is bound to its result path plus immutable commit/blob identity. Launch refresh rereads the exact Card, authority refs, DONE predecessor results and only the optional technical contract named by that Card. Missing/stale or same-path-changed dependency inputs fail closed before execution.
 
 Predecessor-dependent downstream work remains a Task Board JIT trigger until its stable Card contract becomes knowable. Simple Cards do not load a second technical contract.
 
