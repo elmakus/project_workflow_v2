@@ -1,12 +1,13 @@
 # Project Workflow V2 — Durable State Envelope
 
-M01 established common ownership/binding. M02 extends only concrete pre-execution state through Intake, Brainstorming, Research, Definition and Strategic Planning.
+M01 established common ownership/binding. M02 extends only concrete pre-execution state through Intake, Brainstorming, Research, Definition, Strategic Planning and GitHub tracker correlation.
 
 ## Owners
 
 - PROJECT.md identifies the V2 project contract/workstream root; it is not a live phase/Card registry.
 - WORKSTREAM.toml owns stable workstream identity/provenance and exact locators for currently materialized workstream-local records.
 - INTAKE.toml owns managed-intent diagnosis and exact issue-repair alignment.
+- TRACKER.toml owns GitHub Issue bookkeeping/correlation only; it never owns requirements, repair authorization, planning or execution state.
 - BRAINSTORM.toml owns one exploratory revision, challenge audit, explicit user stop and exact Definition-promotion authorization.
 - RESEARCH.toml owns one factual obligation, source accounting, exact return owner and once-only reconciliation.
 - DEFINITION.toml owns exact promoted scope, accepted authority, completeness and premium-A state.
@@ -20,25 +21,25 @@ M01 established common ownership/binding. M02 extends only concrete pre-executio
 
 Issue markers/symptoms never authorize repair. Questions/concerns/alternatives are responses but not authorization. Authorization is bound to the exact current repair subject; changed repair makes it stale. Micro-fix candidacy is illegal before exact issue alignment.
 
-## Brainstorming promotion
+## GitHub tracker correlation
 
-Definition readiness requires GREEN challenge audit. Promotion is bound to exact `scope_id@revision`; a changed revision invalidates old authorization. Ready-for-definition without exact promotion is a real user stop.
+Tracker lifecycle is `discovery | create_pending_readback | linked | ambiguous | unavailable`.
 
-## Research return
+- discovery performs exact repository/dedup recovery before create;
+- create_pending_readback requires readback/search before any retry;
+- linked requires one positive Issue number and verified readback;
+- ambiguous requires multiple candidates and fails closed instead of creating a duplicate;
+- unavailable records capability absence without inventing a tracker.
 
-Completed Research accounts for official/upstream, project/runtime, tracker/discussion and practitioner/community source classes with explicit status/weight. A pending completed result returns to exactly one owner. An applied result carries an exact result and is consume-only.
+Tracker records reject workflow authorization/approval fields. Optional `final_pr` is reserved for later M04 correlation and requires an already linked Issue.
 
-## Definition / premium A
+## Brainstorming / Research / Definition
 
-Definition GREEN requires accepted authority and GREEN completeness. Premium A becomes due before material Planning. Canonical state stores semantic gate state only, never model/session identity.
+Definition readiness requires GREEN challenge audit and exact `scope_id@revision` promotion. Completed Research accounts for all proportional source classes and has one exact return owner. Definition GREEN requires accepted authority/completeness and premium A before Planning.
 
 ## Planning / Plan Review / premium B/C
 
-Each material Planning entry has a positive `cycle` and exact `entry_subject`. Premium A satisfaction must match that cycle. Material re-entry uses a new cycle, so stale A cannot authorize it.
-
-A plan may freeze only after GREEN planner audit. Its exact Git blob becomes the premium-B subject. B must be satisfied before a fresh independent PLAN_REVIEW attempt exists. Plan Review subject/revision/cycle must match the frozen plan exactly.
-
-GREEN Plan Review is consumed by Planning into `approved`; only then premium C becomes due for the same exact subject. C must be satisfied before Execution Prep. RED never mutates the failed attempt subject.
+Each material Planning entry has an exact cycle/entry subject; stale A cannot authorize a new cycle. GREEN planner audit freezes one exact Git blob for B. Independent Plan Review must match the frozen subject/revision/cycle. GREEN is consumed into approved plan, then C becomes due for the same subject before Execution Prep.
 
 ## Mutation guard / one-Card invariant
 
