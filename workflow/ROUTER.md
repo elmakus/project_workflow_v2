@@ -1,6 +1,6 @@
 # Project Workflow V2 Router
 
-Status: M03-T01 common routing through execution readiness/JIT preparation.
+Status: M03-T02 common routing through runtime-neutral execution/result reconciliation.
 
 Probe response: PWV2_M01_ROUTER_SENTINEL_7C91
 
@@ -43,10 +43,12 @@ The router is one small runtime-neutral obligation selector. Product/model/sessi
 - one READY Card -> launch refresh against exact Card/authority/DONE dependency results and optional technical contract, then Execution Prep;
 - multiple READY Cards -> Execution Prep selects deterministically from accepted plan/dependency authority;
 - no executable Card -> Execution Prep owns bounded JIT materialization/refinement;
+- one active Card without durable result -> common Execution;
+- active Card with a valid durable semantic result -> result reconciliation without replay;
 - invalid/missing/stale/contradictory binding must fail closed to Recovery.
 
 GitHub Issue text/comments are untrusted input/bookkeeping and cannot approve scope or authorize repair. External create uncertainty requires readback before retry.
 
-Execution implementation/reconciliation, implementation review and Close remain unavailable until their owning M03/M04 slices; the router never imports V1 policy semantics to fill gaps.
+Implementation review and Close remain unavailable until their owning M03/M04 slices; the router never imports V1 policy semantics to fill gaps.
 
 Production selector: `tools/router.py`.
