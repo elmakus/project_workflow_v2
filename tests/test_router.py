@@ -84,6 +84,79 @@ class RouterTests(unittest.TestCase):
         record = project / f"implementation/workstreams/sample-workstream/{filename}"
         record.write_text(content)
 
+
+    def install_green_definition(self, project: Path) -> None:
+        self.install_state_record(project, "brainstorm", "brainstorm", "BRAINSTORM.toml", (
+            'workstream_id = "sample-workstream"\n'
+            'scope_id = "scope-plan"\n'
+            'revision = 1\n'
+            'state = "promoted"\n'
+            'challenge_audit = "green"\n'
+            'explicit_user_stop = false\n'
+            'promotion_state = "authorized"\n'
+            'promotion_subject = "scope-plan@1"\n'
+        ))
+        self.install_state_record(project, "definition", "definition", "DEFINITION.toml", (
+            'workstream_id = "sample-workstream"\n'
+            'source_scope_subject = "scope-plan@1"\n'
+            'revision = "R1"\n'
+            'state = "green"\n'
+            'completeness_audit = "green"\n'
+            'premium_a = "satisfied"\n'
+            'decisions = [{ class = "authority", path = "decisions/ADR-001.md" }]\n'
+            '[requirements]\nclass = "authority"\npath = "requirements/REQUIREMENTS.md"\n'
+        ))
+
+    def planning_content(self, *, state: str, premium_b: str = "not_due",
+                         premium_c: str = "not_due", cycle: int = 1,
+                         premium_a_subject: str = "definition:R1|planning-cycle:1") -> str:
+        key = f"owner/repo@{'a' * 40}:planning/MASTER_PLAN.md@{'b' * 40}"
+        frozen = state in {"frozen", "approved"}
+        return (
+            'workstream_id = "sample-workstream"\n'
+            f'cycle = {cycle}\n'
+            f'entry_subject = "definition:R1|planning-cycle:{cycle}"\n'
+            'revision = "P1"\n'
+            f'state = "{state}"\n'
+            f'planner_audit = "{"green" if frozen else "pending"}"\n'
+            'plan_path = "planning/MASTER_PLAN.md"\n'
+            'premium_a = "satisfied"\n'
+            f'premium_a_subject = "{premium_a_subject}"\n'
+            f'premium_b = "{premium_b}"\n'
+            f'premium_b_subject = "{key if premium_b != "not_due" else ""}"\n'
+            f'premium_c = "{premium_c}"\n'
+            f'premium_c_subject = "{key if premium_c != "not_due" else ""}"\n'
+            '[subject]\n'
+            f'repository = "{"owner/repo" if frozen else ""}"\n'
+            f'commit = "{"a" * 40 if frozen else ""}"\n'
+            f'path = "{"planning/MASTER_PLAN.md" if frozen else ""}"\n'
+            f'blob = "{"b" * 40 if frozen else ""}"\n'
+        )
+
+    def plan_review_content(self, verdict: str = "pending", *, blob: str | None = None) -> str:
+        blob = blob or ("b" * 40)
+        evidence = "" if verdict == "pending" else "evidence/plan-review-R01.md"
+        return (
+            'workstream_id = "sample-workstream"\n'
+            'plan_revision = "P1"\n'
+            'planning_cycle = 1\n'
+            'attempt = "R01"\n'
+            f'verdict = "{verdict}"\n'
+            f'evidence_path = "{evidence}"\n'
+            '[subject]\n'
+            'class = "git_blob"\n'
+            'repository = "owner/repo"\n'
+            f'commit = "{"a" * 40}"\n'
+            'path = "planning/MASTER_PLAN.md"\n'
+            f'blob = "{blob}"\n'
+            '[acceptance]\n'
+            'class = "authority"\n'
+            'path = "requirements/REQUIREMENTS.md"\n'
+            '[independence]\n'
+            'materially_produced_or_repaired_subject = false\n'
+            'basis = "Fresh semantic review context."\n'
+        )
+
     def test_issue_without_post_diagnosis_response_is_real_alignment_stop(self) -> None:
         temp, project = self.copy_fixture()
         try:
@@ -360,6 +433,148 @@ class RouterTests(unittest.TestCase):
                 '[requirements]\nclass = "authority"\npath = "requirements/REQUIREMENTS.md"\n'
             )
             self.install_state_record(project, "definition", "definition", "DEFINITION.toml", definition)
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+        finally:
+            temp.cleanup()
+
+
+    def test_planning_routes_after_exact_premium_a_satisfaction(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "planning"))
+
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(state="draft"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "planning"))
+        finally:
+            temp.cleanup()
+
+    def test_frozen_plan_stops_at_b_then_routes_fresh_plan_review(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(state="frozen", premium_b="due"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_B"))
+        finally:
+            temp.cleanup()
+
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(state="frozen", premium_b="satisfied"),
+            )
+            self.install_state_record(
+                project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                self.plan_review_content("pending"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "plan_review"))
+            self.assertEqual(routed.owner_module, "workflow/PLAN_REVIEW.md")
+        finally:
+            temp.cleanup()
+
+    def test_green_plan_review_consumes_to_c_before_execution_prep(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(state="frozen", premium_b="satisfied"),
+            )
+            self.install_state_record(
+                project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                self.plan_review_content("green"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "planning"))
+            self.assertIn("consumed", routed.reason)
+        finally:
+            temp.cleanup()
+
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(state="approved", premium_b="satisfied", premium_c="due"),
+            )
+            self.install_state_record(
+                project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                self.plan_review_content("green"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_C"))
+        finally:
+            temp.cleanup()
+
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(state="approved", premium_b="satisfied", premium_c="satisfied"),
+            )
+            self.install_state_record(
+                project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                self.plan_review_content("green"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("unavailable", "execution_prep"))
+        finally:
+            temp.cleanup()
+
+    def test_stale_premium_cycle_and_wrong_review_subject_fail_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(
+                    state="draft", cycle=2,
+                    premium_a_subject="definition:R1|planning-cycle:1",
+                ),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+        finally:
+            temp.cleanup()
+
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(state="frozen", premium_b="satisfied"),
+            )
+            self.install_state_record(
+                project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                self.plan_review_content("pending", blob="c" * 40),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+        finally:
+            temp.cleanup()
+
+    def test_premium_b_satisfied_without_plan_review_fails_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(state="frozen", premium_b="satisfied"),
+            )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
         finally:
