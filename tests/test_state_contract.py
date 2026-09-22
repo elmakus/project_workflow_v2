@@ -128,7 +128,7 @@ class StateEnvelopeTests(unittest.TestCase):
         }
         validate_workstream(workstream)
         workstream.pop("intake")
-        with self.assertRaisesRegex(ValidationError, "Intake or execution Task Board"):
+        with self.assertRaisesRegex(ValidationError, "workstream-local state locator"):
             validate_workstream(workstream)
 
     def test_intake_locator_is_workstream_bound(self) -> None:
