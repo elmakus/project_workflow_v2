@@ -14,6 +14,7 @@ from tools.state_contract import (
     validate_brainstorm,
     validate_bundle,
     validate_definition,
+    validate_external_effect,
     validate_intake,
     validate_plan_review,
     validate_planning,
@@ -601,6 +602,28 @@ class StateEnvelopeTests(unittest.TestCase):
         workstream["tracker"]["path"] = "implementation/workstreams/other/TRACKER.toml"
         with self.assertRaises(ValidationError):
             validate_workstream(workstream)
+
+    def test_external_effect_observation_matches_readback_state(self) -> None:
+        effect = read_toml(VALID / "EXTERNAL_EFFECT.toml")
+        validate_external_effect(effect, "sample-workstream")
+
+        pending = copy.deepcopy(effect)
+        pending.update({"readback_state": "pending", "observation": "unknown"})
+        validate_external_effect(pending, "sample-workstream")
+
+        uncertain = copy.deepcopy(effect)
+        uncertain.update({"readback_state": "uncertain", "observation": "unknown"})
+        validate_external_effect(uncertain, "sample-workstream")
+
+        bad_pending = copy.deepcopy(effect)
+        bad_pending.update({"readback_state": "pending", "observation": "expected_effect"})
+        with self.assertRaisesRegex(ValidationError, "cannot claim an observation"):
+            validate_external_effect(bad_pending, "sample-workstream")
+
+        bad_verified = copy.deepcopy(effect)
+        bad_verified.update({"readback_state": "verified", "observation": "unknown"})
+        with self.assertRaisesRegex(ValidationError, "requires a concrete observation"):
+            validate_external_effect(bad_verified, "sample-workstream")
 
     def test_project_contract_is_common_v2_only(self) -> None:
         project = read_project(VALID / "PROJECT.md")

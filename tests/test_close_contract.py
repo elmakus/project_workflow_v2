@@ -6,7 +6,10 @@ from tools.close_contract import (
     CloseContractError,
     RefreshSnapshot,
     classify_review_coverage,
+    external_effect_recovery_action,
+    reconcile_issue_readback,
     stacked_integration_path,
+    tracker_pr_linkage,
     verify_pre_mutation_target,
 )
 
@@ -112,6 +115,109 @@ class CloseRefreshTests(unittest.TestCase):
                 dependency_accepted_in_target=False,
             ),
             "integrate_child_independently",
+        )
+
+
+    def test_external_effect_recovery_requires_readback_before_retry(self) -> None:
+        self.assertEqual(
+            external_effect_recovery_action(
+                readback_state="pending", observation="unknown"
+            ),
+            "readback_exact_target",
+        )
+        with self.assertRaisesRegex(CloseContractError, "fail closed without retry"):
+            external_effect_recovery_action(
+                readback_state="uncertain", observation="unknown"
+            )
+
+    def test_verified_external_effect_selects_idempotent_continuation(self) -> None:
+        self.assertEqual(
+            external_effect_recovery_action(
+                readback_state="verified", observation="no_effect"
+            ),
+            "retry_allowed",
+        )
+        self.assertEqual(
+            external_effect_recovery_action(
+                readback_state="verified", observation="expected_effect"
+            ),
+            "reconcile_without_retry",
+        )
+        self.assertEqual(
+            external_effect_recovery_action(
+                readback_state="verified", observation="unexpected_effect"
+            ),
+            "reconcile_unexpected_effect",
+        )
+
+    def test_tracker_closing_linkage_is_final_default_branch_only(self) -> None:
+        self.assertEqual(
+            tracker_pr_linkage(
+                tracker_linked=True,
+                final_scope_completing=False,
+                target_is_default_branch=True,
+            ),
+            "reference_only",
+        )
+        self.assertEqual(
+            tracker_pr_linkage(
+                tracker_linked=True,
+                final_scope_completing=True,
+                target_is_default_branch=False,
+            ),
+            "reference_only",
+        )
+        self.assertEqual(
+            tracker_pr_linkage(
+                tracker_linked=True,
+                final_scope_completing=True,
+                target_is_default_branch=True,
+            ),
+            "closing_linkage",
+        )
+
+    def test_issue_readback_never_turns_early_close_into_approval(self) -> None:
+        self.assertEqual(
+            reconcile_issue_readback(
+                accepted_scope_durably_complete=False,
+                observed_issue_state="closed",
+                automatic_close_available=True,
+            ),
+            "reconcile_unexpected_early_close",
+        )
+        self.assertEqual(
+            reconcile_issue_readback(
+                accepted_scope_durably_complete=False,
+                observed_issue_state="open",
+                automatic_close_available=True,
+            ),
+            "keep_open",
+        )
+
+    def test_issue_fallback_close_requires_accepted_completion(self) -> None:
+        self.assertEqual(
+            reconcile_issue_readback(
+                accepted_scope_durably_complete=True,
+                observed_issue_state="closed",
+                automatic_close_available=True,
+            ),
+            "verified_closed",
+        )
+        self.assertEqual(
+            reconcile_issue_readback(
+                accepted_scope_durably_complete=True,
+                observed_issue_state="open",
+                automatic_close_available=False,
+            ),
+            "explicit_close_allowed",
+        )
+        self.assertEqual(
+            reconcile_issue_readback(
+                accepted_scope_durably_complete=True,
+                observed_issue_state="open",
+                automatic_close_available=True,
+            ),
+            "reconcile_missing_automatic_close",
         )
 
 

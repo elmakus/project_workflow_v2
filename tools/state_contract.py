@@ -854,10 +854,25 @@ def validate_review_history(
 
 def validate_external_effect(data: dict[str, Any], workstream_id: str) -> None:
     reject_prohibited_keys(data, "external_effect")
-    for key in ("obligation_id", "operation", "target", "expected_state", "readback_state"):
+    for key in (
+        "obligation_id", "operation", "target", "expected_state",
+        "readback_state", "observation",
+    ):
         _require(isinstance(data.get(key), str) and data[key], f"external_effect: missing {key}")
-    _require(data["readback_state"] in {"pending", "verified", "uncertain"},
+    readback_state = data["readback_state"]
+    observation = data["observation"]
+    _require(readback_state in {"pending", "verified", "uncertain"},
              "external_effect: invalid readback_state")
+    _require(
+        observation in {"unknown", "expected_effect", "no_effect", "unexpected_effect"},
+        "external_effect: invalid observation",
+    )
+    if readback_state in {"pending", "uncertain"}:
+        _require(observation == "unknown",
+                 "external_effect: non-verified readback cannot claim an observation")
+    else:
+        _require(observation != "unknown",
+                 "external_effect: verified readback requires a concrete observation")
     validate_locator(data.get("evidence"), "evidence", "external_effect.evidence", workstream_id)
 
 
