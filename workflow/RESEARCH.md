@@ -12,7 +12,7 @@ Every completed Research record must proportionally account for these source cla
 - issue/discussion tracker evidence;
 - practitioner/community evidence.
 
-A class may be checked, unavailable or not relevant. Completion may not silently leave a class pending. Each class records an explicit weight. Community evidence may expose practical failure modes/workarounds but does not override stronger authority by popularity.
+A class may be checked, unavailable or not relevant. Completion may not silently leave a class pending or leave source conflicts unaccounted for. Each class records an explicit weight. Completed Research also records an explicit conflict summary, including an explicit `none` when no material conflict exists. Community evidence may expose practical failure modes/workarounds but does not override stronger authority by popularity; conflicts are reconciled by source weight/authority rather than popularity.
 
 ## Durable return ownership
 
@@ -22,7 +22,7 @@ The exact `RESEARCH.toml` record owns:
 - exact return target;
 - return reconciliation: pending / applied;
 - exact return result reference once applied;
-- concise finding and limitations;
+- concise finding, limitations and explicit conflict accounting;
 - source-class accounting.
 
 A completed record with reconciliation pending routes to its exact return owner. A completed record with reconciliation applied routes to that owner only for consume/clear behavior; it must not replay the already-applied result. Consumed Research is historical and does not route again.
