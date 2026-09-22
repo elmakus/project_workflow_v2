@@ -1287,6 +1287,7 @@ class RouterTests(unittest.TestCase):
             self.assertEqual((routed.disposition, routed.obligation), ("route", "close"))
             self.assertEqual(routed.owner_module, "workflow/CLOSE.md")
             self.assertIn("decides whether approved scope is durably complete", routed.reason)
+            self.assertNotIn("package:workflow/FORK_RELEASE_VERSIONING.md", routed.read_set)
         finally:
             temp.cleanup()
 
