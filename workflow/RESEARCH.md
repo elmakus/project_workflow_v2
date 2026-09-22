@@ -27,6 +27,6 @@ The exact `RESEARCH.toml` record owns:
 
 A completed record with reconciliation pending routes to its exact return owner. A completed record with reconciliation applied routes to that owner only for consume/clear behavior; it must not replay the already-applied result. Consumed Research is historical and does not route again.
 
-For a concrete `#issue` diagnosis, Intake uses this same contract: `origin_role = intake`, `origin_subject` is the exact current repair subject and `return_target = intake`. Alignment cannot proceed until that exact proportional prior-art result has been applied and consumed. If the repair subject changes, the old Research result is stale for alignment.
+For a concrete `#issue` diagnosis, Intake uses this same contract: `origin_role = intake`, `origin_subject` is the exact current repair subject and `return_target = intake`. Alignment cannot proceed until that exact proportional prior-art result has been applied and consumed **and** Intake has persisted the exact subject/result binding described in `workflow/INTAKE.md`. After that reconciliation, the single current Research slot may be reused for a later legitimate Brainstorming/Definition obligation without erasing proof that diagnosis prior art was checked. If the repair subject changes, the Intake-owned binding and old Research result are stale for alignment.
 
 Research never selects a different target by itself.
