@@ -185,9 +185,15 @@ class StateEnvelopeTests(unittest.TestCase):
             "return_result": "",
             "finding": "No conflicting prior art.",
             "limitations": "Community source unavailable.",
+            "conflicts": "No material conflicts observed across checked source classes.",
             "sources": sources,
         }
         validate_research(data, "sample-workstream")
+
+        no_conflicts = copy.deepcopy(data)
+        no_conflicts["conflicts"] = ""
+        with self.assertRaisesRegex(ValidationError, "conflict accounting"):
+            validate_research(no_conflicts, "sample-workstream")
 
         missing = copy.deepcopy(data)
         missing["sources"] = missing["sources"][:-1]
@@ -259,6 +265,9 @@ class StateEnvelopeTests(unittest.TestCase):
             "state": state,
             "planner_audit": "pending",
             "plan_path": "planning/MASTER_PLAN.md",
+            "review_mode": "independent",
+            "review_exemption_basis": "",
+            "review_exemption_base_subject": "",
             "premium_a": "satisfied",
             "premium_a_subject": "definition:R1|planning-cycle:1",
             "premium_b": "not_due",
@@ -292,6 +301,16 @@ class StateEnvelopeTests(unittest.TestCase):
         stale["entry_subject"] = "definition:R1|planning-cycle:2"
         with self.assertRaisesRegex(ValidationError, "premium A"):
             validate_planning(stale, "sample-workstream")
+
+        reentry = copy.deepcopy(draft)
+        reentry["cycle"] = 2
+        reentry["entry_subject"] = "definition:R1|planning-cycle:2"
+        reentry["revision"] = "P2"
+        reentry["premium_a"] = "due"
+        reentry["premium_a_subject"] = reentry["entry_subject"]
+        validate_planning(reentry, "sample-workstream")
+        reentry["premium_a"] = "satisfied"
+        validate_planning(reentry, "sample-workstream")
 
         frozen = self.planning_record("frozen")
         validate_planning(frozen, "sample-workstream")
@@ -341,6 +360,45 @@ class StateEnvelopeTests(unittest.TestCase):
             validate_plan_review(green, "sample-workstream", planning)
         green["evidence_path"] = "evidence/plan-review-R01.md"
         validate_plan_review(green, "sample-workstream", planning)
+
+    def test_editorial_plan_exemption_preserves_prior_green_subject(self) -> None:
+        planning = self.planning_record("approved")
+        prior = planning["premium_b_subject"]
+        planning["subject"]["blob"] = "c" * 40
+        planning["review_mode"] = "editorial_exempt"
+        planning["review_exemption_basis"] = "Wording only; no strategy, milestones, coverage or gates changed."
+        planning["review_exemption_base_subject"] = prior
+        planning["premium_c"] = "satisfied"
+        planning["premium_b_subject"] = prior
+        planning["premium_c_subject"] = prior
+        validate_planning(planning, "sample-workstream")
+
+        review = {
+            "workstream_id": "sample-workstream",
+            "plan_revision": "P1",
+            "planning_cycle": 1,
+            "attempt": "R01",
+            "verdict": "green",
+            "evidence_path": "evidence/plan-review-R01.md",
+            "subject": {
+                "class": "git_blob",
+                "repository": "owner/repo",
+                "commit": "a" * 40,
+                "path": "planning/MASTER_PLAN.md",
+                "blob": "b" * 40,
+            },
+            "acceptance": {"class": "authority", "path": "requirements/REQUIREMENTS.md"},
+            "independence": {
+                "materially_produced_or_repaired_subject": False,
+                "basis": "Fresh semantic review context.",
+            },
+        }
+        validate_plan_review(review, "sample-workstream", planning)
+
+        bad = copy.deepcopy(planning)
+        bad["review_exemption_basis"] = ""
+        with self.assertRaisesRegex(ValidationError, "bounded semantic basis"):
+            validate_planning(bad, "sample-workstream")
 
     def test_planning_and_plan_review_locators_are_exact(self) -> None:
         workstream = copy.deepcopy(self.workstream)
