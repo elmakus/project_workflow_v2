@@ -243,13 +243,6 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                 planning = read_toml(reads.project(workstream["planning"]["path"]))
                 validate_planning(planning, workstream["workstream_id"])
 
-            plan_review = None
-            if "plan_review" in workstream:
-                if planning is None:
-                    raise ValidationError("Plan Review locator requires durable Planning state")
-                plan_review = read_toml(reads.project(workstream["plan_review"]["path"]))
-                validate_plan_review(plan_review, workstream["workstream_id"], planning)
-
             if planning is None:
                 return result(
                     reads, "route", "planning",
@@ -257,12 +250,24 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     subject=definition["revision"], owner_module="workflow/PLANNING.md",
                 )
 
+            if planning["premium_a"] == "due":
+                return result(
+                    reads, "stop", "premium_A",
+                    "Material planning re-entry has a new exact cycle; premium stop A is due before Planning resumes",
+                    subject=planning["entry_subject"], owner_module="workflow/PLANNING.md",
+                )
+
             if planning["state"] == "draft":
                 return result(
                     reads, "route", "planning",
-                    "Current planning cycle is still being authored",
+                    "Current planning cycle has exact premium A satisfaction and is still being authored",
                     subject=planning["entry_subject"], owner_module="workflow/PLANNING.md",
                 )
+
+            plan_review = None
+            if "plan_review" in workstream:
+                plan_review = read_toml(reads.project(workstream["plan_review"]["path"]))
+                validate_plan_review(plan_review, workstream["workstream_id"], planning)
 
             subject_key = (
                 f"{planning['subject']['repository']}@{planning['subject']['commit']}:"
@@ -293,6 +298,15 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     reads, "route", "planning",
                     "RED Plan Review returns to Planning for correction classification",
                     subject=subject_key, owner_module="workflow/PLANNING.md",
+                )
+
+            if planning["review_mode"] == "editorial_exempt":
+                if plan_review is None or plan_review["verdict"] != "green":
+                    raise ValidationError("editorial exemption requires prior exact GREEN Plan Review")
+                return result(
+                    reads, "unavailable", "execution_prep",
+                    "Editorial/mechanical-only plan change preserves prior GREEN review and satisfied C; no new Stage-6 review is due",
+                    subject=subject_key, owner_module="workflow/EXECUTION_PREP.md",
                 )
 
             if plan_review is None or plan_review["verdict"] != "green":
