@@ -29,7 +29,15 @@ The tracker record owns:
 - readback state;
 - reserved final PR number for M04 correlation.
 
-A linked record must have one positive Issue number and verified readback. A create-pending record must not claim success. Final tracker closure/closing-keyword behavior belongs to M04.
+A linked record must have one positive Issue number and verified readback. A create-pending record must not claim success. `final_pr` is correlation only and is set only for the exact final scope-completing PR selected by Close.
+
+## Final integration and closure
+
+Intermediate PRs use reference-only Issue linkage and must not close the tracker. Only the accepted scope-completing PR that integrates to the default branch may use closing linkage.
+
+After durable accepted completion, Close reads back the linked Issue. A closed Issue verifies completion only when Project Workflow already has durable accepted completion; an early unexpected close routes reconciliation and never grants approval. If the Issue remains open, explicit close is allowed only after accepted completion and only when automatic closing is unavailable/disabled. When automatic closing was expected but did not occur, reconcile the discrepancy before another external mutation.
+
+Tracker closure follows the same external-effect idempotency contract as every other material external write: exact-object readback before retry, verified no-effect before replay, and fail-closed behavior while occurrence remains uncertain.
 
 ## Authority boundary
 

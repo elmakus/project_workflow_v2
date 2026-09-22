@@ -4,6 +4,7 @@ operation = "example write"
 target = "external-object-identity"
 expected_state = "expected durable state"
 readback_state = "pending"
+observation = "unknown"
 
 [evidence]
 class = "evidence"

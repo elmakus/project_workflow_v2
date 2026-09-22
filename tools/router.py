@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Runtime-neutral Project Workflow V2 obligation selector through M03-T04."""
+"""Runtime-neutral Project Workflow V2 obligation selector through M04-T04."""
 
 from __future__ import annotations
 
@@ -623,9 +623,11 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
         )
 
     if board["cards"] and all(card["status"] == "done" for card in board["cards"]):
-        return result(reads, "unavailable", "milestone_finalization",
-                      "Milestone finalization/Close is not implemented yet",
-                      owner_module="workflow/CLOSE.md")
+        return result(
+            reads, "route", "close",
+            "All current Cards are terminal; Close owns finalization and decides whether approved scope is durably complete",
+            owner_module="workflow/CLOSE.md",
+        )
 
     return result(reads, "route", "execution_prep",
                   "No executable Card is selected; common Execution Prep owns bounded JIT materialization/refinement",

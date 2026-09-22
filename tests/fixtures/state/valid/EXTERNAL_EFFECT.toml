@@ -3,6 +3,7 @@ operation = "write target branch"
 target = "owner/fixture-project:refs/heads/feat/sample-workstream"
 expected_state = "exact committed target bytes"
 readback_state = "verified"
+observation = "expected_effect"
 
 [evidence]
 class = "evidence"

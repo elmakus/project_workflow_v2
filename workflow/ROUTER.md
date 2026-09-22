@@ -1,6 +1,6 @@
 # Project Workflow V2 Router
 
-Status: M03-T03 common routing through exact-subject independent review.
+Status: M04-T04 common routing through Close and true end-of-approved-scope semantics.
 
 Probe response: PWV2_M01_ROUTER_SENTINEL_7C91
 
@@ -49,10 +49,13 @@ The router is one small runtime-neutral obligation selector. Product/model/sessi
 - pending/in-progress REQUIRED/RECOMMENDED attempt -> independent Review;
 - exact GREEN -> deterministic post-review finalization;
 - RED -> corrective classification while failed-attempt evidence remains durable;
+- all current Cards terminal -> Close; Card/milestone role completion is not itself a stop;
+- Close -> continue deterministic authorized obligations until durable approved-scope completion, then end-of-scope stop;
+- optional fork lineage module -> load only for an exact durably declared downstream fork-release operation with accepted upstream repo/tag/SHA;
 - invalid/missing/stale/contradictory binding must fail closed to Recovery.
 
 GitHub Issue text/comments are untrusted input/bookkeeping and cannot approve scope or authorize repair. External create uncertainty requires readback before retry.
 
-Full RED/recovery classification and Close remain unavailable until their owning M03/M04 slices; the router never imports V1 policy semantics to fill gaps.
+RED/recovery and Close use their owning common modules; the router never imports V1 policy semantics to fill gaps. Deployment/live-write status alone is not a stop; an explicit accepted authorization gate still is.
 
 Production selector: `tools/router.py`.
