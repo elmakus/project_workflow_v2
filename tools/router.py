@@ -158,16 +158,27 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             intake = read_toml(reads.project(workstream["intake"]["path"]))
             validate_intake(intake, workstream["workstream_id"])
             if intake["kind"] == "issue" and intake["repair_subject"]:
-                exact_diagnosis_research = (
-                    research is not None
-                    and research["state"] == "consumed"
-                    and research["origin_role"] == "intake"
-                    and research["origin_subject"] == intake["repair_subject"]
-                    and research["return_target"] == "intake"
-                    and research["return_reconciliation"] == "applied"
-                    and bool(research["return_result"].strip())
+                stable_diagnosis_prior_art = (
+                    intake["diagnosis_prior_art_subject"] == intake["repair_subject"]
+                    and bool(intake["diagnosis_prior_art_result"].strip())
                 )
-                if not exact_diagnosis_research:
+                if not stable_diagnosis_prior_art:
+                    exact_diagnosis_research = (
+                        research is not None
+                        and research["state"] == "consumed"
+                        and research["origin_role"] == "intake"
+                        and research["origin_subject"] == intake["repair_subject"]
+                        and research["return_target"] == "intake"
+                        and research["return_reconciliation"] == "applied"
+                        and bool(research["return_result"].strip())
+                    )
+                    if exact_diagnosis_research:
+                        return result(
+                            reads, "route", "intake",
+                            "Exact diagnosis prior-art Research is consumed; Intake must persist its exact "
+                            "subject/result binding before repair alignment proceeds or the Research slot is reused",
+                            subject=intake["repair_subject"], owner_module="workflow/INTAKE.md",
+                        )
                     return result(
                         reads, "route", "intake",
                         "Concrete issue diagnosis must materialize and consume proportional prior-art Research "
