@@ -1,0 +1,22 @@
+# TEMPLATE ONLY — append a new attempt for a changed exact plan subject.
+workstream_id = "example-workstream"
+plan_revision = "P1"
+planning_cycle = 1
+attempt = "R01"
+verdict = "pending"
+evidence_path = ""
+
+[subject]
+class = "git_blob"
+repository = "owner/repository"
+commit = "0000000000000000000000000000000000000000"
+path = "planning/MASTER_PLAN.md"
+blob = "0000000000000000000000000000000000000000"
+
+[acceptance]
+class = "authority"
+path = "requirements/REQUIREMENTS.md"
+
+[independence]
+materially_produced_or_repaired_subject = false
+basis = "Fresh semantic review context did not materially produce or repair this exact plan subject."
