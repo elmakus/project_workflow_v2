@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Minimal runtime-neutral Project Workflow V2 M01 obligation selector."""
+"""Runtime-neutral Project Workflow V2 obligation selector through M02-T02."""
 
 from __future__ import annotations
 
@@ -13,8 +13,11 @@ from tools.state_contract import (
     read_project,
     read_toml,
     validate_board,
+    validate_brainstorm,
+    validate_definition,
     validate_intake,
     validate_project,
+    validate_research,
     validate_workstream,
 )
 
@@ -120,6 +123,33 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
         expected_manifest = f"implementation/workstreams/{workstream['workstream_id']}/WORKSTREAM.toml"
         if manifest_rel != expected_manifest:
             raise ValidationError(f"selected manifest must be exact path {expected_manifest!r}")
+        research = None
+        if "research" in workstream:
+            research = read_toml(reads.project(workstream["research"]["path"]))
+            validate_research(research, workstream["workstream_id"])
+            if research["state"] == "active":
+                return result(
+                    reads, "route", "research",
+                    "Active Research owns the next factual obligation",
+                    subject=research["origin_subject"], owner_module="workflow/RESEARCH.md",
+                )
+            if research["state"] == "complete":
+                owner_modules = {
+                    "intake": "workflow/INTAKE.md",
+                    "brainstorming": "workflow/BRAINSTORMING.md",
+                    "definition": "workflow/DEFINITION.md",
+                }
+                reason = (
+                    "Completed Research must be reconciled by its exact return owner"
+                    if research["return_reconciliation"] == "pending"
+                    else "Research result is already applied; return owner may only consume/clear it"
+                )
+                return result(
+                    reads, "route", research["return_target"], reason,
+                    subject=research["origin_subject"],
+                    owner_module=owner_modules[research["return_target"]],
+                )
+
         intake = None
         if "intake" in workstream:
             intake = read_toml(reads.project(workstream["intake"]["path"]))
@@ -135,8 +165,8 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                         )
                     if response in {"question", "concern", "alternative"}:
                         return result(
-                            reads, "unavailable", "brainstorming",
-                            "User response continues repair alignment; full Brainstorming semantics arrive in M02-T02",
+                            reads, "route", "brainstorming",
+                            "User response continues repair alignment without authorizing implementation",
                             subject=intake["repair_subject"], owner_module="workflow/BRAINSTORMING.md",
                         )
                     return result(
@@ -150,9 +180,73 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     subject=intake["kind"], owner_module="workflow/INTAKE.md",
                 )
 
+        brainstorm = None
+        if "brainstorm" in workstream:
+            brainstorm = read_toml(reads.project(workstream["brainstorm"]["path"]))
+            validate_brainstorm(brainstorm, workstream["workstream_id"])
+
+        definition = None
+        if "definition" in workstream:
+            definition = read_toml(reads.project(workstream["definition"]["path"]))
+            validate_definition(definition, workstream["workstream_id"])
+            if brainstorm is None:
+                raise ValidationError("Definition locator requires durable Brainstorming promotion state")
+            expected_scope = f"{brainstorm['scope_id']}@{brainstorm['revision']}"
+            if (
+                brainstorm["promotion_state"] != "authorized"
+                or brainstorm["promotion_subject"] != expected_scope
+                or definition["source_scope_subject"] != expected_scope
+            ):
+                raise ValidationError("Definition source does not match exact promoted Brainstorming revision")
+
+        if definition is not None:
+            if definition["state"] == "active":
+                return result(
+                    reads, "route", "definition",
+                    "Promoted scope has active Definition work",
+                    subject=definition["source_scope_subject"], owner_module="workflow/DEFINITION.md",
+                )
+            if definition["premium_a"] == "due":
+                return result(
+                    reads, "stop", "premium_A",
+                    "Definition is GREEN; premium stop A is due before material Strategic Planning",
+                    subject=definition["revision"], owner_module="workflow/DEFINITION.md",
+                )
+            return result(
+                reads, "unavailable", "planning",
+                "Premium stop A is satisfied; full Strategic Planning semantics arrive in M02-T03",
+                subject=definition["revision"], owner_module="workflow/PLANNING.md",
+            )
+
+        if brainstorm is not None:
+            exact_scope = f"{brainstorm['scope_id']}@{brainstorm['revision']}"
+            if brainstorm["explicit_user_stop"]:
+                return result(
+                    reads, "stop", "explicit_user_stop",
+                    "Brainstorming carries an explicit user stop",
+                    subject=exact_scope, owner_module="workflow/BRAINSTORMING.md",
+                )
+            if brainstorm["state"] == "active":
+                return result(
+                    reads, "route", "brainstorming",
+                    "Active exploratory scope owns the next product/strategy clarification",
+                    subject=exact_scope, owner_module="workflow/BRAINSTORMING.md",
+                )
+            if brainstorm["promotion_state"] == "pending":
+                return result(
+                    reads, "stop", "definition_promotion",
+                    "Brainstorming is ready but exact current revision is not authorized for Definition",
+                    subject=exact_scope, owner_module="workflow/BRAINSTORMING.md",
+                )
+            return result(
+                reads, "route", "definition",
+                "Exact current exploratory revision is authorized for Definition",
+                subject=exact_scope, owner_module="workflow/DEFINITION.md",
+            )
+
         if "task_board" not in workstream:
             if intake is None:
-                raise ValidationError("selected workstream has neither Intake nor Task Board")
+                raise ValidationError("selected workstream has no routable pre-execution state or Task Board")
             if intake["kind"] == "issue" and intake["micro_fix_candidate"]:
                 return result(
                     reads, "unavailable", "execution_prep",
@@ -160,8 +254,8 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     subject=intake["repair_subject"], owner_module="workflow/EXECUTION_PREP.md",
                 )
             return result(
-                reads, "unavailable", "brainstorming",
-                "Completed pre-execution Intake continues to Brainstorming; full semantics arrive in M02-T02",
+                reads, "route", "brainstorming",
+                "Completed pre-execution Intake continues to common Brainstorming",
                 subject=intake["kind"], owner_module="workflow/BRAINSTORMING.md",
             )
 
@@ -199,7 +293,7 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
 
     if len(ready) > 1:
         return result(reads, "unavailable", "execution_selection",
-                      "Multiple ready Cards require later dependency semantics; M01 does not guess",
+                      "Multiple ready Cards require later dependency semantics; current router does not guess",
                       owner_module="workflow/EXECUTION.md")
 
     if any(card["status"] == "blocked" for card in board["cards"]):
@@ -212,7 +306,7 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                       owner_module="workflow/CLOSE.md")
 
     return result(reads, "unavailable", "card_preparation",
-                  "No executable Card is selected; later Execution Prep/JIT semantics are unavailable in M01")
+                  "No executable Card is selected; later Execution Prep/JIT semantics are unavailable until M03")
 
 
 def main() -> int:
