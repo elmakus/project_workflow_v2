@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Runtime-neutral Project Workflow V2 obligation selector through M03-T02."""
+"""Runtime-neutral Project Workflow V2 obligation selector through M03-T03."""
 
 from __future__ import annotations
 
@@ -22,6 +22,7 @@ from tools.state_contract import (
     validate_planning,
     validate_project,
     validate_research,
+    validate_review_history,
     validate_tracker,
     validate_workstream,
 )
@@ -468,10 +469,52 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             if "result" in card:
                 result_text = reads.project(card["result"]["path"]).read_text(encoding="utf-8")
                 parse_card_result(result_text, card["id"], workstream["workstream_id"])
+                contract = parse_task_card(
+                    reads.project(card["contract"]["path"]).read_text(encoding="utf-8"),
+                    card["id"],
+                    workstream["workstream_id"],
+                )
+                requirement = contract["review_requirement"]
+                attempts: list[dict] = []
+                for attempt_ref in card.get("review_attempts", []):
+                    attempt = read_toml(reads.project(attempt_ref["path"]))
+                    attempts.append(attempt)
+
+                if requirement == "none":
+                    return result(
+                        reads, "route", "result_reconciliation",
+                        "A valid semantic result is already durable and this Card requires no independent review; do not replay implementation",
+                        subject=card["id"], owner_module="workflow/EXECUTION.md",
+                    )
+                if not attempts:
+                    return result(
+                        reads, "route", "review_freeze",
+                        "Accepted semantic result requires an exact independent review attempt before terminal completion",
+                        subject=card["id"], owner_module="workflow/REVIEW.md",
+                    )
+
+                validate_review_history(
+                    attempts,
+                    expected_card_id=card["id"],
+                    workstream_id=workstream["workstream_id"],
+                )
+                verdict = attempts[-1]["verdict"]
+                if verdict in {"pending", "in_progress"}:
+                    return result(
+                        reads, "route", "review",
+                        "Exact REQUIRED/RECOMMENDED review attempt blocks terminal Card completion until GREEN",
+                        subject=card["id"], owner_module="workflow/REVIEW.md",
+                    )
+                if verdict == "green":
+                    return result(
+                        reads, "route", "post_review_finalization",
+                        "Exact current review is GREEN; Card finalization is deterministic and is not a verdict-only stop",
+                        subject=card["id"], owner_module="workflow/EXECUTION.md",
+                    )
                 return result(
-                    reads, "route", "result_reconciliation",
-                    "A valid semantic result is already durable for the active Card; do not replay implementation",
-                    subject=card["id"], owner_module="workflow/EXECUTION.md",
+                    reads, "route", "review_correction",
+                    "RED review evidence remains durable and returns to corrective classification",
+                    subject=card["id"], owner_module="workflow/REVIEW.md",
                 )
         except (OSError, ValidationError, ExecutionContractError, KeyError) as exc:
             return recovery(reads, f"current Card execution state invalid: {exc}")
