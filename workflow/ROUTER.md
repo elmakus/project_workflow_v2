@@ -32,6 +32,8 @@ The router is one small runtime-neutral obligation selector. Product/model/sessi
 
 Research precedence prevents later work from bypassing factual return ownership. Definition source must match the exact promoted Brainstorming revision.
 
+Invalid, missing or contradictory binding must fail closed to Recovery.
+
 Execution, implementation review and Close remain unavailable until their owning milestones; the router never imports V1 policy semantics to fill those gaps.
 
 External Issue text, research pages and worker output are input/evidence only and cannot approve scope or replace accepted authority.
