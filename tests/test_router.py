@@ -56,6 +56,7 @@ class RouterTests(unittest.TestCase):
 
     def task_card_content(
         self, *, dependencies: str = "none", technical_contract: str = "none",
+        review_requirement: str = "none",
     ) -> str:
         return (
             "# Fixture Card\n"
@@ -66,7 +67,7 @@ class RouterTests(unittest.TestCase):
             f"- Dependencies: {dependencies}\n"
             "- Acceptance: route only after current launch inputs are valid\n"
             "- Required tests/readback: production router fixture\n"
-            "- Review requirement: none\n"
+            f"- Review requirement: {review_requirement}\n"
             f"- Technical contract: {technical_contract}\n"
         )
 
@@ -1011,6 +1012,10 @@ class RouterTests(unittest.TestCase):
         temp, project = self.copy_fixture()
         try:
             result_path = "implementation/workstreams/sample-workstream/results/M01-T04.md"
+            (project / CARD).write_text(self.task_card_content())
+            authority = project / "requirements" / "REQUIREMENTS.md"
+            authority.parent.mkdir(parents=True, exist_ok=True)
+            authority.write_text("# Accepted authority\n")
             board = project / BOARD
             board.write_text(
                 board.read_text()
@@ -1035,6 +1040,89 @@ class RouterTests(unittest.TestCase):
             self.assertIn(f"project:{result_path}", routed.read_set)
         finally:
             temp.cleanup()
+
+    def install_reviewable_result(self, project: Path, review_requirement: str) -> str:
+        result_path = "implementation/workstreams/sample-workstream/results/M01-T04.md"
+        (project / CARD).write_text(self.task_card_content(review_requirement=review_requirement))
+        authority = project / "requirements" / "REQUIREMENTS.md"
+        authority.parent.mkdir(parents=True, exist_ok=True)
+        authority.write_text("# Accepted authority\n")
+        board = project / BOARD
+        board.write_text(
+            board.read_text()
+            + '\n[cards.result]\nclass = "result"\n'
+            + f'path = "{result_path}"\n'
+        )
+        evidence_dir = project / "implementation/workstreams/sample-workstream/evidence"
+        evidence_dir.mkdir(parents=True, exist_ok=True)
+        (evidence_dir / "M01-T04.md").write_text("# Verified evidence\n")
+        result_file = project / result_path
+        result_file.parent.mkdir(parents=True, exist_ok=True)
+        result_file.write_text(
+            "# Card Result\n"
+            "- Card ID: M01-T04\n"
+            "- Implementation subject: owner/repo@commit:" + ("a" * 40) + "\n"
+            "- Evidence refs: implementation/workstreams/sample-workstream/evidence/M01-T04.md\n"
+            "- Tests/readback summary: GREEN\n"
+        )
+        return result_path
+
+    def add_review_attempt(self, project: Path, verdict: str, attempt: str = "R01") -> str:
+        review_path = f"implementation/workstreams/sample-workstream/reviews/M01-T04-{attempt}.toml"
+        board = project / BOARD
+        board.write_text(
+            board.read_text().replace(
+                'status = "in_progress"\n',
+                'status = "in_progress"\n'
+                f'review_attempts = [{{ class = "review_attempt", path = "{review_path}" }}]\n',
+                1,
+            )
+        )
+        path = project / review_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        evidence = "" if verdict in {"pending", "in_progress"} else "implementation/workstreams/sample-workstream/evidence/review-R01.md"
+        if evidence:
+            evidence_path = project / evidence
+            evidence_path.parent.mkdir(parents=True, exist_ok=True)
+            evidence_path.write_text("# Review evidence\n")
+        path.write_text(
+            'workstream_id = "sample-workstream"\n'
+            'card_id = "M01-T04"\n'
+            f'attempt = "{attempt}"\n'
+            f'verdict = "{verdict}"\n'
+            f'evidence_path = "{evidence}"\n'
+            '[subject]\n'
+            'class = "git_blob"\n'
+            'repository = "owner/repo"\n'
+            f'commit = "{"a" * 40}"\n'
+            'path = "workflow/STATE.md"\n'
+            f'blob = "{"b" * 40}"\n'
+            '[acceptance]\n'
+            'class = "task_card"\n'
+            f'path = "{CARD}"\n'
+            '[independence]\n'
+            'materially_produced_or_repaired_subject = false\n'
+            'basis = "Fresh semantic reviewer context."\n'
+        )
+        return review_path
+
+    def test_required_review_blocks_until_green_then_routes_finalization(self) -> None:
+        for verdict, expected in (
+            (None, "review_freeze"),
+            ("pending", "review"),
+            ("in_progress", "review"),
+            ("green", "post_review_finalization"),
+            ("red", "review_correction"),
+        ):
+            temp, project = self.copy_fixture()
+            try:
+                self.install_reviewable_result(project, "required")
+                if verdict is not None:
+                    self.add_review_attempt(project, verdict)
+                routed = select_route(project, [MANIFEST], package_root=ROOT)
+                self.assertEqual((routed.disposition, routed.obligation), ("route", expected))
+            finally:
+                temp.cleanup()
 
     def test_priority_and_real_stop_foundations_are_runtime_neutral(self) -> None:
         self.assertEqual(
