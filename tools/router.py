@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Runtime-neutral Project Workflow V2 obligation selector through M02-T02."""
+"""Runtime-neutral Project Workflow V2 obligation selector through M02-T03."""
 
 from __future__ import annotations
 
@@ -16,6 +16,8 @@ from tools.state_contract import (
     validate_brainstorm,
     validate_definition,
     validate_intake,
+    validate_plan_review,
+    validate_planning,
     validate_project,
     validate_research,
     validate_workstream,
@@ -212,10 +214,76 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     "Definition is GREEN; premium stop A is due before material Strategic Planning",
                     subject=definition["revision"], owner_module="workflow/DEFINITION.md",
                 )
+
+            planning = None
+            if "planning" in workstream:
+                planning = read_toml(reads.project(workstream["planning"]["path"]))
+                validate_planning(planning, workstream["workstream_id"])
+
+            plan_review = None
+            if "plan_review" in workstream:
+                if planning is None:
+                    raise ValidationError("Plan Review locator requires durable Planning state")
+                plan_review = read_toml(reads.project(workstream["plan_review"]["path"]))
+                validate_plan_review(plan_review, workstream["workstream_id"], planning)
+
+            if planning is None:
+                return result(
+                    reads, "route", "planning",
+                    "Premium stop A is satisfied; Strategic Planning owns the next obligation",
+                    subject=definition["revision"], owner_module="workflow/PLANNING.md",
+                )
+
+            if planning["state"] == "draft":
+                return result(
+                    reads, "route", "planning",
+                    "Current planning cycle is still being authored",
+                    subject=planning["entry_subject"], owner_module="workflow/PLANNING.md",
+                )
+
+            subject_key = (
+                f"{planning['subject']['repository']}@{planning['subject']['commit']}:"
+                f"{planning['subject']['path']}@{planning['subject']['blob']}"
+            )
+            if planning["state"] == "frozen":
+                if planning["premium_b"] == "due":
+                    return result(
+                        reads, "stop", "premium_B",
+                        "Exact plan subject is frozen; premium stop B requires a fresh independent review context",
+                        subject=subject_key, owner_module="workflow/PLANNING.md",
+                    )
+                if plan_review is None:
+                    raise ValidationError("premium B satisfied without exact Plan Review attempt")
+                if plan_review["verdict"] == "pending":
+                    return result(
+                        reads, "route", "plan_review",
+                        "Fresh independent Plan Review owns the frozen exact subject",
+                        subject=subject_key, owner_module="workflow/PLAN_REVIEW.md",
+                    )
+                if plan_review["verdict"] == "green":
+                    return result(
+                        reads, "route", "planning",
+                        "GREEN Plan Review must be consumed into approved plan state",
+                        subject=subject_key, owner_module="workflow/PLANNING.md",
+                    )
+                return result(
+                    reads, "route", "planning",
+                    "RED Plan Review returns to Planning for correction classification",
+                    subject=subject_key, owner_module="workflow/PLANNING.md",
+                )
+
+            if plan_review is None or plan_review["verdict"] != "green":
+                raise ValidationError("approved plan requires exact GREEN Plan Review")
+            if planning["premium_c"] == "due":
+                return result(
+                    reads, "stop", "premium_C",
+                    "GREEN Plan Review is approved; premium stop C is due before Execution Prep",
+                    subject=subject_key, owner_module="workflow/PLANNING.md",
+                )
             return result(
-                reads, "unavailable", "planning",
-                "Premium stop A is satisfied; full Strategic Planning semantics arrive in M02-T03",
-                subject=definition["revision"], owner_module="workflow/PLANNING.md",
+                reads, "unavailable", "execution_prep",
+                "Premium stop C is satisfied; Execution Prep semantics arrive in M03",
+                subject=subject_key, owner_module="workflow/EXECUTION_PREP.md",
             )
 
         if brainstorm is not None:
