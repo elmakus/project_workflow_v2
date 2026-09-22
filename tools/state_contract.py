@@ -35,6 +35,8 @@ PLANNING_REVIEW_MODES = {"independent", "editorial_exempt"}
 PREMIUM_GATE_STATES = {"not_due", "due", "satisfied"}
 TRACKER_STATES = {"discovery", "create_pending_readback", "linked", "ambiguous", "unavailable"}
 TRACKER_READBACK_STATES = {"pending", "verified", "uncertain", "not_applicable"}
+JIT_TRIGGER_STATES = {"waiting", "satisfied", "consumed"}
+TASK_CARD_REVIEW_REQUIREMENTS = {"none", "required", "recommended"}
 PROHIBITED_KEY_PREFIXES = ("runtime_", "model_", "session_", "worker_", "batch_", "lane_", "scheduler_", "context_health_")
 PROHIBITED_KEYS = {
     "execution_policy",
@@ -558,6 +560,74 @@ def validate_tracker(data: dict[str, Any], workstream_id: str) -> None:
         _require(state == "linked", "tracker: final PR correlation requires a linked Issue")
 
 
+def parse_task_card(text: str, expected_id: str, workstream_id: str) -> dict[str, Any]:
+    """Parse the stable Markdown Task Card fields needed for launch readiness."""
+    wanted = {
+        "card id",
+        "included scope",
+        "excluded scope",
+        "authority refs",
+        "dependencies",
+        "acceptance",
+        "required tests/readback",
+        "review requirement",
+        "technical contract",
+    }
+    fields: dict[str, str] = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line.startswith("- ") or ":" not in line:
+            continue
+        key, value = line[2:].split(":", 1)
+        normalized = key.strip().lower()
+        if normalized in wanted:
+            _require(normalized not in fields, f"task_card: duplicate field {key!r}")
+            fields[normalized] = value.strip()
+
+    missing = sorted(wanted - set(fields))
+    _require(not missing, f"task_card: missing stable field(s): {', '.join(missing)}")
+    for key, value in fields.items():
+        _require(value and "<" not in value and ">" not in value,
+                 f"task_card: unresolved field {key!r}")
+
+    _require(fields["card id"] == expected_id, "task_card: Card ID does not match Task Board")
+
+    authority_refs = [part.strip() for part in fields["authority refs"].split(",") if part.strip()]
+    _require(authority_refs and authority_refs != ["none"], "task_card: at least one authority ref is required")
+    for index, raw in enumerate(authority_refs):
+        path = _safe_relative_path(raw, f"task_card.authority_refs[{index}]")
+        _require(path.startswith(("requirements/", "decisions/", "planning/", "workflow/")),
+                 f"task_card.authority_refs[{index}]: outside accepted authority roots")
+
+    dependencies: list[str] = []
+    if fields["dependencies"].lower() != "none":
+        dependencies = [part.strip() for part in fields["dependencies"].split(",") if part.strip()]
+        _require(dependencies, "task_card: dependencies must be exact result refs or none")
+        expected_prefix = f"implementation/workstreams/{workstream_id}/results/"
+        for index, raw in enumerate(dependencies):
+            path = _safe_relative_path(raw, f"task_card.dependencies[{index}]")
+            _require(path.startswith(expected_prefix) and path.endswith(".md"),
+                     f"task_card.dependencies[{index}]: must be exact workstream result ref")
+
+    review_requirement = fields["review requirement"].lower()
+    _require(review_requirement in TASK_CARD_REVIEW_REQUIREMENTS,
+             "task_card: invalid review requirement")
+
+    technical_contract: str | None = None
+    if fields["technical contract"].lower() != "none":
+        technical_contract = _safe_relative_path(fields["technical contract"], "task_card.technical_contract")
+        _require(technical_contract.startswith(("openspec/", "contracts/")),
+                 "task_card: technical contract must use openspec/ or contracts/ when present")
+
+    return {
+        "card_id": expected_id,
+        "authority_refs": authority_refs,
+        "dependencies": dependencies,
+        "review_requirement": review_requirement,
+        "technical_contract": technical_contract,
+    }
+
+
 def validate_board(
     data: dict[str, Any],
     workstream: dict[str, Any],
@@ -593,6 +663,28 @@ def validate_board(
         if status == "done":
             _require("result" in card, f"{label}: done Card requires an exact result locator")
     _require(active <= 1, "task_board: more than one Project Workflow Card is in_progress")
+
+    triggers = data.get("jit_triggers", [])
+    _require(isinstance(triggers, list), "task_board: jit_triggers must be an array")
+    trigger_ids: set[str] = set()
+    cards_by_id = {card["id"]: card for card in cards}
+    for index, trigger in enumerate(triggers):
+        label = f"task_board.jit_triggers[{index}]"
+        _require(isinstance(trigger, dict), f"{label}: trigger must be table")
+        trigger_id = trigger.get("id")
+        _require(isinstance(trigger_id, str) and trigger_id.strip(), f"{label}: missing id")
+        _require(trigger_id not in trigger_ids, f"{label}: duplicate trigger id {trigger_id!r}")
+        trigger_ids.add(trigger_id)
+        after_card = trigger.get("after_card")
+        _require(after_card in cards_by_id, f"{label}: after_card must name an existing Card")
+        state = trigger.get("state")
+        _require(state in JIT_TRIGGER_STATES, f"{label}: invalid state {state!r}")
+        condition = trigger.get("condition")
+        _require(isinstance(condition, str) and condition.strip(), f"{label}: missing condition")
+        if state in {"satisfied", "consumed"}:
+            predecessor = cards_by_id[after_card]
+            _require(predecessor["status"] == "done" and "result" in predecessor,
+                     f"{label}: satisfied trigger requires DONE predecessor result")
 
 
 def validate_review(data: dict[str, Any]) -> None:
