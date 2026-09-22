@@ -11,4 +11,8 @@ test ! -e implementation/workstreams/feature-common-preexecution-core/TASK_BOARD
 test ! -d workflow/chatgpt_only
 test ! -d workflow/codex_only
 
+if test -f scripts/test-plugin-probe.sh; then
+  sh scripts/test-plugin-probe.sh
+fi
+
 printf 'M01 baseline checks: PASS\n'
