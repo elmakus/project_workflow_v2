@@ -1,6 +1,6 @@
 # Project Workflow V2 — Durable State Envelope
 
-M01 established common ownership/binding. M02 extends only concrete pre-execution state through Intake, Brainstorming, Research, Definition, Strategic Planning and GitHub tracker correlation.
+M01 established common ownership/binding. M02 adds concrete pre-execution state. M03-T01 adds runtime-neutral Card readiness/JIT preparation without runtime orchestration identity.
 
 ## Owners
 
@@ -13,8 +13,8 @@ M01 established common ownership/binding. M02 extends only concrete pre-executio
 - DEFINITION.toml owns exact promoted scope, accepted authority, completeness and premium-A state.
 - PLANNING.toml owns one material planning cycle, plan revision/artifact, planner audit, immutable frozen subject, exact premium A/B/C gate subjects, and any bounded editorial-review exemption classification/base.
 - PLAN_REVIEW.toml owns one independent Stage-6 attempt for one immutable plan subject.
-- TASK_BOARD.toml is materialized only when implementation state exists and then owns mutable Card/milestone execution state.
-- Stable Task Cards own bounded execution contracts; implementation/final review attempts remain exact-subject records.
+- TASK_BOARD.toml is materialized only when implementation state exists and then owns mutable Card/milestone execution state plus bounded predecessor-dependent JIT triggers.
+- Stable Task Cards own bounded authority/scope/acceptance/tests/review and optional technical-contract refs; implementation/final review attempts remain exact-subject records.
 - External-effect records are obligation-local; V2 has no universal event/action ledger.
 
 ## Intake/alignment
@@ -40,6 +40,12 @@ Definition readiness requires GREEN challenge audit and exact `scope_id@revision
 ## Planning / Plan Review / premium B/C
 
 Each material Planning entry has an exact cycle/entry subject; stale A cannot authorize a new cycle. A material re-entry persists its new draft cycle with exact premium A due before Planning resumes. GREEN planner audit freezes one exact Git blob for B. Independent Plan Review must match the frozen subject/revision/cycle. GREEN is consumed into approved plan, then C becomes due for the same subject before Execution Prep. A later purely editorial/mechanical change may omit a new review only by preserving the same approved cycle, naming the exact prior GREEN-reviewed subject, preserving satisfied B/C on that base, and recording a non-empty bounded semantic basis.
+
+## Execution Prep / readiness
+
+READY means the stable Card has current accepted authority, complete testable scope, and exact dependency results; it does not depend on whether a runtime worker/model/session exists. Launch refresh rereads the exact Card, authority refs, DONE predecessor results and only the optional technical contract named by that Card. Missing/stale inputs fail closed before execution.
+
+Predecessor-dependent downstream work remains a Task Board JIT trigger until its stable Card contract becomes knowable. Simple Cards do not load a second technical contract.
 
 ## Mutation guard / one-Card invariant
 
