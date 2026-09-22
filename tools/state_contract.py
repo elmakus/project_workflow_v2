@@ -135,8 +135,13 @@ def validate_workstream(data: dict[str, Any]) -> None:
     _require(isinstance(authority, list) and authority, "workstream: at least one exact authority locator is required")
     for index, ref in enumerate(authority):
         validate_locator(ref, "authority", f"workstream.authority[{index}]")
-    validate_locator(data.get("task_board"), "task_board", "workstream.task_board", data["workstream_id"])
-    if "intake" in data:
+    has_board = "task_board" in data
+    has_intake = "intake" in data
+    _require(has_board or has_intake,
+             "workstream: pre-execution Intake or execution Task Board locator is required")
+    if has_board:
+        validate_locator(data["task_board"], "task_board", "workstream.task_board", data["workstream_id"])
+    if has_intake:
         validate_locator(data["intake"], "intake", "workstream.intake", data["workstream_id"])
 
 
