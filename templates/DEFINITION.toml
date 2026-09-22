@@ -5,9 +5,8 @@ revision = "R1"
 state = "active"
 completeness_audit = "pending"
 premium_a = "not_due"
+decisions = []
 
 [requirements]
 class = "authority"
 path = "requirements/REQUIREMENTS.md"
-
-decisions = []
