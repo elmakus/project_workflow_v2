@@ -19,6 +19,7 @@ from tools.state_contract import (
     validate_project,
     validate_research,
     validate_review,
+    validate_tracker,
     validate_workstream,
 )
 
@@ -356,6 +357,59 @@ class StateEnvelopeTests(unittest.TestCase):
             candidate[key]["path"] = f"implementation/workstreams/other/{filename}"
             with self.subTest(key=key), self.assertRaises(ValidationError):
                 validate_workstream(candidate)
+
+
+    def test_tracker_correlation_states_and_authority_boundary(self) -> None:
+        base = {
+            "workstream_id": "sample-workstream",
+            "provider": "github",
+            "repository": "owner/repo",
+            "dedup_key": "project-workflow:sample-workstream",
+            "state": "discovery",
+            "issue_number": 0,
+            "candidate_issue_numbers": [],
+            "readback_state": "pending",
+            "final_pr": 0,
+        }
+        validate_tracker(base, "sample-workstream")
+
+        pending = copy.deepcopy(base)
+        pending.update({"state": "create_pending_readback", "readback_state": "uncertain"})
+        validate_tracker(pending, "sample-workstream")
+
+        linked = copy.deepcopy(base)
+        linked.update({"state": "linked", "issue_number": 7, "readback_state": "verified"})
+        validate_tracker(linked, "sample-workstream")
+        linked["final_pr"] = 9
+        validate_tracker(linked, "sample-workstream")
+
+        ambiguous = copy.deepcopy(base)
+        ambiguous.update({
+            "state": "ambiguous",
+            "candidate_issue_numbers": [7, 8],
+            "readback_state": "uncertain",
+        })
+        validate_tracker(ambiguous, "sample-workstream")
+
+        unavailable = copy.deepcopy(base)
+        unavailable.update({"state": "unavailable", "readback_state": "not_applicable"})
+        validate_tracker(unavailable, "sample-workstream")
+
+        forbidden = copy.deepcopy(linked)
+        forbidden["repair_authorized"] = True
+        with self.assertRaisesRegex(ValidationError, "must not carry workflow authorization"):
+            validate_tracker(forbidden, "sample-workstream")
+
+    def test_tracker_locator_is_exact_and_workstream_bound(self) -> None:
+        workstream = copy.deepcopy(self.workstream)
+        workstream["tracker"] = {
+            "class": "tracker",
+            "path": "implementation/workstreams/sample-workstream/TRACKER.toml",
+        }
+        validate_workstream(workstream)
+        workstream["tracker"]["path"] = "implementation/workstreams/other/TRACKER.toml"
+        with self.assertRaises(ValidationError):
+            validate_workstream(workstream)
 
     def test_project_contract_is_common_v2_only(self) -> None:
         project = read_project(VALID / "PROJECT.md")
