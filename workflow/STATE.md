@@ -6,7 +6,7 @@ M01 established common ownership/binding. M02 extends only concrete pre-executio
 
 - PROJECT.md identifies the V2 project contract/workstream root; it is not a live phase/Card registry.
 - WORKSTREAM.toml owns stable workstream identity/provenance and exact locators for currently materialized workstream-local records.
-- INTAKE.toml owns managed-intent diagnosis and exact issue-repair alignment.
+- INTAKE.toml owns managed-intent diagnosis, the exact reconciled diagnosis-prior-art subject/result binding, and exact issue-repair alignment.
 - TRACKER.toml owns GitHub Issue bookkeeping/correlation only; it never owns requirements, repair authorization, planning or execution state.
 - BRAINSTORM.toml owns one exploratory revision, challenge audit, explicit user stop and exact Definition-promotion authorization.
 - RESEARCH.toml owns one factual obligation, source accounting, exact return owner and once-only reconciliation.
@@ -19,7 +19,7 @@ M01 established common ownership/binding. M02 extends only concrete pre-executio
 
 ## Intake/alignment
 
-Issue markers/symptoms never authorize repair. Questions/concerns/alternatives are responses but not authorization. Authorization is bound to the exact current repair subject; changed repair makes it stale. Micro-fix candidacy is illegal before exact issue alignment.
+Issue markers/symptoms never authorize repair. A concrete issue repair subject cannot enter alignment until proportional Intake-origin Research is consumed and reconciled into the Intake-owned exact diagnosis-prior-art subject/result binding. That durable binding survives later legitimate reuse of the single current Research slot; changing the repair subject clears/invalidates it. Questions/concerns/alternatives are responses but not authorization. Authorization is bound to the exact current repair subject; changed repair makes it stale. Micro-fix candidacy is illegal before exact issue alignment.
 
 ## GitHub tracker correlation
 
