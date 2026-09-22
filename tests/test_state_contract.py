@@ -14,6 +14,8 @@ from tools.state_contract import (
     validate_bundle,
     validate_definition,
     validate_intake,
+    validate_plan_review,
+    validate_planning,
     validate_project,
     validate_research,
     validate_review,
@@ -234,6 +236,116 @@ class StateEnvelopeTests(unittest.TestCase):
             ("brainstorm", "brainstorm", "BRAINSTORM.toml"),
             ("research", "research", "RESEARCH.toml"),
             ("definition", "definition", "DEFINITION.toml"),
+        ):
+            candidate = copy.deepcopy(workstream)
+            candidate[key] = {
+                "class": klass,
+                "path": f"implementation/workstreams/sample-workstream/{filename}",
+            }
+            validate_workstream(candidate)
+            candidate[key]["path"] = f"implementation/workstreams/other/{filename}"
+            with self.subTest(key=key), self.assertRaises(ValidationError):
+                validate_workstream(candidate)
+
+
+    def planning_record(self, state: str = "draft") -> dict:
+        subject = {"repository": "", "commit": "", "path": "", "blob": ""}
+        data = {
+            "workstream_id": "sample-workstream",
+            "cycle": 1,
+            "entry_subject": "definition:R1|planning-cycle:1",
+            "revision": "P1",
+            "state": state,
+            "planner_audit": "pending",
+            "plan_path": "planning/MASTER_PLAN.md",
+            "premium_a": "satisfied",
+            "premium_a_subject": "definition:R1|planning-cycle:1",
+            "premium_b": "not_due",
+            "premium_b_subject": "",
+            "premium_c": "not_due",
+            "premium_c_subject": "",
+            "subject": subject,
+        }
+        if state in {"frozen", "approved"}:
+            data["planner_audit"] = "green"
+            data["subject"] = {
+                "repository": "owner/repo",
+                "commit": "a" * 40,
+                "path": "planning/MASTER_PLAN.md",
+                "blob": "b" * 40,
+            }
+            key = f"owner/repo@{'a' * 40}:planning/MASTER_PLAN.md@{'b' * 40}"
+            data["premium_b"] = "due" if state == "frozen" else "satisfied"
+            data["premium_b_subject"] = key
+            if state == "approved":
+                data["premium_c"] = "due"
+                data["premium_c_subject"] = key
+        return data
+
+    def test_planning_cycle_rejects_stale_premium_a_and_orders_b_c(self) -> None:
+        draft = self.planning_record()
+        validate_planning(draft, "sample-workstream")
+
+        stale = copy.deepcopy(draft)
+        stale["cycle"] = 2
+        stale["entry_subject"] = "definition:R1|planning-cycle:2"
+        with self.assertRaisesRegex(ValidationError, "premium A"):
+            validate_planning(stale, "sample-workstream")
+
+        frozen = self.planning_record("frozen")
+        validate_planning(frozen, "sample-workstream")
+        bad_c = copy.deepcopy(frozen)
+        bad_c["premium_c"] = "due"
+        bad_c["premium_c_subject"] = frozen["premium_b_subject"]
+        with self.assertRaisesRegex(ValidationError, "premium C cannot"):
+            validate_planning(bad_c, "sample-workstream")
+
+        approved = self.planning_record("approved")
+        validate_planning(approved, "sample-workstream")
+
+    def test_plan_review_must_match_frozen_subject_and_terminal_evidence(self) -> None:
+        planning = self.planning_record("frozen")
+        planning["premium_b"] = "satisfied"
+        subject = {
+            "class": "git_blob",
+            "repository": "owner/repo",
+            "commit": "a" * 40,
+            "path": "planning/MASTER_PLAN.md",
+            "blob": "b" * 40,
+        }
+        review = {
+            "workstream_id": "sample-workstream",
+            "plan_revision": "P1",
+            "planning_cycle": 1,
+            "attempt": "R01",
+            "verdict": "pending",
+            "evidence_path": "",
+            "subject": subject,
+            "acceptance": {"class": "authority", "path": "requirements/REQUIREMENTS.md"},
+            "independence": {
+                "materially_produced_or_repaired_subject": False,
+                "basis": "Fresh semantic review context.",
+            },
+        }
+        validate_plan_review(review, "sample-workstream", planning)
+
+        mismatch = copy.deepcopy(review)
+        mismatch["subject"]["blob"] = "c" * 40
+        with self.assertRaisesRegex(ValidationError, "does not match"):
+            validate_plan_review(mismatch, "sample-workstream", planning)
+
+        green = copy.deepcopy(review)
+        green["verdict"] = "green"
+        with self.assertRaisesRegex(ValidationError, "evidence_path"):
+            validate_plan_review(green, "sample-workstream", planning)
+        green["evidence_path"] = "evidence/plan-review-R01.md"
+        validate_plan_review(green, "sample-workstream", planning)
+
+    def test_planning_and_plan_review_locators_are_exact(self) -> None:
+        workstream = copy.deepcopy(self.workstream)
+        for key, klass, filename in (
+            ("planning", "planning", "PLANNING.toml"),
+            ("plan_review", "plan_review", "PLAN_REVIEW.toml"),
         ):
             candidate = copy.deepcopy(workstream)
             candidate[key] = {
