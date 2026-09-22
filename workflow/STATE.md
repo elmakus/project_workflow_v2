@@ -55,6 +55,12 @@ Only Main/coordinator reconciles an accepted implementation into the Card's exac
 
 An incomplete/incorrect return with a still-valid Card remains `in_progress` for correction. Only a real unresolved blocker moves the Card to `blocked`.
 
+## Independent review attempts
+
+Implementation review attempts are append-only workstream-local records referenced by the Card. Each attempt binds one immutable Git subject to its exact acceptance surface and stores only semantic independence provenance.
+
+For REQUIRED/activated RECOMMENDED review, pending/in-progress/RED blocks terminal Card completion. GREEN for the exact current subject permits deterministic post-review finalization; it is not a verdict-only user stop. A context that materially produced/repaired the subject cannot issue its independent verdict, and runtime reviewer identity is never canonical state.
+
 ## Mutation guard / one-Card invariant
 
 Mutable Task Board revision rejects stale expected writes. At most one Project Workflow Card may be in_progress. Runtime-internal topology remains outside canonical state.
