@@ -12,9 +12,9 @@ class ForkReleaseContractError(ValueError):
     pass
 
 
-UPSTREAM_RE = re.compile(r"^v(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$")
+UPSTREAM_RE = re.compile(r"^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 PRIVATE_RE = re.compile(
-    r"^v(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)-private\\.([1-9]\\d*)$"
+    r"^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-private\.([1-9]\d*)$"
 )
 FORK_RELEASE_OPERATION = "downstream_fork_release"
 FORK_RELEASE_MODULE = "workflow/FORK_RELEASE_VERSIONING.md"
