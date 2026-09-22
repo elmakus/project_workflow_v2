@@ -20,6 +20,7 @@ from tools.state_contract import (
     validate_project,
     validate_research,
     validate_review,
+    validate_review_history,
     validate_tracker,
     validate_workstream,
 )
@@ -125,6 +126,61 @@ class StateEnvelopeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "not semantically independent"):
             validate_review(read_toml(INVALID / "review-not-independent.toml"))
 
+
+    def test_review_terminal_evidence_and_append_only_history(self) -> None:
+        base = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        validate_review(base)
+
+        pending = copy.deepcopy(base)
+        pending["attempt"] = "R02"
+        pending["verdict"] = "pending"
+        pending["evidence_path"] = ""
+        pending["subject"]["blob"] = "4" * 40
+        validate_review_history([base, pending])
+
+        bad_order = [pending, base]
+        with self.assertRaisesRegex(ValidationError, "latest attempt"):
+            validate_review_history(bad_order)
+
+        terminal_without_evidence = copy.deepcopy(base)
+        terminal_without_evidence["evidence_path"] = ""
+        with self.assertRaisesRegex(ValidationError, "terminal verdict"):
+            validate_review(terminal_without_evidence)
+
+    def test_task_card_review_acceptance_is_exact_and_semantic(self) -> None:
+        review = {
+            "workstream_id": "sample-workstream",
+            "card_id": "M03-T03",
+            "attempt": "R01",
+            "verdict": "pending",
+            "evidence_path": "",
+            "subject": {
+                "class": "git_blob",
+                "repository": "owner/repo",
+                "commit": "a" * 40,
+                "path": "workflow/STATE.md",
+                "blob": "b" * 40,
+            },
+            "acceptance": {
+                "class": "task_card",
+                "path": "implementation/workstreams/sample-workstream/cards/M03-T03.md",
+            },
+            "independence": {
+                "materially_produced_or_repaired_subject": False,
+                "basis": "Reviewer did not materially produce or repair the exact subject.",
+            },
+        }
+        validate_review(review)
+        validate_review_history(
+            [review],
+            expected_card_id="M03-T03",
+            workstream_id="sample-workstream",
+        )
+
+        self_review = copy.deepcopy(review)
+        self_review["independence"]["materially_produced_or_repaired_subject"] = True
+        with self.assertRaisesRegex(ValidationError, "not semantically independent"):
+            validate_review(self_review)
 
     def test_issue_intake_alignment_is_exact_and_stale_subject_fails(self) -> None:
         intake = read_toml(VALID / "INTAKE.toml")
