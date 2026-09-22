@@ -1,0 +1,10 @@
+# TEMPLATE ONLY — workstream-local GitHub Issue correlation.
+workstream_id = "example-workstream"
+provider = "github"
+repository = "owner/repository"
+dedup_key = "project-workflow:example-workstream"
+state = "discovery"
+issue_number = 0
+candidate_issue_numbers = []
+readback_state = "pending"
+final_pr = 0
