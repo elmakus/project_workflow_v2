@@ -115,6 +115,19 @@ class StateEnvelopeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "must not manufacture"):
             validate_intake(intake, "sample-workstream")
 
+
+    def test_pre_execution_workstream_may_have_intake_without_task_board(self) -> None:
+        workstream = copy.deepcopy(self.workstream)
+        workstream.pop("task_board")
+        workstream["intake"] = {
+            "class": "intake",
+            "path": "implementation/workstreams/sample-workstream/INTAKE.toml",
+        }
+        validate_workstream(workstream)
+        workstream.pop("intake")
+        with self.assertRaisesRegex(ValidationError, "Intake or execution Task Board"):
+            validate_workstream(workstream)
+
     def test_intake_locator_is_workstream_bound(self) -> None:
         workstream = copy.deepcopy(self.workstream)
         workstream["intake"] = {
