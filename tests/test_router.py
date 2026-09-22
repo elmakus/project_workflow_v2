@@ -54,10 +54,111 @@ class RouterTests(unittest.TestCase):
         self.assertNotIn("untrusted/ISSUE_TEXT.md", joined)
         self.assertNotIn("templates/", joined)
 
-    def test_new_managed_intent_routes_to_unimplemented_intake_without_board(self) -> None:
-        routed = select_route(FIXTURE, [MANIFEST], package_root=ROOT, entry="new_managed_intent")
-        self.assertEqual((routed.disposition, routed.obligation), ("unavailable", "intake"))
-        self.assertEqual(routed.read_set, ("package:workflow/ROUTER.md", "project:PROJECT.md"))
+    def test_new_managed_intent_routes_to_common_intake_without_board(self) -> None:
+        for entry, subject in (
+            ("new_managed_intent", "change"),
+            ("new_issue", "issue"),
+            ("new_feature", "feature"),
+        ):
+            with self.subTest(entry=entry):
+                routed = select_route(FIXTURE, [MANIFEST], package_root=ROOT, entry=entry)
+                self.assertEqual((routed.disposition, routed.obligation, routed.subject), ("route", "intake", subject))
+                self.assertEqual(routed.owner_module, "workflow/INTAKE.md")
+                self.assertEqual(routed.read_set, ("package:workflow/ROUTER.md", "project:PROJECT.md"))
+
+
+    def install_intake(self, project: Path, content: str) -> None:
+        workstream = project / MANIFEST
+        original = workstream.read_text()
+        workstream.write_text(original + '\n[intake]\nclass = "intake"\npath = "implementation/workstreams/sample-workstream/INTAKE.toml"\n')
+        intake = project / "implementation/workstreams/sample-workstream/INTAKE.toml"
+        intake.write_text(content)
+
+    def test_issue_without_post_diagnosis_response_is_real_alignment_stop(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_intake(project, (
+                'workstream_id = "sample-workstream"\n'
+                'kind = "issue"\n'
+                'state = "active"\n'
+                'diagnosis_revision = 1\n'
+                'repair_subject = "repair:v1"\n'
+                'response_kind = "none"\n'
+                'response_observed = false\n'
+                'alignment_state = "pending"\n'
+                'alignment_subject = ""\n'
+                'micro_fix_candidate = false\n'
+            ))
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("stop", "issue_alignment"))
+            self.assertEqual(routed.owner_module, "workflow/INTAKE.md")
+            self.assertNotIn(f"project:{BOARD}", routed.read_set)
+        finally:
+            temp.cleanup()
+
+    def test_issue_question_continues_alignment_without_authorizing_repair(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_intake(project, (
+                'workstream_id = "sample-workstream"\n'
+                'kind = "issue"\n'
+                'state = "active"\n'
+                'diagnosis_revision = 1\n'
+                'repair_subject = "repair:v1"\n'
+                'response_kind = "question"\n'
+                'response_observed = true\n'
+                'alignment_state = "pending"\n'
+                'alignment_subject = ""\n'
+                'micro_fix_candidate = false\n'
+            ))
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("unavailable", "brainstorming"))
+            self.assertEqual(routed.owner_module, "workflow/BRAINSTORMING.md")
+            self.assertNotIn(f"project:{BOARD}", routed.read_set)
+        finally:
+            temp.cleanup()
+
+    def test_completed_authorized_issue_continues_to_existing_board(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_intake(project, (
+                'workstream_id = "sample-workstream"\n'
+                'kind = "issue"\n'
+                'state = "complete"\n'
+                'diagnosis_revision = 2\n'
+                'repair_subject = "repair:v2"\n'
+                'response_kind = "authorization"\n'
+                'response_observed = true\n'
+                'alignment_state = "authorized"\n'
+                'alignment_subject = "repair:v2"\n'
+                'micro_fix_candidate = true\n'
+            ))
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("unavailable", "execution"))
+            self.assertIn("project:implementation/workstreams/sample-workstream/INTAKE.toml", routed.read_set)
+            self.assertIn(f"project:{BOARD}", routed.read_set)
+        finally:
+            temp.cleanup()
+
+    def test_stale_issue_alignment_fails_closed_to_recovery(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_intake(project, (
+                'workstream_id = "sample-workstream"\n'
+                'kind = "issue"\n'
+                'state = "complete"\n'
+                'diagnosis_revision = 3\n'
+                'repair_subject = "repair:v3"\n'
+                'response_kind = "authorization"\n'
+                'response_observed = true\n'
+                'alignment_state = "authorized"\n'
+                'alignment_subject = "repair:v2"\n'
+                'micro_fix_candidate = true\n'
+            ))
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+        finally:
+            temp.cleanup()
 
     def test_missing_or_ambiguous_selection_routes_to_recovery(self) -> None:
         for selected in ([], [MANIFEST, MANIFEST]):
