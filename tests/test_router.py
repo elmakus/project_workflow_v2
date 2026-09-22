@@ -157,6 +157,29 @@ class RouterTests(unittest.TestCase):
             'basis = "Fresh semantic review context."\n'
         )
 
+
+    def tracker_content(self, state: str) -> str:
+        issue = 7 if state == "linked" else 0
+        candidates = "[7, 8]" if state == "ambiguous" else "[]"
+        readback = {
+            "discovery": "pending",
+            "create_pending_readback": "uncertain",
+            "linked": "verified",
+            "ambiguous": "uncertain",
+            "unavailable": "not_applicable",
+        }[state]
+        return (
+            'workstream_id = "sample-workstream"\n'
+            'provider = "github"\n'
+            'repository = "owner/repo"\n'
+            'dedup_key = "project-workflow:sample-workstream"\n'
+            f'state = "{state}"\n'
+            f'issue_number = {issue}\n'
+            f'candidate_issue_numbers = {candidates}\n'
+            f'readback_state = "{readback}"\n'
+            'final_pr = 0\n'
+        )
+
     def test_issue_without_post_diagnosis_response_is_real_alignment_stop(self) -> None:
         temp, project = self.copy_fixture()
         try:
@@ -579,6 +602,53 @@ class RouterTests(unittest.TestCase):
             self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
         finally:
             temp.cleanup()
+
+
+    def test_tracker_discovery_and_pending_create_route_to_github_issues(self) -> None:
+        for state, expected_reason in (
+            ("discovery", "discovery/dedup"),
+            ("create_pending_readback", "readback before any retry"),
+        ):
+            temp, project = self.copy_fixture()
+            try:
+                self.install_state_record(
+                    project, "tracker", "tracker", "TRACKER.toml",
+                    self.tracker_content(state),
+                )
+                routed = select_route(project, [MANIFEST], package_root=ROOT)
+                self.assertEqual((routed.disposition, routed.obligation), ("route", "github_issues"))
+                self.assertEqual(routed.owner_module, "workflow/GITHUB_ISSUES.md")
+                self.assertIn(expected_reason, routed.reason)
+                self.assertNotIn(f"project:{BOARD}", routed.read_set)
+            finally:
+                temp.cleanup()
+
+    def test_tracker_ambiguity_fails_closed_without_duplicate_create(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_state_record(
+                project, "tracker", "tracker", "TRACKER.toml",
+                self.tracker_content("ambiguous"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("creating another tracker is forbidden", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_linked_or_unavailable_tracker_does_not_become_authority(self) -> None:
+        for state in ("linked", "unavailable"):
+            temp, project = self.copy_fixture()
+            try:
+                self.install_state_record(
+                    project, "tracker", "tracker", "TRACKER.toml",
+                    self.tracker_content(state),
+                )
+                routed = select_route(project, [MANIFEST], package_root=ROOT)
+                self.assertEqual((routed.disposition, routed.obligation), ("unavailable", "execution"))
+                self.assertIn(f"project:{BOARD}", routed.read_set)
+            finally:
+                temp.cleanup()
 
     def test_missing_or_ambiguous_selection_routes_to_recovery(self) -> None:
         for selected in ([], [MANIFEST, MANIFEST]):
