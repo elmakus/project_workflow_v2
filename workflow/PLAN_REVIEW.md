@@ -20,7 +20,7 @@ Each `PLAN_REVIEW.toml` attempt owns:
 - pending / green / red verdict;
 - concise evidence locator when verdict is terminal.
 
-A changed plan subject requires a new attempt. RED history remains attached to its failed subject.
+A changed material plan subject requires a new attempt. RED history remains attached to its failed subject. The only omission is the Planning-owned `editorial_exempt` case: it must point to a prior exact GREEN-reviewed subject from the same cycle with satisfied C and a bounded semantic basis proving strategy, milestone structure, requirement coverage and gates are unchanged.
 
 ## GREEN
 
