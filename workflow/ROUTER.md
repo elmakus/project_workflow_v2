@@ -18,6 +18,7 @@ The router is one small runtime-neutral obligation selector. Product/model/sessi
 ## Implemented routes
 
 - new issue/feature/neutral managed intent -> Intake;
+- concrete issue diagnosis without an exact durable Intake-owned prior-art subject/result binding -> Intake Research/reconciliation before alignment; once persisted, later Research-slot reuse does not erase that proof;
 - issue without post-diagnosis response -> alignment stop;
 - question/concern/alternative -> Brainstorming, not repair authorization;
 - active/completed Research -> exact Research/return owner; applied result is consume-only;
