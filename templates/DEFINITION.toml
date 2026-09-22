@@ -1,0 +1,13 @@
+# TEMPLATE ONLY — accepted Definition state for one promoted scope.
+workstream_id = "example-workstream"
+source_scope_subject = "scope-example@1"
+revision = "R1"
+state = "active"
+completeness_audit = "pending"
+premium_a = "not_due"
+
+[requirements]
+class = "authority"
+path = "requirements/REQUIREMENTS.md"
+
+decisions = []
