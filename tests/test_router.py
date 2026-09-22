@@ -1054,6 +1054,8 @@ class RouterTests(unittest.TestCase):
             board.read_text()
             + '\n[cards.result]\nclass = "result"\n'
             + f'path = "{result_path}"\n'
+            + f'commit = "{"a" * 40}"\n'
+            + f'blob = "{"b" * 40}"\n'
         )
         evidence_dir = project / "implementation/workstreams/sample-workstream/evidence"
         evidence_dir.mkdir(parents=True, exist_ok=True)
