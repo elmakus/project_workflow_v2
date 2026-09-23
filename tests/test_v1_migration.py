@@ -293,6 +293,35 @@ class V1MigrationDryRunTests(unittest.TestCase):
         self.assertEqual(bundle["task_board"]["cards"][0]["status"], "blocked")
         self.assertIn("corrective review", bundle["review_obligations"][0]["reason"])
 
+    def test_exact_pending_review_remains_blocking_until_green(self) -> None:
+        board, manifest = self.texts("chatgpt")
+        pending_board = board.replace("review_state: green", "review_state: pending")
+        pending = self.exact_review_proof("pending")
+        plan = dry_run(
+            source_class="chatgpt_workstream_yaml_v1",
+            repository=REPO,
+            expected_commit=SHA,
+            observed_commit=SHA,
+            board_text=pending_board,
+            manifest_text=manifest,
+            destination_workstream="migrated-chatgpt",
+        )
+        bundle = convert_dry_run(
+            plan=plan,
+            board_text=pending_board,
+            manifest_text=manifest,
+            review_proofs={"M05-T05": [pending]},
+        )
+        attempts = bundle["review_attempts"]["M05-T05"]
+        validate_review_history(
+            attempts,
+            expected_card_id="M05-T05",
+            workstream_id="migrated-chatgpt",
+        )
+        self.assertEqual(attempts[-1]["verdict"], "pending")
+        self.assertEqual(bundle["task_board"]["cards"][0]["status"], "blocked")
+        self.assertIn("pending review remains outstanding", bundle["review_obligations"][0]["reason"])
+
     def test_legacy_root_maps_to_branch_local_v2_owner_while_preserving_source_branch(self) -> None:
         board, _ = self.texts("legacy-root")
         plan = self.plan("legacy_root_yaml_v1", "legacy-root")
