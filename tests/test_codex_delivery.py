@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -51,6 +52,30 @@ class CodexDeliveryTests(unittest.TestCase):
 
         self.assertFalse((ROOT / "skills" / "project_workflow_v2" / "workflow").exists())
         self.assertFalse((ROOT / "skills" / "project_workflow_v2" / "references").exists())
+
+    def test_canonical_workflow_is_byte_preserving_package_payload(self) -> None:
+        def digest_tree(root: Path) -> dict[str, str]:
+            return {
+                path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in sorted(root.rglob("*"))
+                if path.is_file()
+            }
+
+        source = ROOT / "workflow"
+        with tempfile.TemporaryDirectory() as tmp:
+            installed = Path(tmp) / "installed-workflow"
+            shutil.copytree(source, installed)
+            self.assertEqual(digest_tree(source), digest_tree(installed))
+
+    def test_session_start_read_set_is_router_only(self) -> None:
+        text = SESSION_START.read_text(encoding="utf-8")
+        self.assertIn('root / "workflow" / "ROUTER.md"', text)
+        self.assertNotIn(".glob(", text)
+        self.assertNotIn(".rglob(", text)
+        self.assertNotIn("PROJECT.md", text)
+        for module in (ROOT / "workflow").glob("*.md"):
+            if module.name != "ROUTER.md":
+                self.assertNotIn(module.name, text)
 
     def test_hook_manifest_is_bounded_local_command(self) -> None:
         manifest = json.loads(HOOKS.read_text(encoding="utf-8"))
