@@ -217,6 +217,25 @@ class V1MigrationDryRunTests(unittest.TestCase):
         self.assertEqual(bundle["provenance"]["source_base_ref"], "fd2dc95f539d982e1009d71bbf1301f3098900f6")
         self.assertEqual(bundle["provenance"]["source_integration_target"], "main")
 
+    def test_repeated_conversion_is_byte_semantically_idempotent(self) -> None:
+        board, manifest = self.texts("chatgpt")
+        plan = self.plan("chatgpt_workstream_yaml_v1", "chatgpt")
+        proof = {"M05-T05": [self.exact_review_proof()]}
+        first = convert_dry_run(
+            plan=plan,
+            board_text=board,
+            manifest_text=manifest,
+            review_proofs=proof,
+        )
+        second = convert_dry_run(
+            plan=plan,
+            board_text=board,
+            manifest_text=manifest,
+            review_proofs=proof,
+        )
+        self.assertEqual(first, second)
+        self.assertEqual(first["output_fingerprint"], second["output_fingerprint"])
+
     def test_unproven_terminal_review_becomes_blocking_review_obligation_not_invented_green(self) -> None:
         board, manifest = self.texts("chatgpt")
         bundle = convert_dry_run(
