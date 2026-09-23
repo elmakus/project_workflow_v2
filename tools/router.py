@@ -86,6 +86,11 @@ class Reads:
 
 def result(reads: Reads, disposition: str, obligation: str, reason: str,
            subject: str | None = None, owner_module: str | None = None) -> RouteResult:
+    if disposition == "stop":
+        try:
+            reads.package("workflow/USER_STOP.md").read_text(encoding="utf-8")
+        except OSError as exc:
+            return recovery(reads, f"real-stop formatter unavailable: {exc}")
     return RouteResult(disposition, obligation, subject, owner_module, reason, tuple(reads.items))
 
 

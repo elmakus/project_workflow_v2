@@ -41,8 +41,8 @@ Premium C must be satisfied before Execution Prep. RED never mutates the failed 
 ## Human-facing premium recommendations
 
 The premium stops carry recommendation semantics without storing runtime identity:
-- A recommends the best available model/context for Strategic Planning;
-- B requires a fresh independent best-available context for Plan Review;
-- C recommends switching to a lighter/cheaper model/context before Execution Prep.
+- A recommends the best available model/context for Strategic Planning; continuing in the current context is allowed, but the stop also renders an optional ready-to-copy locator-only handoff for moving Planning to another context/harness;
+- B requires a fresh independent best-available context for Plan Review and MUST render the ready-to-copy locator-only handoff in the same stop response;
+- C recommends switching to a lighter/cheaper model/context before Execution Prep; continuing is allowed, but the stop also renders an optional ready-to-copy locator-only handoff for moving downstream execution preparation to another context/harness.
 
-These recommendations are user-facing guidance only. Canonical state stores semantic gates/subjects, never current model/session identity or a hard-coded product model name.
+The handoff rendering contract is owned by `workflow/USER_STOP.md`. These recommendations are user-facing guidance only. Canonical state stores semantic gates/subjects, never current model/session identity or a hard-coded product model name.
