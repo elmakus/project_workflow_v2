@@ -1,0 +1,23 @@
+# Exact real V1-derived source identities used to select the finite M06 reader classes.
+
+[chatgpt_workstream_yaml_v1]
+repository = "elmakus/chatgpt-codex-project-workflow"
+commit = "fdd198a1d109058b124481de398c192d360b70bf"
+manifest_path = "implementation/workstreams/feature-common-preexecution-core/WORKSTREAM.yaml"
+manifest_blob = "c0f37d336843a1b9f3a9a4e0fd571c7be996152b"
+board_path = "implementation/workstreams/feature-common-preexecution-core/TASK_BOARD.yaml"
+board_blob = "cb51de8f96edee23cb988fedb4ab5b6170f24f9d"
+
+[codex_workstream_yaml_v1]
+repository = "elmakus/chatgpt-codex-project-workflow"
+commit = "7aa7512ead67a86256089d1af0171e2e655e700d"
+manifest_path = "implementation/workstreams/feature-codex-only-policy/WORKSTREAM.yaml"
+manifest_blob = "6b1a484342178ac29065f2f657cb9ebde1558d98"
+board_path = "implementation/workstreams/feature-codex-only-policy/TASK_BOARD.yaml"
+board_blob = "bd1cfcf9a825508ec7cc53d91f7a961ca82147c0"
+
+[legacy_root_yaml_v1]
+repository = "elmakus/chatgpt-codex-project-workflow"
+commit = "7aa7512ead67a86256089d1af0171e2e655e700d"
+board_path = "implementation/TASK_BOARD.yaml"
+board_blob = "894f8baa201980ffcb9b1af37a9ca6a4c9322a68"

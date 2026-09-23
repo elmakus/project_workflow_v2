@@ -1,0 +1,26 @@
+id: "feature-codex-only-policy"
+kind: "feature"
+status: "done"
+branch: "feat/codex-only-policy"
+base_ref: "6b0445256b417f82431fb7b2704f56691eb4e7ae"
+integration_target: "main"
+parent_workstream: null
+parent_branch: null
+parent_dependency: null
+intake:
+  state: "complete"
+  record: "implementation/workstreams/feature-codex-only-policy/INTAKE.md"
+task_board: "implementation/workstreams/feature-codex-only-policy/TASK_BOARD.yaml"
+authority:
+  requirements: "requirements/CODEX_ONLY_POLICY.md"
+  decisions:
+    - "decisions/ADR_CODEX_ONLY_DEDICATED_NAMESPACE.md"
+  plan: "planning/CODEX_ONLY_MASTER_PLAN.md"
+review:
+  requirement: "RECOMMENDED"
+  state: green
+  subject: "feature@subject"
+  evidence: "implementation/workstreams/feature-codex-only-policy/evidence/M05-final-integration-review-02.md"
+  covered_by: null
+pr: 33
+result: "600e01e4a910acef2d3e26fc03341e8ea137a46e"

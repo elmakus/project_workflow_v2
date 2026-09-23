@@ -1,0 +1,35 @@
+id: "feature-common-preexecution-core"
+kind: "feature"
+status: "planning"
+branch: "feat/common-preexecution-core"
+base_ref: "fd2dc95f539d982e1009d71bbf1301f3098900f6"
+integration_target: "main"
+parent_workstream: null
+parent_branch: null
+parent_dependency: null
+intake:
+  state: complete
+  record: "implementation/workstreams/feature-common-preexecution-core/INTAKE.md"
+routing:
+  exploratory_scope: null
+  research_obligation: null
+  plan_review: null
+task_board: "implementation/workstreams/feature-common-preexecution-core/TASK_BOARD.yaml"
+authority:
+  requirements: "requirements/PROJECT_WORKFLOW_V2.md"
+  decisions:
+    - "decisions/ADR_PROJECT_WORKFLOW_V2_SINGLE_SEMANTIC_CORE.md"
+  plan: "planning/PROJECT_WORKFLOW_V2_MASTER_PLAN.md"
+review:
+  requirement: RECOMMENDED
+  state: null
+  subject: null
+  evidence: null
+  covered_by: null
+branch_cleanup:
+  state: null
+  ref: null
+  verified_head: null
+  evidence: null
+pr: null
+result: null

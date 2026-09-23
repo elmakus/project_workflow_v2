@@ -1,0 +1,38 @@
+project: "elmakus/chatgpt-codex-project-workflow"
+workstream_id: "feature-codex-only-policy"
+plan_revision: "CO-P1"
+current_milestone: "M05"
+execution_ref:
+  branch: "feat/codex-only-policy"
+  pr: 33
+  head: "f9bd74aa4fd9ddfff4af62a4e476587b5ac2a7cd"
+research_obligation: null
+milestones:
+  M05:
+    decision_state: accepted
+    execution_status: done
+    contract: "planning/CODEX_ONLY_MASTER_PLAN.md#M05"
+    checkpoint: "f9bd74aa4fd9ddfff4af62a4e476587b5ac2a7cd"
+    implementation_head: "f9bd74aa4fd9ddfff4af62a4e476587b5ac2a7cd"
+    handoff: "implementation/workstreams/feature-codex-only-policy/handoffs/M05_HANDOFF.md"
+    acceptance_evidence: "implementation/workstreams/feature-codex-only-policy/evidence/M05-acceptance-R2.md"
+    review_state: null
+    review_subject: null
+    review_evidence: null
+cards:
+  - id: "M03-T01"
+    title: "Bounded parallel Card safety"
+    milestone: "M03"
+    decision_state: accepted
+    execution_status: done
+    executor: chatgpt
+    depends_on: ["M02-T01"]
+    openspec_change: "openspec/changes/codex-only-m03-bounded-parallel-safety"
+    contract: "implementation/workstreams/feature-codex-only-policy/cards/M03-T01.md"
+    review_state: green
+    review_subject: "1fbb601461604fe07151478e017cb94bf60de47b"
+    review_evidence: "implementation/workstreams/feature-codex-only-policy/evidence/M03-T01-review-04.md"
+    result_commit: "1fbb601461604fe07151478e017cb94bf60de47b"
+    result_pr: 33
+    evidence: "implementation/workstreams/feature-codex-only-policy/evidence/M03-T01.md"
+    tests_summary: "GREEN"
