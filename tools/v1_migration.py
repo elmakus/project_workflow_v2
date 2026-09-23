@@ -41,6 +41,11 @@ CARD_KEYS = {
     "evidence", "tests_summary",
 }
 EXECUTION_REF_KEYS = {"branch", "pr", "head"}
+MANIFEST_INTAKE_KEYS = {"state", "record"}
+MANIFEST_ROUTING_KEYS = {"exploratory_scope", "research_obligation", "plan_review"}
+MANIFEST_AUTHORITY_KEYS = {"requirements", "decisions", "plan"}
+MANIFEST_REVIEW_KEYS = {"requirement", "state", "subject", "evidence", "covered_by"}
+MANIFEST_CLEANUP_KEYS = {"state", "ref", "verified_head", "evidence"}
 
 
 class MigrationInputError(ValueError):
@@ -232,14 +237,56 @@ def validate_manifest(manifest: dict[str, Any], source_class: str) -> None:
             raise MigrationInputError(f"manifest: missing {key}")
     if source_class == "legacy_root_yaml_v1":
         raise MigrationInputError("legacy root source must not manufacture a branch-local manifest")
+    intake = _require_mapping(manifest.get("intake"), "manifest.intake")
+    _unknown_keys(intake, MANIFEST_INTAKE_KEYS, "manifest.intake")
+    if not isinstance(intake.get("state"), str) or not isinstance(intake.get("record"), str):
+        raise MigrationInputError("manifest.intake: exact state and record are required")
+
+    routing = manifest.get("routing")
+    if routing is not None:
+        routing = _require_mapping(routing, "manifest.routing")
+        _unknown_keys(routing, MANIFEST_ROUTING_KEYS, "manifest.routing")
+        for key in MANIFEST_ROUTING_KEYS:
+            value = routing.get(key)
+            if value is not None and (not isinstance(value, str) or not value):
+                raise MigrationInputError(f"manifest.routing.{key}: expected non-empty string or null")
+
     authority = _require_mapping(manifest.get("authority"), "manifest.authority")
+    _unknown_keys(authority, MANIFEST_AUTHORITY_KEYS, "manifest.authority")
     if not isinstance(authority.get("requirements"), str) or not authority["requirements"]:
         raise MigrationInputError("manifest.authority: exact requirements path is required")
     if not isinstance(authority.get("plan"), str) or not authority["plan"]:
         raise MigrationInputError("manifest.authority: exact plan path is required")
     decisions = authority.get("decisions")
-    if not isinstance(decisions, list):
-        raise MigrationInputError("manifest.authority: decisions must be a list")
+    if not isinstance(decisions, list) or not all(isinstance(value, str) and value for value in decisions):
+        raise MigrationInputError("manifest.authority: decisions must be a list of exact paths")
+
+    review = manifest.get("review")
+    if review is not None:
+        review = _require_mapping(review, "manifest.review")
+        _unknown_keys(review, MANIFEST_REVIEW_KEYS, "manifest.review")
+        if review.get("requirement") not in {"NONE", "RECOMMENDED", "REQUIRED"}:
+            raise MigrationInputError("manifest.review: unsupported requirement")
+        if review.get("state") not in {None, "pending", "in_progress", "green", "red"}:
+            raise MigrationInputError("manifest.review: unsupported state")
+        for key in ("subject", "evidence", "covered_by"):
+            if review.get(key) is not None and not isinstance(review.get(key), str):
+                raise MigrationInputError(f"manifest.review.{key}: expected string or null")
+
+    cleanup = manifest.get("branch_cleanup")
+    if cleanup is not None:
+        cleanup = _require_mapping(cleanup, "manifest.branch_cleanup")
+        _unknown_keys(cleanup, MANIFEST_CLEANUP_KEYS, "manifest.branch_cleanup")
+        for key in MANIFEST_CLEANUP_KEYS:
+            if cleanup.get(key) is not None and not isinstance(cleanup.get(key), str):
+                raise MigrationInputError(f"manifest.branch_cleanup.{key}: expected string or null")
+
+    parent_values = [manifest.get("parent_workstream"), manifest.get("parent_branch"), manifest.get("parent_dependency")]
+    present_parent = [value is not None for value in parent_values]
+    if any(present_parent) and not all(present_parent):
+        raise MigrationInputError("manifest: stacked parent provenance must be complete")
+    if all(present_parent) and not all(isinstance(value, str) and value for value in parent_values):
+        raise MigrationInputError("manifest: stacked parent provenance must use exact non-empty strings")
 
 
 def validate_board(board: dict[str, Any], source_class: str, manifest: dict[str, Any] | None) -> None:
@@ -292,7 +339,10 @@ def _digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def _semantic_summary(board: dict[str, Any]) -> tuple[list[str], list[str]]:
+def _semantic_summary(
+    board: dict[str, Any],
+    manifest: dict[str, Any] | None,
+) -> tuple[list[str], list[str]]:
     outstanding: list[str] = []
     blockers: list[str] = []
     cards = _require_list(board["cards"], "board.cards")
@@ -306,9 +356,12 @@ def _semantic_summary(board: dict[str, Any]) -> tuple[list[str], list[str]]:
         review = card.get("review_state")
         if review in {"pending", "in_progress", "red"}:
             outstanding.append(f"review:{card['id']}:{review}")
+
     research = board.get("research_obligation")
     if research is not None:
         outstanding.append(f"research:{research}")
+        blockers.append("preexecution_reconstitution_required:research_obligation")
+
     for milestone_id, milestone in board["milestones"].items():
         status = milestone.get("execution_status")
         if status != "done":
@@ -316,8 +369,34 @@ def _semantic_summary(board: dict[str, Any]) -> tuple[list[str], list[str]]:
         review = milestone.get("review_state")
         if review in {"pending", "in_progress", "red"}:
             outstanding.append(f"milestone_review:{milestone_id}:{review}")
-    return sorted(outstanding), sorted(blockers)
 
+    if manifest is not None:
+        routing = manifest.get("routing") or {}
+        for key in ("exploratory_scope", "research_obligation", "plan_review"):
+            value = routing.get(key)
+            if value is not None:
+                outstanding.append(f"preexecution:{key}:{value}")
+                blockers.append(f"preexecution_reconstitution_required:{key}")
+
+        review = manifest.get("review") or {}
+        if review.get("state") in {"pending", "in_progress", "red"}:
+            outstanding.append(f"workstream_review:{review['state']}")
+            blockers.append("workstream_review_reconciliation_required")
+
+        if manifest.get("parent_dependency") is not None:
+            outstanding.append(
+                "stacked_parent_dependency:"
+                + ":".join(
+                    [
+                        str(manifest["parent_workstream"]),
+                        str(manifest["parent_branch"]),
+                        str(manifest["parent_dependency"]),
+                    ]
+                )
+            )
+            blockers.append("stacked_parent_dependency_requires_reconciliation")
+
+    return sorted(set(outstanding)), sorted(set(blockers))
 
 def dry_run(
     *,
@@ -346,7 +425,7 @@ def dry_run(
     if manifest is not None:
         validate_manifest(manifest, source_class)
     validate_board(board, source_class, manifest)
-    outstanding, blockers = _semantic_summary(board)
+    outstanding, blockers = _semantic_summary(board, manifest)
 
     source_identity = {
         "class": source_class,
