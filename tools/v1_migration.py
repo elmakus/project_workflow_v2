@@ -698,19 +698,25 @@ def convert_dry_run(
                 "reason": review_problem,
                 "blocker_path": blocker_path,
             })
-        elif attempts and attempts[-1]["verdict"] == "red":
+        elif attempts and attempts[-1]["verdict"] in {"pending", "in_progress", "red"}:
+            review_state = attempts[-1]["verdict"]
             blocker_path = (
                 f"implementation/workstreams/{destination_workstream}/blockers/"
-                f"{card_id}-red-review.toml"
+                f"{card_id}-{review_state.replace('_', '-')}-review.toml"
             )
             canonical["status"] = "blocked"
             canonical["blocker"] = {"class": "blocker", "path": blocker_path}
+            reason = (
+                "exact RED history is preserved and corrective review remains outstanding"
+                if review_state == "red"
+                else f"exact {review_state} review remains outstanding and blocks completion"
+            )
             review_obligations.append({
                 "card_id": card_id,
-                "source_review_state": "red",
+                "source_review_state": review_state,
                 "source_review_subject": str(source_card.get("review_subject")),
                 "source_review_evidence": str(source_card.get("review_evidence")),
-                "reason": "exact RED history is preserved and corrective review remains outstanding",
+                "reason": reason,
                 "blocker_path": blocker_path,
             })
         canonical_cards.append(canonical)
