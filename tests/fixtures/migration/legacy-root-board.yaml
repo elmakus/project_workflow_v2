@@ -1,0 +1,37 @@
+project: "elmakus/chatgpt-codex-project-workflow"
+plan_revision: "CUBC-P1"
+current_milestone: "CUBC-M01"
+execution_ref:
+  branch: "main"
+  pr: 35
+  head: "3062786dea216296672bc059bbdc58320b6434cb"
+research_obligation: null
+milestones:
+  CUBC-M01:
+    decision_state: accepted
+    execution_status: done
+    contract: "planning/CODEX_ONLY_UNMERGED_BRANCH_CLEANUP_MASTER_PLAN.md#M01"
+    checkpoint: "3062786dea216296672bc059bbdc58320b6434cb"
+    implementation_head: "4ead7a4a7c0ed13bc82a504a8b038dc20b788217"
+    handoff: "project-handoffs/CUBC-M01_HANDOFF.md"
+    acceptance_evidence: "implementation/evidence/CUBC-M01-acceptance.md"
+    review_state: null
+    review_subject: null
+    review_evidence: null
+cards:
+  - id: "CUBC-M01-T01"
+    title: "Terminal-unmerged Codex-only branch cleanup contracts"
+    milestone: "CUBC-M01"
+    decision_state: accepted
+    execution_status: done
+    executor: chatgpt
+    depends_on: []
+    openspec_change: null
+    contract: "implementation/cards/CUBC-M01-T01.md"
+    review_state: green
+    review_subject: "4ead7a4a7c0ed13bc82a504a8b038dc20b788217"
+    review_evidence: "implementation/evidence/CUBC-M01-T01-review-01.md"
+    result_commit: "4ead7a4a7c0ed13bc82a504a8b038dc20b788217"
+    result_pr: 35
+    evidence: "implementation/evidence/CUBC-M01-T01.md"
+    tests_summary: "GREEN"
