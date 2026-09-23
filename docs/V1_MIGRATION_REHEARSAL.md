@@ -12,6 +12,7 @@ The finite V1 readers cover the three real-derived source classes frozen in
 | one active/in-progress Project Card | preserve the Card status/contract locator; never recreate V1 batch/lane scheduler state |
 | completed Card/result | preserve it as a result to reconcile; never replay it as fresh execution |
 | pending/RED/GREEN Card review | preserve exact append-only proof when supplied; otherwise create a blocking V2 review obligation rather than invent GREEN |
+| activated workstream final-integration review | fail closed until exact V2 review reconciliation/coverage is reconstituted; a V1 GREEN verdict is never silently dropped |
 | legacy root terminal/unmerged state | map to a branch-local V2 destination; never revive the legacy root as live V2 state |
 | source disappears after activation | destination readback remains self-verifying from its migration record |
 | exploratory promotion / active Research / Plan Review or premium A/B/C-equivalent pre-execution state | fail closed and require explicit V2 reconstitution; M06 does not infer missing human authorization or translate V1 stage prose into V2 TOML |
@@ -27,9 +28,12 @@ fixture rehearsal does not guess them.
 ## Apply, rollback and recovery
 
 Apply is allowed only after a GREEN exact dry run plus explicit authorization for that exact
-source fingerprint. Generated state is staged, read back and verified before promotion.
-Repeating the same exact migration is a verified no-op; changed source or destination state
-conflicts instead of being overwritten.
+source fingerprint. Generated state is staged, read back and verified before promotion. Stable
+Task Card contracts and terminal review evidence are read from the exact immutable source
+repository/commit, DONE Cards receive a durable normalized result record, and activation
+readback requires every canonical workstream-local contract/result/review-evidence locator to
+resolve inside the migration record. Repeating the same exact migration is a verified no-op;
+changed source or destination state conflicts instead of being overwritten.
 
 An unactivated staging tree may be rolled back. Once activated, durable history is
 **forward-repair** only. An uncertain external effect is read back before retry, and unknown
