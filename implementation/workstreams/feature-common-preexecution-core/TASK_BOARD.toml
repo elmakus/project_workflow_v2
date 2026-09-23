@@ -1,13 +1,17 @@
 workstream_id = "feature-common-preexecution-core"
-revision = 0
+revision = 1
 
 [execution_ref]
 branch = "custody/feature-common-preexecution-core"
 
 [[cards]]
 id = "M07-T09"
-status = "in_progress"
+status = "blocked"
 
 [cards.contract]
 class = "task_card"
 path = "implementation/workstreams/feature-common-preexecution-core/cards/M07-T09.md"
+
+[cards.blocker]
+class = "blocker"
+path = "implementation/workstreams/feature-common-preexecution-core/blockers/M07-T09-bootstrap-project-instructions.toml"

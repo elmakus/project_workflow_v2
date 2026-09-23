@@ -1,0 +1,5 @@
+workstream_id = "feature-common-preexecution-core"
+card_id = "M07-T09"
+class = "runtime_access_input"
+summary = "Pilot V2 repository state is verified and staged, but ChatGPT bootstrap cannot be safely activated until the user-owned Project Instructions point to Project Workflow V2; this session has no capability to edit that setting."
+evidence_path = "implementation/workstreams/feature-common-preexecution-core/evidence/M07-T09-pilot-staging-bootstrap-blocker-2026-09-23.md"
