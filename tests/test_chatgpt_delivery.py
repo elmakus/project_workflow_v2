@@ -42,11 +42,16 @@ class ChatGPTDeliveryTests(unittest.TestCase):
         self.assertIn("prompts/CHATGPT_FRESH_SESSION.md", text)
         self.assertIn("there is no Project Workflow Context Health/FRESH lifecycle", text)
         self.assertIn("consumer repository", text)
+        self.assertIn("Premium A — optional handoff", text)
+        self.assertIn("Premium B — mandatory fresh independent handoff", text)
+        self.assertIn("Premium C — optional handoff", text)
+        self.assertIn("another context or harness", text)
         self.assertNotIn("review evidence:", text.lower())
 
     def test_router_points_to_canonical_user_stop_module(self) -> None:
         text = ROUTER.read_text(encoding="utf-8")
         self.assertIn("workflow/USER_STOP.md", text)
+        self.assertIn("Every real `stop` result MUST also load", text)
 
 
 if __name__ == "__main__":

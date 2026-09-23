@@ -709,6 +709,7 @@ class RouterTests(unittest.TestCase):
             self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_A"))
             self.assertEqual(routed.owner_module, "workflow/DEFINITION.md")
             self.assertIn("best available model/context", routed.reason)
+            self.assertIn("package:workflow/USER_STOP.md", routed.read_set)
         finally:
             temp.cleanup()
 
@@ -770,6 +771,7 @@ class RouterTests(unittest.TestCase):
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_B"))
             self.assertIn("best-available", routed.reason)
+            self.assertIn("package:workflow/USER_STOP.md", routed.read_set)
         finally:
             temp.cleanup()
 
@@ -822,6 +824,7 @@ class RouterTests(unittest.TestCase):
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_C"))
             self.assertIn("lighter/cheaper", routed.reason)
+            self.assertIn("package:workflow/USER_STOP.md", routed.read_set)
         finally:
             temp.cleanup()
 
@@ -854,6 +857,7 @@ class RouterTests(unittest.TestCase):
             self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_A"))
             self.assertEqual(routed.subject, "definition:R1|planning-cycle:2")
             self.assertIn("best available model/context", routed.reason)
+            self.assertIn("package:workflow/USER_STOP.md", routed.read_set)
 
             planning_path.write_text(
                 self.planning_content(state="draft", cycle=2, revision="P2", premium_a="satisfied")
@@ -869,6 +873,7 @@ class RouterTests(unittest.TestCase):
             )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_B"))
+            self.assertIn("package:workflow/USER_STOP.md", routed.read_set)
 
             planning_path.write_text(
                 self.planning_content(
@@ -892,6 +897,7 @@ class RouterTests(unittest.TestCase):
             )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_C"))
+            self.assertIn("package:workflow/USER_STOP.md", routed.read_set)
 
             planning_path.write_text(
                 self.planning_content(

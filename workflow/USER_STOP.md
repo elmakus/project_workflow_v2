@@ -26,6 +26,16 @@ When user action is required, include an explicit `USER ACTION REQUIRED:` line w
 
 When a fresh ChatGPT context is required or recommended, include a ready-to-copy `NEW CHAT START PROMPT` using the support template at `prompts/CHATGPT_FRESH_SESSION.md`.
 
+## Premium A/B/C handoff behavior
+
+Premium gates have distinct handoff requirements:
+
+- **Premium A — optional handoff.** The user may continue in the current context when it is already the best available planning context. The stop MUST also include a ready-to-copy locator-only `NEW CHAT START PROMPT` so the user can move Strategic Planning to another context or harness without asking for a prompt.
+- **Premium B — mandatory fresh independent handoff.** The current planning context must not review the plan it produced. The stop MUST tell the user to start a fresh independent best-available context/harness and MUST include the ready-to-copy locator-only `NEW CHAT START PROMPT` in the same response.
+- **Premium C — optional handoff.** After GREEN Plan Review, the user may continue in the current context or move Execution Prep to a lighter/cheaper context or harness. The stop MUST include a ready-to-copy locator-only `NEW CHAT START PROMPT` so switching does not require another request.
+
+The locator prompt is runtime-neutral. A receiving harness must already have a valid Project Workflow V2 bootstrap/entry mechanism; the locator does not copy workflow policy into the handoff.
+
 ## Locator-only fresh handoff
 
 The fresh-session prompt contains only:
