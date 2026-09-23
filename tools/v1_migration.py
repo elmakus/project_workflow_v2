@@ -421,6 +421,8 @@ def _normalized_review_attempts(
             "and semantic independence proof"
         )
 
+    if proof[-1].get("source_review_subject") != source_card.get("review_subject"):
+        return [], [], "review proof is not bound to the exact current V1 review_subject"
     attempts: list[dict[str, Any]] = []
     refs: list[dict[str, str]] = []
     for index, item in enumerate(proof, 1):
@@ -518,6 +520,11 @@ def convert_dry_run(
 
     destination_workstream = plan["destination"]["workstream_id"]
     source_branch = board["execution_ref"]["branch"]
+    live_branch = (
+        source_branch
+        if source_class != "legacy_root_yaml_v1"
+        else f"migration/{destination_workstream}"
+    )
     created_from = (
         manifest.get("base_ref")
         if manifest is not None and isinstance(manifest.get("base_ref"), str)
@@ -532,7 +539,7 @@ def convert_dry_run(
     workstream: dict[str, Any] = {
         "kind": (manifest.get("kind") if manifest is not None else "migration") or "migration",
         "workstream_id": destination_workstream,
-        "branch": source_branch,
+        "branch": live_branch,
         "created_from": created_from,
         "integration_target": integration_target,
         "authority": _authority_locators(manifest, board),
@@ -632,7 +639,7 @@ def convert_dry_run(
     task_board: dict[str, Any] = {
         "workstream_id": destination_workstream,
         "revision": 0,
-        "execution_ref": {"branch": source_branch},
+        "execution_ref": {"branch": live_branch},
         "cards": canonical_cards,
     }
     source_research = board.get("research_obligation")
