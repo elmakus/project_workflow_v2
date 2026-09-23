@@ -71,7 +71,14 @@ class V1MigrationDryRunTests(unittest.TestCase):
                     if p.is_file()
                 }
                 self.assertEqual(first, second)
-                self.assertTrue(first["valid"])
+                if source_class == "codex_workstream_yaml_v1":
+                    self.assertFalse(first["valid"])
+                    self.assertIn(
+                        "workstream_review_reconciliation_required",
+                        first["blockers"],
+                    )
+                else:
+                    self.assertTrue(first["valid"])
                 self.assertEqual(first["destination"]["root"], f"implementation/workstreams/migrated-{stem}")
                 self.assertEqual(before, after)
 
@@ -236,6 +243,23 @@ class V1MigrationDryRunTests(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(first["output_fingerprint"], second["output_fingerprint"])
 
+    def test_conversion_rejects_inputs_that_do_not_match_green_dry_run(self) -> None:
+        board, manifest = self.texts("chatgpt")
+        plan = self.plan("chatgpt_workstream_yaml_v1", "chatgpt")
+        changed = board.replace(
+            "execution_status: done",
+            "execution_status: in_progress",
+            1,
+        )
+        with self.assertRaisesRegex(
+            MigrationInputError, "conversion board diverges from GREEN dry-run source"
+        ):
+            convert_dry_run(
+                plan=plan,
+                board_text=changed,
+                manifest_text=manifest,
+            )
+
     def test_unproven_terminal_review_becomes_blocking_review_obligation_not_invented_green(self) -> None:
         board, manifest = self.texts("chatgpt")
         bundle = convert_dry_run(
@@ -356,8 +380,25 @@ class V1MigrationDryRunTests(unittest.TestCase):
 
     def test_conversion_output_drops_runtime_policy_scheduler_keys_from_canonical_state(self) -> None:
         board, manifest = self.texts("codex")
+        manifest = manifest.replace("  state: green", "  state: null", 1)
+        manifest = manifest.replace('  subject: "feature@subject"', "  subject: null", 1)
+        manifest = manifest.replace(
+            '  evidence: "implementation/workstreams/feature-codex-only-policy/evidence/M05-final-integration-review-02.md"',
+            "  evidence: null",
+            1,
+        )
+        plan = dry_run(
+            source_class="codex_workstream_yaml_v1",
+            repository=REPO,
+            expected_commit=SHA,
+            observed_commit=SHA,
+            board_text=board,
+            manifest_text=manifest,
+            destination_workstream="migrated-codex",
+        )
+        self.assertTrue(plan["valid"])
         bundle = convert_dry_run(
-            plan=self.plan("codex_workstream_yaml_v1", "codex"),
+            plan=plan,
             board_text=board,
             manifest_text=manifest,
         )
