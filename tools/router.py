@@ -10,7 +10,7 @@ from pathlib import Path, PurePosixPath
 
 from tools.execution_contract import ExecutionContractError, parse_card_result
 from tools.recovery_contract import RecoveryContractError, classify_resolution, exact_result_subject, review_subject
-from tools.policy_kernel import PolicyKernel
+from tools.policy_kernel import MechanicalDecision, PolicyKernel
 from tools.state_contract import (
     ValidationError,
     read_project,
@@ -102,6 +102,28 @@ def recovery(reads: Reads, reason: str) -> RouteResult:
         reason += "; recovery module unreadable"
     return result(reads, "recovery", "recovery_boundary", reason,
                   owner_module="workflow/RECOVERY.md")
+
+
+def policy_result(
+    reads: Reads,
+    decision: MechanicalDecision,
+    reason: str,
+    *,
+    subject: str | None = None,
+) -> RouteResult:
+    if decision.disposition == "recovery":
+        try:
+            reads.package(decision.owner_module).read_text(encoding="utf-8")
+        except OSError:
+            reason += "; recovery module unreadable"
+    return result(
+        reads,
+        decision.disposition,
+        decision.obligation,
+        reason,
+        subject=subject,
+        owner_module=decision.owner_module,
+    )
 
 
 def classify_jit_refinement(change_class: str) -> tuple[str, str]:
@@ -293,9 +315,10 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
         if "tracker" in workstream:
             tracker = read_toml(reads.project(workstream["tracker"]["path"]))
             validate_tracker(tracker, workstream["workstream_id"])
-            if kernel.matches("PWV21-K001", {"tracker": tracker}):
-                return recovery(
+            if (decision := kernel.route("PWV21-K001", {"tracker": tracker})) is not None:
+                return policy_result(
                     reads,
+                    decision,
                     "GitHub Issue tracker recovery is ambiguous; creating another tracker is forbidden",
                 )
             if tracker["state"] == "discovery":
@@ -337,12 +360,13 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     "Promoted scope has active Definition work",
                     subject=definition["source_scope_subject"], owner_module="workflow/DEFINITION.md",
                 )
-            if kernel.matches("PWV21-K002", {"definition": definition}):
-                return result(
-                    reads, "stop", "premium_A",
+            if (decision := kernel.route("PWV21-K002", {"definition": definition})) is not None:
+                return policy_result(
+                    reads,
+                    decision,
                     "Definition is GREEN; premium stop A is due before material Strategic Planning; "
                     "recommend the best available model/context for Strategic Planning without making model identity canonical",
-                    subject=definition["revision"], owner_module="workflow/DEFINITION.md",
+                    subject=definition["revision"],
                 )
 
             planning = None
@@ -357,19 +381,21 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     subject=definition["revision"], owner_module="workflow/PLANNING.md",
                 )
 
-            if kernel.matches("PWV21-K003", {"planning": planning}):
-                return result(
-                    reads, "stop", "premium_A",
+            if (decision := kernel.route("PWV21-K003", {"planning": planning})) is not None:
+                return policy_result(
+                    reads,
+                    decision,
                     "Material planning re-entry has a new exact cycle; premium stop A is due before Planning resumes; "
                     "recommend the best available model/context for Strategic Planning without making model identity canonical",
-                    subject=planning["entry_subject"], owner_module="workflow/PLANNING.md",
+                    subject=planning["entry_subject"],
                 )
 
-            if kernel.matches("PWV21-K004", {"planning": planning}):
-                return result(
-                    reads, "route", "planning",
+            if (decision := kernel.route("PWV21-K004", {"planning": planning})) is not None:
+                return policy_result(
+                    reads,
+                    decision,
                     "Current planning cycle has exact premium A satisfaction and is still being authored",
-                    subject=planning["entry_subject"], owner_module="workflow/PLANNING.md",
+                    subject=planning["entry_subject"],
                 )
 
             plan_review = None
@@ -382,25 +408,28 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                 f"{planning['subject']['path']}@{planning['subject']['blob']}"
             )
             if planning["state"] == "frozen":
-                if kernel.matches("PWV21-K005", {"planning": planning}):
-                    return result(
-                        reads, "stop", "premium_B",
+                if (decision := kernel.route("PWV21-K005", {"planning": planning})) is not None:
+                    return policy_result(
+                        reads,
+                        decision,
                         "Exact plan subject is frozen; premium stop B requires a fresh independent best-available review context",
-                        subject=subject_key, owner_module="workflow/PLANNING.md",
+                        subject=subject_key,
                     )
                 if plan_review is None:
                     raise ValidationError("premium B satisfied without exact Plan Review attempt")
-                if kernel.matches("PWV21-K006", {"plan_review": plan_review}):
-                    return result(
-                        reads, "route", "plan_review",
+                if (decision := kernel.route("PWV21-K006", {"plan_review": plan_review})) is not None:
+                    return policy_result(
+                        reads,
+                        decision,
                         "Fresh independent Plan Review owns the frozen exact subject",
-                        subject=subject_key, owner_module="workflow/PLAN_REVIEW.md",
+                        subject=subject_key,
                     )
-                if kernel.matches("PWV21-K007", {"plan_review": plan_review}):
-                    return result(
-                        reads, "route", "planning",
+                if (decision := kernel.route("PWV21-K007", {"plan_review": plan_review})) is not None:
+                    return policy_result(
+                        reads,
+                        decision,
                         "GREEN Plan Review must be consumed into approved plan state",
-                        subject=subject_key, owner_module="workflow/PLANNING.md",
+                        subject=subject_key,
                     )
                 return result(
                     reads, "route", "planning",
@@ -419,12 +448,13 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
 
             if plan_review is None or plan_review["verdict"] != "green":
                 raise ValidationError("approved plan requires exact GREEN Plan Review")
-            if kernel.matches("PWV21-K008", {"planning": planning}):
-                return result(
-                    reads, "stop", "premium_C",
+            if (decision := kernel.route("PWV21-K008", {"planning": planning})) is not None:
+                return policy_result(
+                    reads,
+                    decision,
                     "GREEN Plan Review is approved; premium stop C is due before Execution Prep; "
                     "recommend switching to a lighter/cheaper model/context for Execution Prep",
-                    subject=subject_key, owner_module="workflow/PLANNING.md",
+                    subject=subject_key,
                 )
             return result(
                 reads, "route", "execution_prep",
@@ -434,17 +464,19 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
 
         if brainstorm is not None:
             exact_scope = f"{brainstorm['scope_id']}@{brainstorm['revision']}"
-            if kernel.matches("PWV21-K009", {"brainstorm": brainstorm}):
-                return result(
-                    reads, "stop", "explicit_user_stop",
+            if (decision := kernel.route("PWV21-K009", {"brainstorm": brainstorm})) is not None:
+                return policy_result(
+                    reads,
+                    decision,
                     "Brainstorming carries an explicit user stop",
-                    subject=exact_scope, owner_module="workflow/BRAINSTORMING.md",
+                    subject=exact_scope,
                 )
-            if kernel.matches("PWV21-K010", {"brainstorm": brainstorm}):
-                return result(
-                    reads, "route", "brainstorming",
+            if (decision := kernel.route("PWV21-K010", {"brainstorm": brainstorm})) is not None:
+                return policy_result(
+                    reads,
+                    decision,
                     "Active exploratory scope owns the next product/strategy clarification",
-                    subject=exact_scope, owner_module="workflow/BRAINSTORMING.md",
+                    subject=exact_scope,
                 )
             if brainstorm["promotion_state"] == "pending":
                 return result(
@@ -611,16 +643,17 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             subject=card["id"], owner_module="workflow/RECOVERY.md",
         )
 
-    if kernel.matches("PWV21-K011", {"board": board}):
+    if (decision := kernel.route("PWV21-K011", {"board": board})) is not None:
         card = ready[0]
         try:
             refresh_ready_card(reads, board, workstream, card)
         except (OSError, ValidationError, KeyError) as exc:
             return recovery(reads, f"ready Card launch refresh failed: {exc}")
-        return result(
-            reads, "route", "execution_prep",
+        return policy_result(
+            reads,
+            decision,
             "READY Card passed launch refresh against current authority, DONE dependency results and optional technical contract",
-            subject=card["id"], owner_module="workflow/EXECUTION_PREP.md",
+            subject=card["id"],
         )
 
     if len(ready) > 1:
@@ -630,11 +663,11 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             owner_module="workflow/EXECUTION_PREP.md",
         )
 
-    if kernel.matches("PWV21-K012", {"board": board}):
-        return result(
-            reads, "route", "close",
+    if (decision := kernel.route("PWV21-K012", {"board": board})) is not None:
+        return policy_result(
+            reads,
+            decision,
             "All current Cards are terminal; Close owns finalization and decides whether approved scope is durably complete",
-            owner_module="workflow/CLOSE.md",
         )
 
     return result(reads, "route", "execution_prep",
