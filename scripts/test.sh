@@ -35,6 +35,6 @@ if test -f scripts/test-recovery-contract.sh; then
   sh scripts/test-recovery-contract.sh
 fi
 
-python3 -m unittest tests.test_close_contract tests.test_fork_release_contract tests.test_chatgpt_delivery tests.test_codex_delivery tests.test_v1_migration
+python3 -m unittest tests.test_close_contract tests.test_fork_release_contract tests.test_chatgpt_delivery tests.test_codex_delivery tests.test_v1_migration tests.test_migration_apply
 
 printf 'M01 baseline checks: PASS\n'
