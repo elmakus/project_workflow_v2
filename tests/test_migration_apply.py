@@ -28,6 +28,11 @@ class MigrationApplyTests(unittest.TestCase):
             (FIX / "chatgpt-workstream.yaml").read_text(encoding="utf-8"),
         )
 
+    def artifact_reader(self, repository: str, commit: str, path: str):
+        self.assertEqual(repository, REPO)
+        self.assertEqual(commit, SHA)
+        return f"# exact source artifact\n\n{repository}@{commit}:{path}\n".encode("utf-8")
+
     def bundle(self):
         board, manifest = self.texts()
         plan = dry_run(
@@ -52,6 +57,7 @@ class MigrationApplyTests(unittest.TestCase):
             board_text=source_board if board is None else board,
             manifest_text=source_manifest if manifest is None else manifest,
             crash_at=crash_at,
+            source_artifact_reader=self.artifact_reader,
         )
 
     def test_apply_requires_explicit_exact_authorization(self):
@@ -66,6 +72,7 @@ class MigrationApplyTests(unittest.TestCase):
                     observed_commit=SHA,
                     board_text=board,
                     manifest_text=manifest,
+                    source_artifact_reader=self.artifact_reader,
                 )
 
     def test_apply_readback_and_repeat_are_idempotent(self):
@@ -75,8 +82,26 @@ class MigrationApplyTests(unittest.TestCase):
             first = self.apply(destination, bundle=bundle)
             self.assertEqual(first["status"], "applied")
             self.assertEqual(readback_fixture_destination(destination, bundle)["status"], "verified")
+            self.assertTrue((destination / "cards" / "M05-T05.md").is_file())
+            self.assertTrue((destination / "results" / "M05-T05.md").is_file())
             second = self.apply(destination, bundle=bundle)
             self.assertEqual(second["status"], "noop")
+
+    def test_apply_fails_closed_when_exact_source_artifacts_cannot_be_materialized(self):
+        board, manifest = self.texts()
+        bundle = self.bundle()
+        with tempfile.TemporaryDirectory() as td:
+            destination = Path(td) / "migrated-chatgpt"
+            with self.assertRaisesRegex(MigrationApplyError, "artifact reader"):
+                apply_fixture_conversion(
+                    bundle=bundle,
+                    destination_root=destination,
+                    authorization=authorization_for(bundle),
+                    observed_commit=SHA,
+                    board_text=board,
+                    manifest_text=manifest,
+                )
+            self.assertFalse(destination.exists())
 
     def test_changed_source_fails_closed_before_destination_mutation(self):
         board, _ = self.texts()
@@ -152,6 +177,51 @@ class MigrationApplyTests(unittest.TestCase):
 
         with self.assertRaisesRegex(MigrationApplyError, "retry is forbidden"):
             reconcile_uncertain_external_effect(lambda: "unknown")
+
+    def test_terminal_review_evidence_is_materialized_and_read_back_locally(self):
+        board, manifest = self.texts()
+        plan = dry_run(
+            source_class="chatgpt_workstream_yaml_v1",
+            repository=REPO,
+            expected_commit=SHA,
+            observed_commit=SHA,
+            board_text=board,
+            manifest_text=manifest,
+            destination_workstream="migrated-chatgpt",
+        )
+        proof = {
+            "attempt": "R01",
+            "verdict": "green",
+            "source_review_subject": "exact-subject",
+            "subject": {
+                "repository": REPO,
+                "commit": "b" * 40,
+                "path": "implementation/workstreams/feature-common-preexecution-core/evidence/reviewed.md",
+                "blob": "c" * 40,
+            },
+            "materially_produced_or_repaired_subject": False,
+            "independence_basis": "Exact V1 evidence proves semantic independence.",
+            "evidence_path": (
+                "implementation/workstreams/feature-common-preexecution-core/evidence/"
+                "M05-T05-independent-review-R01-2026-09-23.md"
+            ),
+        }
+        bundle = convert_dry_run(
+            plan=plan,
+            board_text=board,
+            manifest_text=manifest,
+            review_proofs={"M05-T05": [proof]},
+        )
+        with tempfile.TemporaryDirectory() as td:
+            destination = Path(td) / "migrated-chatgpt"
+            self.apply(destination, bundle=bundle)
+            evidence = destination / "evidence" / "migrated-M05-T05-R01.md"
+            self.assertTrue(evidence.is_file())
+            self.assertIn(proof["evidence_path"], evidence.read_text(encoding="utf-8"))
+            self.assertEqual(
+                readback_fixture_destination(destination, bundle)["status"],
+                "verified",
+            )
 
     def test_activated_destination_readback_survives_source_disappearance(self):
         bundle = self.bundle()
