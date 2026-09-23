@@ -383,6 +383,310 @@ def dry_run(
     }
 
 
+
+def _authority_locators(manifest: dict[str, Any] | None, board: dict[str, Any]) -> list[dict[str, str]]:
+    paths: list[str] = []
+    if manifest is not None:
+        authority = manifest.get("authority", {})
+        for value in [authority.get("requirements"), *(authority.get("decisions") or []), authority.get("plan")]:
+            if isinstance(value, str) and value.startswith(("requirements/", "decisions/", "planning/", "workflow/")):
+                paths.append(value)
+    else:
+        for milestone in board["milestones"].values():
+            value = milestone.get("contract")
+            if isinstance(value, str) and value.startswith(("requirements/", "decisions/", "planning/", "workflow/")):
+                paths.append(value.split("#", 1)[0])
+    unique = list(dict.fromkeys(paths))
+    if not unique:
+        raise MigrationInputError("cannot preserve accepted authority: no exact V1 authority path is available")
+    return [{"class": "authority", "path": value} for value in unique]
+
+
+def _normalized_review_attempts(
+    *,
+    source_card: dict[str, Any],
+    destination_workstream: str,
+    proof: list[dict[str, Any]] | None,
+) -> tuple[list[dict[str, Any]], list[dict[str, str]], str | None]:
+    review_state = source_card.get("review_state")
+    if review_state is None:
+        return [], [], None
+    if review_state not in {"pending", "in_progress", "green", "red"}:
+        raise MigrationInputError(
+            f"card {source_card['id']}: unsupported V1 review_state {review_state!r}"
+        )
+    if not proof:
+        return [], [], (
+            f"V1 review {review_state!r} cannot be reused without exact immutable subject "
+            "and semantic independence proof"
+        )
+
+    attempts: list[dict[str, Any]] = []
+    refs: list[dict[str, str]] = []
+    for index, item in enumerate(proof, 1):
+        attempt_id = item.get("attempt") or f"R{index:02d}"
+        verdict = item.get("verdict")
+        subject = item.get("subject")
+        basis = item.get("independence_basis")
+        produced = item.get("materially_produced_or_repaired_subject")
+        source_evidence = item.get("evidence_path", "")
+        if verdict not in {"pending", "in_progress", "green", "red"}:
+            return [], [], f"review proof {attempt_id}: invalid verdict"
+        if not isinstance(subject, dict):
+            return [], [], f"review proof {attempt_id}: missing exact subject"
+        if (
+            not isinstance(subject.get("repository"), str)
+            or not subject["repository"]
+            or not isinstance(subject.get("path"), str)
+            or not subject["path"]
+            or SHA40.fullmatch(str(subject.get("commit", ""))) is None
+            or SHA40.fullmatch(str(subject.get("blob", ""))) is None
+        ):
+            return [], [], f"review proof {attempt_id}: subject is not exact git-blob identity"
+        if produced is not False or not isinstance(basis, str) or not basis.strip():
+            return [], [], f"review proof {attempt_id}: semantic independence is unproven"
+
+        evidence_path = ""
+        if verdict in {"green", "red"}:
+            if not isinstance(source_evidence, str) or not source_evidence:
+                return [], [], f"review proof {attempt_id}: terminal evidence is missing"
+            evidence_path = (
+                f"implementation/workstreams/{destination_workstream}/evidence/"
+                f"migrated-{source_card['id']}-{attempt_id}.md"
+            )
+        attempt = {
+            "workstream_id": destination_workstream,
+            "card_id": source_card["id"],
+            "attempt": attempt_id,
+            "verdict": verdict,
+            "evidence_path": evidence_path,
+            "subject": {
+                "class": "git_blob",
+                "repository": subject["repository"],
+                "commit": subject["commit"],
+                "path": subject["path"],
+                "blob": subject["blob"],
+            },
+            "acceptance": {
+                "class": "task_card",
+                "path": (
+                    f"implementation/workstreams/{destination_workstream}/cards/"
+                    f"{source_card['id']}.md"
+                ),
+            },
+            "independence": {
+                "materially_produced_or_repaired_subject": False,
+                "basis": basis,
+            },
+        }
+        attempts.append(attempt)
+        refs.append({
+            "class": "review_attempt",
+            "path": (
+                f"implementation/workstreams/{destination_workstream}/reviews/"
+                f"{source_card['id']}-{attempt_id}.toml"
+            ),
+        })
+
+    if attempts[-1]["verdict"] != review_state:
+        return [], [], (
+            f"V1 current review state {review_state!r} does not match exact proof "
+            f"{attempts[-1]['verdict']!r}"
+        )
+    nonterminal = [a for a in attempts if a["verdict"] in {"pending", "in_progress"}]
+    if len(nonterminal) > 1 or (nonterminal and attempts[-1] is not nonterminal[-1]):
+        return [], [], "review proof history has invalid non-terminal ordering"
+    return attempts, refs, None
+
+
+def convert_dry_run(
+    *,
+    plan: dict[str, Any],
+    board_text: str,
+    manifest_text: str | None,
+    review_proofs: dict[str, list[dict[str, Any]]] | None = None,
+) -> dict[str, Any]:
+    """Build a canonical V2 bundle in memory. This function performs no writes."""
+    if plan.get("schema") != "pwv2-m06-dry-run-v1" or plan.get("valid") is not True:
+        raise MigrationInputError("conversion requires a GREEN exact M06 dry run")
+    source_class = plan["source"]["class"]
+    board = parse_bounded_yaml(board_text)
+    manifest = parse_bounded_yaml(manifest_text) if manifest_text is not None else None
+    if manifest is not None:
+        validate_manifest(manifest, source_class)
+    validate_board(board, source_class, manifest)
+
+    destination_workstream = plan["destination"]["workstream_id"]
+    source_branch = board["execution_ref"]["branch"]
+    created_from = (
+        manifest.get("base_ref")
+        if manifest is not None and isinstance(manifest.get("base_ref"), str)
+        and SHA40.fullmatch(manifest["base_ref"])
+        else plan["source"]["commit"]
+    )
+    integration_target = (
+        manifest.get("integration_target")
+        if manifest is not None
+        else "main"
+    )
+    workstream: dict[str, Any] = {
+        "kind": (manifest.get("kind") if manifest is not None else "migration") or "migration",
+        "workstream_id": destination_workstream,
+        "branch": source_branch,
+        "created_from": created_from,
+        "integration_target": integration_target,
+        "authority": _authority_locators(manifest, board),
+        "task_board": {
+            "class": "task_board",
+            "path": f"implementation/workstreams/{destination_workstream}/TASK_BOARD.toml",
+        },
+    }
+
+    artifact_plan: list[dict[str, str]] = []
+    review_attempts: dict[str, list[dict[str, Any]]] = {}
+    review_obligations: list[dict[str, str]] = []
+    result_provenance: list[dict[str, Any]] = []
+    canonical_cards: list[dict[str, Any]] = []
+    proofs = review_proofs or {}
+
+    for source_card in board["cards"]:
+        card_id = source_card["id"]
+        status = source_card["execution_status"]
+        canonical: dict[str, Any] = {
+            "id": card_id,
+            "status": status,
+            "contract": {
+                "class": "task_card",
+                "path": f"implementation/workstreams/{destination_workstream}/cards/{card_id}.md",
+            },
+        }
+        source_contract = source_card.get("contract")
+        if isinstance(source_contract, str) and source_contract:
+            artifact_plan.append({
+                "kind": "task_card",
+                "source": source_contract,
+                "destination": canonical["contract"]["path"],
+            })
+
+        if status == "done":
+            result_path = f"implementation/workstreams/{destination_workstream}/results/{card_id}.md"
+            canonical["result"] = {"class": "result", "path": result_path}
+            result_provenance.append({
+                "card_id": card_id,
+                "source_result_commit": source_card.get("result_commit"),
+                "source_result_pr": source_card.get("result_pr"),
+                "source_evidence": source_card.get("evidence"),
+                "destination": result_path,
+            })
+
+        attempts, refs, review_problem = _normalized_review_attempts(
+            source_card=source_card,
+            destination_workstream=destination_workstream,
+            proof=proofs.get(card_id),
+        )
+        if attempts:
+            canonical["review_attempts"] = refs
+            review_attempts[card_id] = attempts
+            for attempt, ref in zip(attempts, refs):
+                if attempt["evidence_path"]:
+                    source_attempt = next(
+                        item for item in proofs[card_id] if (item.get("attempt") or "") == attempt["attempt"]
+                    )
+                    artifact_plan.append({
+                        "kind": "review_evidence",
+                        "source": source_attempt["evidence_path"],
+                        "destination": attempt["evidence_path"],
+                    })
+        if review_problem is not None:
+            blocker_path = (
+                f"implementation/workstreams/{destination_workstream}/blockers/"
+                f"{card_id}-migration-review.toml"
+            )
+            canonical["status"] = "blocked"
+            canonical["blocker"] = {"class": "blocker", "path": blocker_path}
+            review_obligations.append({
+                "card_id": card_id,
+                "source_review_state": str(source_card.get("review_state")),
+                "source_review_subject": str(source_card.get("review_subject")),
+                "source_review_evidence": str(source_card.get("review_evidence")),
+                "reason": review_problem,
+                "blocker_path": blocker_path,
+            })
+        elif attempts and attempts[-1]["verdict"] == "red":
+            blocker_path = (
+                f"implementation/workstreams/{destination_workstream}/blockers/"
+                f"{card_id}-red-review.toml"
+            )
+            canonical["status"] = "blocked"
+            canonical["blocker"] = {"class": "blocker", "path": blocker_path}
+            review_obligations.append({
+                "card_id": card_id,
+                "source_review_state": "red",
+                "source_review_subject": str(source_card.get("review_subject")),
+                "source_review_evidence": str(source_card.get("review_evidence")),
+                "reason": "exact RED history is preserved and corrective review remains outstanding",
+                "blocker_path": blocker_path,
+            })
+        canonical_cards.append(canonical)
+
+    task_board: dict[str, Any] = {
+        "workstream_id": destination_workstream,
+        "revision": 0,
+        "execution_ref": {"branch": source_branch},
+        "cards": canonical_cards,
+    }
+    source_research = board.get("research_obligation")
+    if source_research is not None:
+        research_path = f"implementation/workstreams/{destination_workstream}/RESEARCH.toml"
+        locator = {"class": "research", "path": research_path}
+        task_board["research_obligation"] = locator
+        workstream["research"] = locator
+        artifact_plan.append({
+            "kind": "research",
+            "source": str(source_research),
+            "destination": research_path,
+        })
+
+    provenance = {
+        "source": plan["source"],
+        "source_fingerprint": plan["source_fingerprint"],
+        "source_branch": source_branch,
+        "source_base_ref": manifest.get("base_ref") if manifest is not None else None,
+        "source_parent_workstream": manifest.get("parent_workstream") if manifest is not None else None,
+        "source_parent_branch": manifest.get("parent_branch") if manifest is not None else None,
+        "source_parent_dependency": manifest.get("parent_dependency") if manifest is not None else None,
+        "source_integration_target": integration_target,
+        "source_plan_revision": board.get("plan_revision"),
+        "source_current_milestone": board.get("current_milestone"),
+        "source_milestones": board.get("milestones"),
+        "source_review_snapshots": [
+            {
+                "card_id": card["id"],
+                "review_state": card.get("review_state"),
+                "review_subject": card.get("review_subject"),
+                "review_evidence": card.get("review_evidence"),
+            }
+            for card in board["cards"]
+            if card.get("review_state") is not None
+        ],
+    }
+    bundle = {
+        "schema": "pwv2-m06-conversion-v1",
+        "source_fingerprint": plan["source_fingerprint"],
+        "workstream": workstream,
+        "task_board": task_board,
+        "review_attempts": review_attempts,
+        "review_obligations": review_obligations,
+        "result_provenance": result_provenance,
+        "artifact_plan": artifact_plan,
+        "provenance": provenance,
+    }
+    bundle["output_fingerprint"] = hashlib.sha256(
+        json.dumps(bundle, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return bundle
+
+
 def _main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
