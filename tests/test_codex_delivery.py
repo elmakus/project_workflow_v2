@@ -25,7 +25,7 @@ class CodexDeliveryTests(unittest.TestCase):
         marketplace = json.loads(MARKETPLACE.read_text(encoding="utf-8"))
 
         self.assertEqual(plugin["name"], "pw")
-        self.assertEqual(plugin["version"], "0.2.0")
+        self.assertEqual(plugin["version"], "0.2.1")
         self.assertEqual(plugin["skills"], "./skills/")
         self.assertEqual(marketplace["name"], "project-workflow-v2")
 

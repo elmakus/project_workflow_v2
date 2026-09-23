@@ -2,7 +2,7 @@
 
 Status: M04-T04 common routing through Close and true end-of-approved-scope semantics.
 
-Probe response: PWV2_M01_ROUTER_SENTINEL_7C91
+Probe response: PWV2_M05_UPDATE_SENTINEL_92AF
 
 The router is one small runtime-neutral obligation selector. Product/model/session/worker identity never selects workflow semantics.
 

@@ -9,7 +9,7 @@ test -f hooks/session-start.py
 test -f workflow/ROUTER.md
 
 grep -q '"name": "pw"' .codex-plugin/plugin.json
-grep -q '"version": "0.2.0"' .codex-plugin/plugin.json
+grep -q '"version": "0.2.1"' .codex-plugin/plugin.json
 grep -q '"name": "project-workflow-v2"' .agents/plugins/marketplace.json
 grep -q '^name: project_workflow_v2$' skills/project_workflow_v2/SKILL.md
 grep -q '\$pw:project_workflow_v2' skills/project_workflow_v2/SKILL.md
