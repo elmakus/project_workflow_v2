@@ -1,0 +1,38 @@
+project: "elmakus/chatgpt-codex-project-workflow"
+workstream_id: "feature-common-preexecution-core"
+plan_revision: "PWV2-P2"
+current_milestone: "M05"
+execution_ref:
+  branch: "feat/common-preexecution-core"
+  pr: null
+  head: "b3d3a7e5f1b8ea968c449b1fa4ec313134c47ae0"
+research_obligation: null
+milestones:
+  M05:
+    decision_state: accepted
+    execution_status: done
+    contract: "planning/PROJECT_WORKFLOW_V2_MASTER_PLAN.md#m05"
+    checkpoint: "b3d3a7e5f1b8ea968c449b1fa4ec313134c47ae0"
+    implementation_head: "e95bea2e828e86601cb127fd7564d013a51b0846"
+    handoff: "implementation/workstreams/feature-common-preexecution-core/handoffs/M05_HANDOFF.md"
+    acceptance_evidence: "implementation/workstreams/feature-common-preexecution-core/evidence/M05-T05-cumulative-acceptance-P2-2026-09-23.md"
+    review_state: null
+    review_subject: null
+    review_evidence: null
+cards:
+  - id: "M05-T05"
+    title: "Cumulative M05 acceptance"
+    milestone: "M05"
+    decision_state: accepted
+    execution_status: done
+    executor: chatgpt
+    depends_on: ["M05-T04"]
+    openspec_change: null
+    contract: "implementation/workstreams/feature-common-preexecution-core/cards/M05-T05.md"
+    review_state: green
+    review_subject: "exact-subject"
+    review_evidence: "implementation/workstreams/feature-common-preexecution-core/evidence/M05-T05-independent-review-R01-2026-09-23.md"
+    result_commit: "e95bea2e828e86601cb127fd7564d013a51b0846"
+    result_pr: 5
+    evidence: "implementation/workstreams/feature-common-preexecution-core/evidence/M05-T05-cumulative-acceptance-P2-2026-09-23.md"
+    tests_summary: "GREEN"
