@@ -89,25 +89,17 @@ It is not a workflow DSL, does not own semantic judgment, and authorizes no cano
 - Owner: `workflow/BRAINSTORMING.md`
 - Semantics: An active exploratory scope remains owned by Brainstorming.
 
-## PWV21-K011 — `board_has_active_card`
+## PWV21-K011 — `board_one_ready_card`
 
 - Precedence: `400`
-- Canonical inputs: `board.cards`
-- Outcome: `route / execution`
-- Owner: `workflow/EXECUTION.md`
-- Semantics: Exactly one in-progress Card selects the current execution unit after higher-precedence recovery and research checks.
-
-## PWV21-K012 — `board_one_ready_card`
-
-- Precedence: `410`
 - Canonical inputs: `board.cards`
 - Outcome: `route / execution_prep`
 - Owner: `workflow/EXECUTION_PREP.md`
 - Semantics: Exactly one READY Card identifies the launch-refresh candidate for Execution Prep.
 
-## PWV21-K013 — `board_all_cards_done`
+## PWV21-K012 — `board_all_cards_done`
 
-- Precedence: `420`
+- Precedence: `410`
 - Canonical inputs: `board.cards`
 - Outcome: `route / close`
 - Owner: `workflow/CLOSE.md`

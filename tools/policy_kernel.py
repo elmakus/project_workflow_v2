@@ -67,10 +67,6 @@ def _board_statuses(inputs: Mapping[str, Any]) -> list[str]:
     return statuses
 
 
-def _board_has_active_card(inputs: Mapping[str, Any]) -> bool:
-    return _board_statuses(inputs).count("in_progress") == 1
-
-
 def _board_one_ready_card(inputs: Mapping[str, Any]) -> bool:
     return _board_statuses(inputs).count("ready") == 1
 
@@ -91,7 +87,6 @@ DEFAULT_PREDICATES: dict[str, Predicate] = {
     "tracker_ambiguous": _eq("tracker.state", "ambiguous"),
     "brainstorm_explicit_user_stop": _eq("brainstorm.explicit_user_stop", True),
     "brainstorm_active": _eq("brainstorm.state", "active"),
-    "board_has_active_card": _board_has_active_card,
     "board_one_ready_card": _board_one_ready_card,
     "board_all_cards_done": _board_all_cards_done,
 }

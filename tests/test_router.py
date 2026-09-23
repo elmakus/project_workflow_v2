@@ -45,6 +45,8 @@ class RouterTests(unittest.TestCase):
                 "package:workflow/ROUTER.md",
                 "project:PROJECT.md",
                 f"project:{MANIFEST}",
+                "package:policy/mechanical_policy.json",
+                "package:workflow/POLICY_KERNEL.md",
                 f"project:{BOARD}",
                 f"project:{CARD}",
             ),

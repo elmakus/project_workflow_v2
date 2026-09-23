@@ -7,7 +7,9 @@
       "id": "PWV21-K001",
       "precedence": 100,
       "predicate": "tracker_ambiguous",
-      "inputs": ["tracker.state"],
+      "inputs": [
+        "tracker.state"
+      ],
       "outcome": {
         "disposition": "recovery",
         "obligation": "recovery_boundary",
@@ -19,7 +21,9 @@
       "id": "PWV21-K002",
       "precedence": 200,
       "predicate": "definition_premium_a_due",
-      "inputs": ["definition.premium_a"],
+      "inputs": [
+        "definition.premium_a"
+      ],
       "outcome": {
         "disposition": "stop",
         "obligation": "premium_A",
@@ -31,7 +35,9 @@
       "id": "PWV21-K003",
       "precedence": 210,
       "predicate": "planning_premium_a_due",
-      "inputs": ["planning.premium_a"],
+      "inputs": [
+        "planning.premium_a"
+      ],
       "outcome": {
         "disposition": "stop",
         "obligation": "premium_A",
@@ -43,7 +49,9 @@
       "id": "PWV21-K004",
       "precedence": 220,
       "predicate": "planning_state_draft",
-      "inputs": ["planning.state"],
+      "inputs": [
+        "planning.state"
+      ],
       "outcome": {
         "disposition": "route",
         "obligation": "planning",
@@ -55,7 +63,10 @@
       "id": "PWV21-K005",
       "precedence": 230,
       "predicate": "planning_frozen_premium_b_due",
-      "inputs": ["planning.state", "planning.premium_b"],
+      "inputs": [
+        "planning.state",
+        "planning.premium_b"
+      ],
       "outcome": {
         "disposition": "stop",
         "obligation": "premium_B",
@@ -67,7 +78,9 @@
       "id": "PWV21-K006",
       "precedence": 240,
       "predicate": "plan_review_pending",
-      "inputs": ["plan_review.verdict"],
+      "inputs": [
+        "plan_review.verdict"
+      ],
       "outcome": {
         "disposition": "route",
         "obligation": "plan_review",
@@ -79,7 +92,9 @@
       "id": "PWV21-K007",
       "precedence": 250,
       "predicate": "plan_review_green",
-      "inputs": ["plan_review.verdict"],
+      "inputs": [
+        "plan_review.verdict"
+      ],
       "outcome": {
         "disposition": "route",
         "obligation": "planning",
@@ -91,7 +106,10 @@
       "id": "PWV21-K008",
       "precedence": 260,
       "predicate": "planning_approved_premium_c_due",
-      "inputs": ["planning.state", "planning.premium_c"],
+      "inputs": [
+        "planning.state",
+        "planning.premium_c"
+      ],
       "outcome": {
         "disposition": "stop",
         "obligation": "premium_C",
@@ -103,7 +121,9 @@
       "id": "PWV21-K009",
       "precedence": 300,
       "predicate": "brainstorm_explicit_user_stop",
-      "inputs": ["brainstorm.explicit_user_stop"],
+      "inputs": [
+        "brainstorm.explicit_user_stop"
+      ],
       "outcome": {
         "disposition": "stop",
         "obligation": "explicit_user_stop",
@@ -115,7 +135,9 @@
       "id": "PWV21-K010",
       "precedence": 310,
       "predicate": "brainstorm_active",
-      "inputs": ["brainstorm.state"],
+      "inputs": [
+        "brainstorm.state"
+      ],
       "outcome": {
         "disposition": "route",
         "obligation": "brainstorming",
@@ -126,20 +148,10 @@
     {
       "id": "PWV21-K011",
       "precedence": 400,
-      "predicate": "board_has_active_card",
-      "inputs": ["board.cards"],
-      "outcome": {
-        "disposition": "route",
-        "obligation": "execution",
-        "owner_module": "workflow/EXECUTION.md"
-      },
-      "semantics": "Exactly one in-progress Card selects the current execution unit after higher-precedence recovery and research checks."
-    },
-    {
-      "id": "PWV21-K012",
-      "precedence": 410,
       "predicate": "board_one_ready_card",
-      "inputs": ["board.cards"],
+      "inputs": [
+        "board.cards"
+      ],
       "outcome": {
         "disposition": "route",
         "obligation": "execution_prep",
@@ -148,10 +160,12 @@
       "semantics": "Exactly one READY Card identifies the launch-refresh candidate for Execution Prep."
     },
     {
-      "id": "PWV21-K013",
-      "precedence": 420,
+      "id": "PWV21-K012",
+      "precedence": 410,
       "predicate": "board_all_cards_done",
-      "inputs": ["board.cards"],
+      "inputs": [
+        "board.cards"
+      ],
       "outcome": {
         "disposition": "route",
         "obligation": "close",

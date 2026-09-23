@@ -1,6 +1,6 @@
 # Project Workflow V2 Router
 
-Status: M04-T04 common routing through Close and true end-of-approved-scope semantics.
+Status: PWv2.1 M01 mechanical-policy kernel integrated over selected V2 predicates; common routing through Close and true end-of-approved-scope semantics preserved.
 
 Probe response: PWV2_M05_UPDATE_SENTINEL_92AF
 
@@ -11,9 +11,16 @@ The router is one small runtime-neutral obligation selector. Product/model/sessi
 1. router;
 2. PROJECT.md;
 3. exact selected workstream manifest;
-4. only pointed current pre-execution records needed by precedence;
-5. Task Board only after implementation state exists;
-6. exact current Card/authority refs only when needed.
+4. checked package mechanical registry + generated projection for a valid selected workstream;
+5. only pointed current pre-execution records needed by precedence;
+6. Task Board only after implementation state exists;
+7. exact current Card/authority refs only when needed.
+
+## PWv2.1 mechanical policy kernel
+
+`policy/mechanical_policy.json` is the canonical machine-readable representation for the currently registered named mechanical predicates. `tools/policy_kernel.py` provides the stateless read-only evaluator and a fixed predicate vocabulary; `workflow/POLICY_KERNEL.md` is its generated checked semantic projection.
+
+The registry is deliberately not an expression language. It names exact canonical inputs, precedence metadata and route/stop/recovery outcomes only. Registry/implementation vocabulary mismatch, unsupported versions, missing canonical inputs, or registry/projection drift are validation defects and fail closed through the existing Recovery path. Semantic product, strategy and review judgment remains owned by the existing workflow modules. Unregistered routing logic remains governed by those modules and the current router until a later accepted milestone moves it into the fixed mechanical vocabulary.
 
 ## Implemented routes
 
