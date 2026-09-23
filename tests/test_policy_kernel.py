@@ -13,6 +13,7 @@ from tools.policy_kernel import (
     MechanicalDecision,
     PolicyKernel,
 )
+from tools.router import Reads, policy_result
 
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = ROOT / "policy" / "mechanical_policy.json"
@@ -66,8 +67,31 @@ class PolicyKernelTests(unittest.TestCase):
 
     def test_every_registered_rule_is_wired_into_the_production_router(self) -> None:
         router = (ROOT / "tools" / "router.py").read_text(encoding="utf-8")
+        positions = []
         for rule_id in self.kernel.rule_ids:
-            self.assertIn(f'kernel.matches("{rule_id}"', router)
+            needle = f'kernel.route("{rule_id}"'
+            self.assertEqual(router.count(needle), 1)
+            positions.append(router.index(needle))
+        self.assertEqual(positions, sorted(positions))
+
+    def test_policy_result_consumes_registered_outcome_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            reads = Reads(Path(temp), Path(temp))
+            routed = policy_result(
+                reads,
+                MechanicalDecision(
+                    rule_id="PWV21-K999",
+                    disposition="route",
+                    obligation="registry_owned_obligation",
+                    owner_module="workflow/REGISTRY_OWNER.md",
+                ),
+                "registered outcome adapter probe",
+                subject="subject-1",
+            )
+        self.assertEqual(routed.disposition, "route")
+        self.assertEqual(routed.obligation, "registry_owned_obligation")
+        self.assertEqual(routed.owner_module, "workflow/REGISTRY_OWNER.md")
+        self.assertEqual(routed.subject, "subject-1")
 
     def test_projection_is_exact_registry_derived_contract(self) -> None:
         self.kernel.verify_projection(PROJECTION)
