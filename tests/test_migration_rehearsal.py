@@ -29,6 +29,31 @@ class MigrationRehearsalTests(unittest.TestCase):
             destination_workstream="migrated-rehearsal",
         )
 
+    def test_activated_workstream_review_requires_explicit_reconciliation(self):
+        board = (FIX / "codex-board.yaml").read_text(encoding="utf-8")
+        manifest = (FIX / "codex-workstream.yaml").read_text(encoding="utf-8")
+        for state in ("pending", "red", "green"):
+            with self.subTest(state=state):
+                changed = manifest.replace("  state: green", f"  state: {state}", 1)
+                plan = dry_run(
+                    source_class="codex_workstream_yaml_v1",
+                    repository=REPO,
+                    expected_commit=SHA,
+                    observed_commit=SHA,
+                    board_text=board,
+                    manifest_text=changed,
+                    destination_workstream="migrated-codex",
+                )
+                self.assertFalse(plan["valid"])
+                self.assertIn(
+                    "workstream_review_reconciliation_required",
+                    plan["blockers"],
+                )
+                self.assertIn(
+                    f"workstream_review:{state}",
+                    plan["outstanding_obligations"],
+                )
+
     def test_preexecution_promotion_research_and_plan_review_require_explicit_reconstitution(self):
         board, manifest = self.source()
         cases = {
