@@ -152,7 +152,58 @@ def _relative_generated_path(bundle: dict[str, Any], absolute_project_path: str)
     return path
 
 
-def _stage_payloads(bundle: dict[str, Any]) -> dict[str, bytes]:
+def _read_source_artifact(
+    bundle: dict[str, Any],
+    source_path: str,
+    source_artifact_reader: Callable[[str, str, str], bytes | str] | None,
+) -> bytes:
+    source = bundle.get("provenance", {}).get("source")
+    if not isinstance(source, dict):
+        raise MigrationApplyError("conversion bundle is missing exact source provenance")
+    repository = source.get("repository")
+    commit = source.get("commit")
+    if not isinstance(repository, str) or not repository or not isinstance(commit, str):
+        raise MigrationApplyError("conversion bundle source provenance is incomplete")
+    if source_artifact_reader is None:
+        raise MigrationApplyError(
+            f"exact source artifact reader is required for {source_path}"
+        )
+    try:
+        payload = source_artifact_reader(repository, commit, source_path)
+    except Exception as exc:
+        raise MigrationApplyError(
+            f"failed to read exact source artifact {source_path}"
+        ) from exc
+    if isinstance(payload, str):
+        payload = payload.encode("utf-8")
+    if not isinstance(payload, (bytes, bytearray)):
+        raise MigrationApplyError(
+            f"source artifact reader returned unsupported content for {source_path}"
+        )
+    return bytes(payload)
+
+
+def _migrated_result_payload(bundle: dict[str, Any], item: dict[str, Any]) -> bytes:
+    source = bundle["provenance"]["source"]
+
+    def shown(value: Any) -> str:
+        return "null" if value is None else str(value)
+
+    return (
+        "# Migrated V1 result provenance\n\n"
+        f"- Card: `{shown(item.get('card_id'))}`\n"
+        f"- Source repository: `{shown(source.get('repository'))}`\n"
+        f"- Source commit: `{shown(source.get('commit'))}`\n"
+        f"- Source result commit: `{shown(item.get('source_result_commit'))}`\n"
+        f"- Source result PR: `{shown(item.get('source_result_pr'))}`\n"
+        f"- Source evidence: `{shown(item.get('source_evidence'))}`\n"
+    ).encode("utf-8")
+
+
+def _stage_payloads(
+    bundle: dict[str, Any],
+    source_artifact_reader: Callable[[str, str, str], bytes | str] | None,
+) -> dict[str, bytes]:
     payloads: dict[str, bytes] = {
         "WORKSTREAM.toml": _render_toml(bundle["workstream"]),
         "TASK_BOARD.toml": _render_toml(bundle["task_board"]),
@@ -161,6 +212,34 @@ def _stage_payloads(bundle: dict[str, Any]) -> dict[str, bytes]:
         "migration/artifact-plan.json": _json_bytes(bundle.get("artifact_plan", [])),
         "migration/result-provenance.json": _json_bytes(bundle.get("result_provenance", [])),
     }
+
+    for artifact in bundle.get("artifact_plan", []):
+        if not isinstance(artifact, dict):
+            raise MigrationApplyError("artifact plan entries must be mappings")
+        source_path = artifact.get("source")
+        destination = artifact.get("destination")
+        if not isinstance(source_path, str) or not source_path:
+            raise MigrationApplyError("artifact plan entry lacks exact source path")
+        if not isinstance(destination, str) or not destination:
+            raise MigrationApplyError("artifact plan entry lacks destination path")
+        rel = _relative_generated_path(bundle, destination).as_posix()
+        if rel in payloads:
+            raise MigrationApplyError(f"duplicate generated artifact destination: {rel}")
+        payloads[rel] = _read_source_artifact(
+            bundle, source_path, source_artifact_reader
+        )
+
+    for result in bundle.get("result_provenance", []):
+        if not isinstance(result, dict):
+            raise MigrationApplyError("result provenance entries must be mappings")
+        destination = result.get("destination")
+        if not isinstance(destination, str) or not destination:
+            raise MigrationApplyError("result provenance entry lacks destination path")
+        rel = _relative_generated_path(bundle, destination).as_posix()
+        if rel in payloads:
+            raise MigrationApplyError(f"duplicate generated result destination: {rel}")
+        payloads[rel] = _migrated_result_payload(bundle, result)
+
     for attempts in bundle.get("review_attempts", {}).values():
         for attempt in attempts:
             ref = next(
@@ -249,6 +328,28 @@ def _verify_materialized_root(root: Path, bundle: dict[str, Any]) -> dict[str, A
     validate_workstream(workstream)
     validate_v2_board(task_board, workstream)
 
+    def require_materialized(project_path: str, label: str) -> str:
+        relative = _relative_generated_path(bundle, project_path).as_posix()
+        if relative not in files:
+            raise MigrationApplyError(
+                f"{label} is not covered by the migration record: {relative}"
+            )
+        if not (root / relative).is_file():
+            raise MigrationApplyError(f"{label} is missing after activation: {relative}")
+        return relative
+
+    require_materialized(workstream["task_board"]["path"], "Task Board")
+    for card in task_board["cards"]:
+        require_materialized(card["contract"]["path"], f"Card {card['id']} contract")
+        if "result" in card:
+            require_materialized(card["result"]["path"], f"Card {card['id']} result")
+        if "blocker" in card:
+            require_materialized(card["blocker"]["path"], f"Card {card['id']} blocker")
+        for attempt_ref in card.get("review_attempts", []):
+            require_materialized(
+                attempt_ref["path"], f"Card {card['id']} review attempt"
+            )
+
     review_groups: dict[str, list[dict[str, Any]]] = {}
     for relative in sorted(files):
         if not relative.startswith("reviews/") or not relative.endswith(".toml"):
@@ -258,6 +359,11 @@ def _verify_materialized_root(root: Path, bundle: dict[str, Any]) -> dict[str, A
         except (OSError, tomllib.TOMLDecodeError) as exc:
             raise MigrationApplyError(f"review readback failed: {relative}") from exc
         validate_review(review)
+        if review["verdict"] in {"green", "red"}:
+            require_materialized(
+                review["evidence_path"],
+                f"Card {review['card_id']} terminal review evidence",
+            )
         review_groups.setdefault(review["card_id"], []).append(review)
     for card_id, attempts in review_groups.items():
         validate_review_history(
@@ -325,6 +431,7 @@ def apply_fixture_conversion(
     board_text: str,
     manifest_text: str | None,
     crash_at: str | None = None,
+    source_artifact_reader: Callable[[str, str, str], bytes | str] | None = None,
 ) -> dict[str, str]:
     """Apply one exact conversion to a disposable fixture destination."""
     if authorization != authorization_for(bundle):
@@ -352,7 +459,7 @@ def apply_fixture_conversion(
             shutil.rmtree(stage)
 
     if not stage.exists():
-        payloads = _stage_payloads(bundle)
+        payloads = _stage_payloads(bundle, source_artifact_reader)
         stage.mkdir(parents=True, exist_ok=False)
         for relative, payload in payloads.items():
             path = stage / relative
