@@ -1,5 +1,5 @@
 workstream_id = "feature-common-preexecution-core"
-revision = 2
+revision = 3
 
 [execution_ref]
 branch = "custody/feature-common-preexecution-core"
@@ -11,3 +11,9 @@ status = "in_progress"
 [cards.contract]
 class = "task_card"
 path = "implementation/workstreams/feature-common-preexecution-core/cards/M07-T09.md"
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/feature-common-preexecution-core/results/M07-T09.md"
+commit = "ec153524f5ec5a39f19db10f4f1c2cb77302396b"
+blob = "5c2c48acb0b8c07321aa50d6a9195daee61409d1"
