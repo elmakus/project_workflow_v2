@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bounded Project Workflow V2 M01 SessionStart bootstrap."""
+"""Thin fail-closed SessionStart bootstrap for the installed Project Workflow V2 package."""
 
 from __future__ import annotations
 
@@ -7,32 +7,67 @@ import json
 import os
 from pathlib import Path
 
+
 MAX_CONTEXT_CHARS = 900
-SESSION_PROBE = "PWV2_M01_SESSION_SENTINEL_4D2A"
+ROUTER_HEADER = "# Project Workflow V2 Router"
+ROUTER_SELECTOR = "Production selector: `tools/router.py`."
 
 
-def plugin_root() -> Path:
+class BootstrapError(RuntimeError):
+    """The installed package cannot establish one unambiguous local authority root."""
+
+
+def installed_root() -> Path:
+    script_root = Path(__file__).resolve().parents[1]
     configured = os.environ.get("PLUGIN_ROOT")
-    if configured:
-        return Path(configured).expanduser().resolve()
-    return Path(__file__).resolve().parents[1]
+    if not configured:
+        return script_root
 
-
-def build_context(root: Path) -> str:
-    router = root / "workflow" / "ROUTER.md"
-    if router.is_file():
-        context = (
-            "Project Workflow V2 package is enabled for this workspace. "
-            f"M01 session probe token: {SESSION_PROBE}. "
-            f"Canonical router: {router}. "
-            "Read only the canonical V2 router and exact durable project state required by the current obligation. "
-            "This SessionStart message is bootstrap context, not workflow policy."
+    configured_root = Path(configured).expanduser().resolve()
+    if configured_root != script_root:
+        raise BootstrapError(
+            "configured PLUGIN_ROOT does not match the root containing this SessionStart hook"
         )
-    else:
+    return script_root
+
+
+def canonical_router(root: Path) -> Path:
+    root = root.resolve()
+    candidate = root / "workflow" / "ROUTER.md"
+    if not candidate.is_file():
+        raise BootstrapError(f"canonical bundled router is missing at {candidate}")
+
+    router = candidate.resolve()
+    try:
+        router.relative_to(root)
+    except ValueError as exc:
+        raise BootstrapError("canonical router resolves outside the installed package root") from exc
+
+    try:
+        text = router.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise BootstrapError("canonical bundled router is unreadable") from exc
+
+    if ROUTER_HEADER not in text or ROUTER_SELECTOR not in text:
+        raise BootstrapError("canonical bundled router is malformed or not Project Workflow V2")
+    return router
+
+
+def build_context() -> str:
+    try:
+        router = canonical_router(installed_root())
         context = (
-            "Project Workflow V2 package is enabled, but the canonical router is missing at "
-            f"{router}. Treat this as a blocking plugin-package error. "
-            "Do not fall back to V1, runtime-specific policy, or reconstructed chat memory."
+            "Project Workflow V2 package is enabled. "
+            f"Canonical bundled router: {router}. "
+            "Read that local router first, then recover only the exact durable consumer-project "
+            "state and authority it requests. This SessionStart message is bootstrap context, "
+            "not workflow policy. Do not fetch remote workflow policy during ordinary operation."
+        )
+    except BootstrapError as exc:
+        context = (
+            f"BLOCKING Project Workflow V2 plugin-package error: {exc}. "
+            "Do not fall back to V1, another package/source, runtime-specific policy, "
+            "remote workflow policy, or reconstructed chat memory."
         )
     return context[:MAX_CONTEXT_CHARS]
 
@@ -41,7 +76,7 @@ def main() -> None:
     output = {
         "hookSpecificOutput": {
             "hookEventName": "SessionStart",
-            "additionalContext": build_context(plugin_root()),
+            "additionalContext": build_context(),
         }
     }
     print(json.dumps(output, ensure_ascii=False, separators=(",", ":")))
