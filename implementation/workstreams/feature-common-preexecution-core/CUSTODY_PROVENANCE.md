@@ -1,6 +1,6 @@
 # Construction custody package provenance
 
-Status: STAGED — NOT LIVE UNTIL THE V1 TERMINAL TRANSFER HANDOFF IS DURABLE
+Status: LIVE — V1 TERMINAL TRANSFER VERIFIED
 
 ## Production release/package identity
 
@@ -32,6 +32,13 @@ The full V1 repository remains immutable development/history evidence after tran
 Before the terminal V1 transfer handoff is written, V1 remains the sole live construction controller and this package is only staged.
 
 After a V1 terminal handoff identifies the exact committed custody package and retires V1 mutable construction control, this V2 workstream becomes the sole live construction/adoption owner. Never mutate both controllers as live state.
+
+## Verified terminal source handoff
+
+- V1 terminal handoff commit: `961a88dc1343c21d57a5f986faa91453eb83cca3`
+- V1 terminal handoff evidence blob: `f8662377c5c14771ee7a8ce39c4fc09463c3344c`
+- Source V1 workstream now reads `status: done` and is immutable historical evidence.
+- This V2 custody workstream is the sole live construction/adoption owner.
 
 ## Active transferred obligation
 
