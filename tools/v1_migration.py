@@ -315,6 +315,19 @@ def validate_board(board: dict[str, Any], source_class: str, manifest: dict[str,
         seen.add(card_id)
         if card.get("execution_status") not in {"planned", "ready", "in_progress", "blocked", "done"}:
             raise MigrationInputError(f"board.cards[{index}]: unsupported execution_status")
+        contract = card.get("contract")
+        if not isinstance(contract, str) or not contract:
+            raise MigrationInputError(f"board.cards[{index}]: exact Task Card contract path is required")
+        if card.get("execution_status") == "done":
+            result_commit = card.get("result_commit")
+            if not isinstance(result_commit, str) or SHA40.fullmatch(result_commit) is None:
+                raise MigrationInputError(
+                    f"board.cards[{index}]: DONE V1 Card requires exact result_commit"
+                )
+            if not isinstance(card.get("evidence"), str) or not card["evidence"]:
+                raise MigrationInputError(
+                    f"board.cards[{index}]: DONE V1 Card requires result evidence"
+                )
         review_state = card.get("review_state")
         if review_state in {"green", "red"} and not card.get("review_subject"):
             raise MigrationInputError(
@@ -379,7 +392,7 @@ def _semantic_summary(
                 blockers.append(f"preexecution_reconstitution_required:{key}")
 
         review = manifest.get("review") or {}
-        if review.get("state") in {"pending", "in_progress", "red"}:
+        if review.get("state") in {"pending", "in_progress", "red", "green"}:
             outstanding.append(f"workstream_review:{review['state']}")
             blockers.append("workstream_review_reconciliation_required")
 
@@ -590,7 +603,22 @@ def convert_dry_run(
     """Build a canonical V2 bundle in memory. This function performs no writes."""
     if plan.get("schema") != "pwv2-m06-dry-run-v1" or plan.get("valid") is not True:
         raise MigrationInputError("conversion requires a GREEN exact M06 dry run")
-    source_class = plan["source"]["class"]
+    source = plan.get("source")
+    if not isinstance(source, dict):
+        raise MigrationInputError("conversion plan is missing exact source identity")
+    expected_fingerprint = hashlib.sha256(
+        json.dumps(source, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    if plan.get("source_fingerprint") != expected_fingerprint:
+        raise MigrationInputError("conversion plan source fingerprint is inconsistent")
+    actual_board_sha256 = _digest(board_text)
+    actual_manifest_sha256 = _digest(manifest_text) if manifest_text is not None else None
+    if source.get("board_sha256") != actual_board_sha256:
+        raise MigrationInputError("conversion board diverges from GREEN dry-run source")
+    if source.get("manifest_sha256") != actual_manifest_sha256:
+        raise MigrationInputError("conversion manifest diverges from GREEN dry-run source")
+
+    source_class = source["class"]
     board = parse_bounded_yaml(board_text)
     manifest = parse_bounded_yaml(manifest_text) if manifest_text is not None else None
     if manifest is not None:
