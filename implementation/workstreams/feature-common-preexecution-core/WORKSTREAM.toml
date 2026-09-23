@@ -1,0 +1,20 @@
+kind = "feature"
+workstream_id = "feature-common-preexecution-core"
+branch = "custody/feature-common-preexecution-core"
+created_from = "c2f53dc15f35dcbf1506b5a80ad3fd85d32211dd"
+integration_target = "main"
+authority = [
+  { class = "authority", path = "requirements/PROJECT_WORKFLOW_V2.md" },
+  { class = "authority", path = "decisions/ADR_PROJECT_WORKFLOW_V2_SINGLE_SEMANTIC_CORE.md" },
+  { class = "authority", path = "decisions/ADR_PROJECT_WORKFLOW_V2_DELIVERY_BOOTSTRAP.md" },
+  { class = "authority", path = "decisions/ADR_PROJECT_WORKFLOW_V2_MANAGED_CHANGE_LIFECYCLE.md" },
+  { class = "authority", path = "decisions/ADR_PROJECT_WORKFLOW_V2_EXECUTION_BOUNDARY.md" },
+  { class = "authority", path = "decisions/ADR_PROJECT_WORKFLOW_V2_REVIEW_AND_PREMIUM_PLANNING.md" },
+  { class = "authority", path = "decisions/ADR_PROJECT_WORKFLOW_V2_CONTEXT_RESEARCH_YAGNI.md" },
+  { class = "authority", path = "decisions/DECISION_M07_L08_DURABLE_EVIDENCE_LIMITATION.md" },
+  { class = "authority", path = "planning/PROJECT_WORKFLOW_V2_MASTER_PLAN.md" },
+]
+
+[task_board]
+class = "task_board"
+path = "implementation/workstreams/feature-common-preexecution-core/TASK_BOARD.toml"
