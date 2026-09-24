@@ -35,7 +35,8 @@
     },
     "role": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "pattern": "\\S"
     },
     "subject": {
       "$ref": "#/$defs/exact_ref"
@@ -51,14 +52,16 @@
       "type": "array",
       "items": {
         "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "pattern": "\\S"
       }
     },
     "constraints": {
       "type": "array",
       "items": {
         "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "pattern": "\\S"
       }
     },
     "completion": {
@@ -106,7 +109,8 @@
         },
         "path": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
         },
         "blob": {
           "type": "string",
@@ -136,7 +140,8 @@
         },
         "path": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
         },
         "blob": {
           "type": "string",
@@ -164,21 +169,24 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           }
         },
         "tests": {
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           }
         },
         "evidence": {
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           }
         }
       }
@@ -205,7 +213,9 @@
                 "type": "string",
                 "pattern": "^[a-z_][a-z0-9_]*(?:\\.[a-z_][a-z0-9_]*)*$"
               },
-              "equals": {}
+              "equals": {
+                "$ref": "#/$defs/telemetry_free_json"
+              }
             }
           }
         },
@@ -223,7 +233,9 @@
                 "type": "string",
                 "pattern": "^[a-z_][a-z0-9_]*(?:\\.[a-z_][a-z0-9_]*)*$"
               },
-              "equals": {}
+              "equals": {
+                "$ref": "#/$defs/telemetry_free_json"
+              }
             }
           }
         }
@@ -274,25 +286,46 @@
         },
         "inputs": {
           "type": "object",
-          "propertyNames": {
-            "not": {
-              "enum": [
-                "provider",
-                "model",
-                "model_id",
-                "worker",
-                "worker_id",
-                "session",
-                "session_id",
-                "retry",
-                "retries",
-                "worktree",
-                "paseo",
-                "runtime",
-                "invocation",
-                "scheduler"
-              ]
-            }
+          "$ref": "#/$defs/telemetry_free_json"
+        }
+      }
+    },
+    "telemetry_free_json": {
+      "if": {
+        "type": "object"
+      },
+      "then": {
+        "propertyNames": {
+          "not": {
+            "enum": [
+              "provider",
+              "model",
+              "model_id",
+              "worker",
+              "worker_id",
+              "session",
+              "session_id",
+              "retry",
+              "retries",
+              "worktree",
+              "paseo",
+              "runtime",
+              "invocation",
+              "scheduler"
+            ]
+          }
+        },
+        "additionalProperties": {
+          "$ref": "#/$defs/telemetry_free_json"
+        }
+      },
+      "else": {
+        "if": {
+          "type": "array"
+        },
+        "then": {
+          "items": {
+            "$ref": "#/$defs/telemetry_free_json"
           }
         }
       }
