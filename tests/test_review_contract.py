@@ -452,6 +452,50 @@ class ReviewContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ReviewContractError, "only one post-convergence"):
             review_convergence_state(attempts)
 
+    def test_revisited_repaired_content_counts_new_failed_round_after_transition(self) -> None:
+        source = {
+            "attempt": "R01",
+            "verdict": "red",
+            "review_kind": "discovery",
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "material_defect_class_ids": ["class-a"],
+            "post_convergence_validation": False,
+            "subject": {
+                "repository": "owner/repo",
+                "commit": "1" * 40,
+                "path": "results/card.md",
+                "blob": "2" * 40,
+            },
+        }
+        attempts = [source]
+        for attempt_id, commit, blob in (
+            ("R02", "3" * 40, "4" * 40),
+            ("R03", "5" * 40, "6" * 40),
+            ("R04", "7" * 40, "4" * 40),
+        ):
+            attempts.append({
+                "attempt": attempt_id,
+                "verdict": "red",
+                "review_kind": "closure_verification",
+                "source_discovery_attempt": "R01",
+                "review_scope": "card",
+                "review_epoch": "E01",
+                "material_defect_class_ids": ["class-a"],
+                "post_convergence_validation": False,
+                "subject": {
+                    "repository": "owner/repo",
+                    "commit": commit,
+                    "path": "results/card.md",
+                    "blob": blob,
+                },
+            })
+
+        state = review_convergence_state(attempts)
+        self.assertEqual(state.failed_closure_rounds["class-a"], 3)
+        self.assertTrue(state.convergence_required)
+
+
     def test_closure_cannot_finalize_review_obligation(self) -> None:
         self.assertTrue(can_finalize_review_obligation({
             "verdict": "green",
