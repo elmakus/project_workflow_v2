@@ -1,0 +1,24 @@
+kind = "issue"
+workstream_id = "issue-router-board-precedence"
+branch = "work/pwv2-router-board-precedence-hotfix"
+created_from = "986affffb7ba816e260e48549bf56e198ed51c21"
+integration_target = "main"
+authority = [
+  { class = "authority", path = "requirements/PROJECT_WORKFLOW_V2.md" },
+  { class = "authority", path = "workflow/ROUTER.md" },
+  { class = "authority", path = "workflow/STATE.md" },
+  { class = "authority", path = "workflow/INTAKE.md" },
+  { class = "authority", path = "workflow/RESEARCH.md" },
+]
+
+[intake]
+class = "intake"
+path = "implementation/workstreams/issue-router-board-precedence/INTAKE.toml"
+
+[research]
+class = "research"
+path = "implementation/workstreams/issue-router-board-precedence/RESEARCH.toml"
+
+[task_board]
+class = "task_board"
+path = "implementation/workstreams/issue-router-board-precedence/TASK_BOARD.toml"

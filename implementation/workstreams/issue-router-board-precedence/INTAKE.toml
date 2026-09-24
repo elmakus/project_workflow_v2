@@ -1,0 +1,12 @@
+workstream_id = "issue-router-board-precedence"
+kind = "issue"
+state = "complete"
+diagnosis_revision = 1
+repair_subject = "repair:approved-plan-co-bound-board-precedence:v1"
+diagnosis_prior_art_subject = "repair:approved-plan-co-bound-board-precedence:v1"
+diagnosis_prior_art_result = "prior-art:router-board-precedence:v1:no-blocker"
+response_kind = "authorization"
+response_observed = true
+alignment_state = "authorized"
+alignment_subject = "repair:approved-plan-co-bound-board-precedence:v1"
+micro_fix_candidate = true
