@@ -20,6 +20,8 @@ epoch_reset_basis = ""
 # path = "requirements/ACCEPTED_REQUIREMENTS.md"
 # blob = "0000000000000000000000000000000000000000"
 material_defect_class_ids = []
+# RED closure_verification only: subset of material_defect_class_ids that actually remained blocking.
+failed_material_defect_class_ids = []
 post_convergence_validation = false
 convergence_basis = ""
 
