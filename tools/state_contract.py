@@ -842,7 +842,7 @@ def validate_board(
             raise ValidationError(f"{exc}") from exc
 
     try:
-        validate_sizing_audits(data.get("sizing_audits"), cards)
+        validate_sizing_audits(data.get("sizing_audits"), cards, triggers)
     except CardSizingError as exc:
         raise ValidationError(f"{exc}") from exc
 

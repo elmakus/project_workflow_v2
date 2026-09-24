@@ -9,6 +9,7 @@ from tools.card_sizing_contract import (
     AUDIT_DIMENSIONS,
     REBUTTAL_CLASSES,
     CardSizingError,
+    parse_allocation,
     required_decision,
     separable_outcomes,
     validate_audit_dimensions,
@@ -16,6 +17,7 @@ from tools.card_sizing_contract import (
     validate_sizing_audit,
     validate_sizing_audits,
     validate_sizing_decision,
+    validate_split_coverage,
 )
 from tools.router import select_route
 from tools.state_contract import (
@@ -73,6 +75,42 @@ def _audit(card_id: str = "M01-T02", **overrides) -> dict:
     }
     record.update(overrides)
     return record
+
+
+def _split_outcomes(first_dest: str = "card:M01-T02",
+                    second_dest: str = "card:M01-T03") -> list[dict]:
+    return [
+        _outcome("first", kind="invariant", family="identity",
+                 allocated_to=first_dest),
+        _outcome("second", kind="useful_outcome", family="bundles",
+                 allocated_to=second_dest),
+    ]
+
+
+def _add_card(board: dict, card_id: str, status: str) -> None:
+    card: dict = {
+        "id": card_id,
+        "status": status,
+        "contract": {
+            "class": "task_card",
+            "path": f"implementation/workstreams/sample-workstream/cards/{card_id}.md",
+        },
+    }
+    if status == "blocked":
+        card["blocker"] = {
+            "class": "blocker",
+            "path": f"implementation/workstreams/sample-workstream/blockers/{card_id}.toml",
+        }
+    board["cards"].append(card)
+
+
+def _add_trigger(board: dict, trigger_id: str, after_card: str, state: str) -> None:
+    board.setdefault("jit_triggers", []).append({
+        "id": trigger_id,
+        "after_card": after_card,
+        "state": state,
+        "condition": f"Downstream boundary {trigger_id} holds split scope.",
+    })
 
 
 def _m02_mega_outcomes() -> list[dict]:
@@ -164,12 +202,14 @@ class StructuralBoundaryTests(unittest.TestCase):
             kind="invariant",
             statement="Router predicate in tools/router.py with its own parity fixtures.",
             family="routing",
+            allocated_to="card:M01-T02",
         )
         second = _outcome(
             "router-recovery",
             kind="acceptance",
             statement="Recovery routing in tools/router.py verified by disjoint fixtures.",
             family="recovery",
+            allocated_to="jit:after-M01-T02",
         )
         self.assertEqual(required_decision([first, second]), "split")
         decision = validate_sizing_decision(outcomes=[first, second], decision="split")
@@ -207,8 +247,10 @@ class ScaffoldingTests(unittest.TestCase):
 class SplitDecisionMatrixTests(unittest.TestCase):
     def test_two_separable_outcomes_require_split_by_default(self) -> None:
         outcomes = [
-            _outcome("first", kind="invariant", family="identity"),
-            _outcome("second", kind="useful_outcome", family="bundles"),
+            _outcome("first", kind="invariant", family="identity",
+                     allocated_to="card:M01-T02"),
+            _outcome("second", kind="useful_outcome", family="bundles",
+                     allocated_to="card:M01-T03"),
         ]
         self.assertEqual(len(separable_outcomes(outcomes)), 2)
         self.assertEqual(required_decision(outcomes), "split")
@@ -366,6 +408,94 @@ class SplitDecisionMatrixTests(unittest.TestCase):
             )
 
 
+class SplitAllocationTests(unittest.TestCase):
+    def test_split_without_any_allocation_is_rejected(self) -> None:
+        outcomes = [_outcome("first"), _outcome("second")]
+        with self.assertRaisesRegex(
+            CardSizingError, "without durable allocation: first, second"
+        ):
+            validate_sizing_decision(outcomes=outcomes, decision="split")
+
+    def test_split_with_partially_missing_allocation_names_uncovered_outcome(self) -> None:
+        outcomes = [
+            _outcome("first", allocated_to="card:M01-T02"),
+            _outcome("second"),
+        ]
+        with self.assertRaisesRegex(
+            CardSizingError, "without durable allocation: second"
+        ):
+            validate_sizing_decision(outcomes=outcomes, decision="split")
+
+    def test_split_to_one_destination_is_rejected(self) -> None:
+        for outcomes in (
+            _split_outcomes("card:M01-T02", "card:M01-T02"),
+            [
+                _outcome("a", allocated_to="jit:after-M01-T02"),
+                _outcome("b", allocated_to="jit:after-M01-T02"),
+                _outcome("c", allocated_to="jit:after-M01-T02"),
+            ],
+        ):
+            with self.subTest(outcomes=[o["id"] for o in outcomes]):
+                with self.assertRaisesRegex(CardSizingError, "one destination"):
+                    validate_sizing_decision(outcomes=outcomes, decision="split")
+
+    def test_split_coverage_returns_sorted_distinct_destinations(self) -> None:
+        destinations = validate_split_coverage(
+            [
+                {"id": "b", "allocated_to": "jit:after-M01-T02"},
+                {"id": "a", "allocated_to": "card:M01-T02"},
+            ],
+            "sizing",
+        )
+        self.assertEqual(destinations, ["card:M01-T02", "jit:after-M01-T02"])
+
+    def test_malformed_allocations_are_rejected(self) -> None:
+        for bad in ("M01-T03", "card:", "card:  ", "split:M01-T03", "jit:",
+                    " CARD:M01-T03"):
+            with self.subTest(allocated_to=bad):
+                with self.assertRaisesRegex(CardSizingError, "invalid split allocation"):
+                    validate_outcome(
+                        _outcome(allocated_to=bad),
+                        "task_board.sizing_audits[0].outcomes[0]",
+                    )
+        for bad in (42, None, ["card:M01-T03"]):
+            with self.subTest(allocated_to=bad):
+                with self.assertRaisesRegex(CardSizingError, "must be a string"):
+                    validate_outcome(
+                        _outcome(allocated_to=bad),
+                        "task_board.sizing_audits[0].outcomes[0]",
+                    )
+
+    def test_parse_allocation_returns_kind_and_ref(self) -> None:
+        self.assertEqual(
+            parse_allocation("card:M01-T03", "label"), ("card", "M01-T03")
+        )
+        self.assertEqual(
+            parse_allocation("jit:after-M01-T02", "label"), ("jit", "after-M01-T02")
+        )
+
+    def test_single_decision_must_not_claim_split_allocation(self) -> None:
+        with self.assertRaisesRegex(CardSizingError, "must not claim split allocation"):
+            validate_sizing_decision(
+                outcomes=[_outcome(allocated_to="card:M01-T02")],
+                decision="single",
+            )
+        with self.assertRaisesRegex(CardSizingError, "must not claim split allocation"):
+            validate_sizing_decision(
+                outcomes=_split_outcomes(),
+                decision="single",
+                rebuttal_class="atomicity",
+                rebuttal="Concrete atomic cutover with exact migration paths.",
+            )
+
+    def test_split_across_card_and_trigger_destinations_is_valid(self) -> None:
+        decision = validate_sizing_decision(
+            outcomes=_split_outcomes("card:M01-T02", "jit:after-M01-T02"),
+            decision="split",
+        )
+        self.assertEqual(decision, "split")
+
+
 class DecompositionAuditTests(unittest.TestCase):
     def test_all_seven_dimensions_are_required(self) -> None:
         self.assertEqual(
@@ -449,6 +579,9 @@ class MegaCardRegressionTests(unittest.TestCase):
         self.assertEqual(len(families), 4)
         kinds = {outcome["kind"] for outcome in outcomes}
         self.assertTrue({"contract", "invariant", "acceptance"} <= kinds)
+        destinations = ("card:M02-T01", "card:M02-T02", "jit:after-M02-T01", "jit:after-M02-T02")
+        for outcome, destination in zip(outcomes, destinations):
+            outcome["allocated_to"] = destination
         decision = validate_sizing_decision(outcomes=outcomes, decision="split")
         self.assertEqual(decision, "split")
 
@@ -588,6 +721,185 @@ class SizingBoardBindingTests(unittest.TestCase):
         self.assertEqual(audited, {"M01-T02"})
 
 
+class SplitTopologyBoardTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.workstream = read_toml(VALID / "WORKSTREAM.toml")
+
+    def test_lone_card_split_without_allocation_is_rejected(self) -> None:
+        board = read_toml(VALID / "TASK_BOARD.toml")
+        board["sizing_audits"] = [
+            _audit(
+                card_id="M01-T02",
+                decision="split",
+                outcomes=[_outcome("first"), _outcome("second")],
+            )
+        ]
+        with self.assertRaisesRegex(ValidationError, "without durable allocation"):
+            validate_board(board, self.workstream)
+
+    def test_split_allocating_everything_to_self_is_rejected(self) -> None:
+        board = read_toml(VALID / "TASK_BOARD.toml")
+        board["sizing_audits"] = [
+            _audit(
+                card_id="M01-T02",
+                decision="split",
+                outcomes=_split_outcomes("card:M01-T02", "card:M01-T02"),
+            )
+        ]
+        with self.assertRaisesRegex(ValidationError, "one destination"):
+            validate_board(board, self.workstream)
+
+    def test_split_to_unknown_card_is_rejected(self) -> None:
+        board = read_toml(VALID / "TASK_BOARD.toml")
+        board["sizing_audits"] = [
+            _audit(
+                card_id="M01-T02",
+                decision="split",
+                outcomes=_split_outcomes("card:M01-T02", "card:M09-T99"),
+            )
+        ]
+        with self.assertRaisesRegex(ValidationError, "unknown Card 'M09-T99'"):
+            validate_board(board, self.workstream)
+
+    def test_split_to_done_card_is_rejected(self) -> None:
+        board = read_toml(VALID / "TASK_BOARD.toml")
+        board["sizing_audits"] = [
+            _audit(
+                card_id="M01-T02",
+                decision="split",
+                outcomes=_split_outcomes("card:M01-T02", "card:M01-T01"),
+            )
+        ]
+        with self.assertRaisesRegex(ValidationError, "terminal DONE Card 'M01-T01'"):
+            validate_board(board, self.workstream)
+
+    def test_split_to_blocked_card_is_rejected(self) -> None:
+        board = read_toml(VALID / "TASK_BOARD.toml")
+        _add_card(board, "M01-T03", "blocked")
+        board["sizing_audits"] = [
+            _audit(
+                card_id="M01-T02",
+                decision="split",
+                outcomes=_split_outcomes("card:M01-T02", "card:M01-T03"),
+            )
+        ]
+        with self.assertRaisesRegex(ValidationError, "names blocked Card 'M01-T03'"):
+            validate_board(board, self.workstream)
+
+    def test_split_to_unknown_trigger_is_rejected(self) -> None:
+        board = read_toml(VALID / "TASK_BOARD.toml")
+        board["sizing_audits"] = [
+            _audit(
+                card_id="M01-T02",
+                decision="split",
+                outcomes=_split_outcomes("card:M01-T02", "jit:after-M01-T02"),
+            )
+        ]
+        with self.assertRaisesRegex(ValidationError, "unknown JIT trigger 'after-M01-T02'"):
+            validate_board(board, self.workstream)
+
+    def test_split_to_consumed_trigger_is_rejected(self) -> None:
+        board = read_toml(VALID / "TASK_BOARD.toml")
+        _add_trigger(board, "after-M01-T01", "M01-T01", "consumed")
+        board["sizing_audits"] = [
+            _audit(
+                card_id="M01-T02",
+                decision="split",
+                outcomes=_split_outcomes("card:M01-T02", "jit:after-M01-T01"),
+            )
+        ]
+        with self.assertRaisesRegex(ValidationError, "consumed JIT trigger 'after-M01-T01'"):
+            validate_board(board, self.workstream)
+
+    def test_split_to_sibling_card_is_valid(self) -> None:
+        board = read_toml(VALID / "TASK_BOARD.toml")
+        _add_card(board, "M01-T03", "planned")
+        board["sizing_audits"] = [
+            _audit(
+                card_id="M01-T02",
+                decision="split",
+                outcomes=_split_outcomes("card:M01-T02", "card:M01-T03"),
+            ),
+            _audit(card_id="M01-T03"),
+        ]
+        validate_board(board, self.workstream)
+
+    def test_split_to_waiting_trigger_is_valid(self) -> None:
+        board = read_toml(VALID / "TASK_BOARD.toml")
+        _add_trigger(board, "after-M01-T02", "M01-T02", "waiting")
+        board["sizing_audits"] = [
+            _audit(
+                card_id="M01-T02",
+                decision="split",
+                outcomes=_split_outcomes("card:M01-T02", "jit:after-M01-T02"),
+            )
+        ]
+        validate_board(board, self.workstream)
+
+    def test_split_to_foreign_predecessor_trigger_is_rejected(self) -> None:
+        for state in ("waiting", "satisfied"):
+            with self.subTest(state=state):
+                board = read_toml(VALID / "TASK_BOARD.toml")
+                _add_trigger(board, "after-M01-T01", "M01-T01", state)
+                board["sizing_audits"] = [
+                    _audit(
+                        card_id="M01-T02",
+                        decision="split",
+                        outcomes=_split_outcomes("card:M01-T02", "jit:after-M01-T01"),
+                    )
+                ]
+                with self.assertRaisesRegex(
+                    ValidationError,
+                    "bounded after Card 'M01-T01', not the audited Card 'M01-T02'",
+                ):
+                    validate_board(board, self.workstream)
+
+    def test_split_allocating_everything_away_is_rejected(self) -> None:
+        board = read_toml(VALID / "TASK_BOARD.toml")
+        _add_trigger(board, "after-M01-T02a", "M01-T02", "waiting")
+        _add_trigger(board, "after-M01-T02b", "M01-T02", "waiting")
+        board["sizing_audits"] = [
+            _audit(
+                card_id="M01-T02",
+                decision="split",
+                outcomes=_split_outcomes("jit:after-M01-T02a", "jit:after-M01-T02b"),
+            )
+        ]
+        with self.assertRaisesRegex(
+            ValidationError, "must retain at least one outcome in the audited Card"
+        ):
+            validate_board(board, self.workstream)
+
+    def test_split_to_sibling_and_trigger_without_self_is_rejected(self) -> None:
+        board = read_toml(VALID / "TASK_BOARD.toml")
+        _add_card(board, "M01-T03", "planned")
+        _add_trigger(board, "after-M01-T02", "M01-T02", "waiting")
+        board["sizing_audits"] = [
+            _audit(
+                card_id="M01-T02",
+                decision="split",
+                outcomes=_split_outcomes("card:M01-T03", "jit:after-M01-T02"),
+            ),
+            _audit(card_id="M01-T03"),
+        ]
+        with self.assertRaisesRegex(
+            ValidationError, "must retain at least one outcome in the audited Card"
+        ):
+            validate_board(board, self.workstream)
+
+    def test_single_audit_with_allocation_is_rejected_at_board(self) -> None:
+        board = read_toml(VALID / "TASK_BOARD.toml")
+        board["sizing_audits"] = [
+            _audit(
+                card_id="M01-T02",
+                decision="single",
+                outcomes=[_outcome(allocated_to="card:M01-T02")],
+            )
+        ]
+        with self.assertRaisesRegex(ValidationError, "must not claim split allocation"):
+            validate_board(board, self.workstream)
+
+
 class SizingRouterPathTests(unittest.TestCase):
     def copy_fixture(self) -> tuple[tempfile.TemporaryDirectory[str], Path]:
         temp = tempfile.TemporaryDirectory()
@@ -662,6 +974,45 @@ class SizingRouterPathTests(unittest.TestCase):
             f"{dimensions}"
         )
 
+    def split_audit_toml(self, first_dest: str | None,
+                         second_dest: str | None) -> str:
+        def outcome_toml(oid: str, kind: str, statement: str, family: str,
+                         dest: str | None) -> str:
+            text = (
+                "[[sizing_audits.outcomes]]\n"
+                f"id = \"{oid}\"\n"
+                f"kind = \"{kind}\"\n"
+                f"statement = \"{statement}\"\n"
+                f"family = \"{family}\"\n"
+                "independently_verifiable = true\n"
+                "independently_useful = true\n"
+                "falsifiable = true\n"
+                "substantial = true\n"
+                "scaffolding_only = false\n"
+                "independently_consumed = false\n"
+            )
+            if dest is not None:
+                text += f"allocated_to = \"{dest}\"\n"
+            return text
+
+        dimensions = "".join(
+            f"{name} = \"Durable {name.replace('_', ' ')} statement for M01-T04.\"\n"
+            for name in AUDIT_DIMENSIONS
+        )
+        return (
+            "[[sizing_audits]]\n"
+            "card_id = \"M01-T04\"\n"
+            "decision = \"split\"\n"
+            "rebuttal_class = \"\"\n"
+            "rebuttal = \"\"\n"
+            + outcome_toml("o1", "invariant", "First separable invariant.",
+                           "routing", first_dest)
+            + outcome_toml("o2", "acceptance", "Second separable acceptance.",
+                           "recovery", second_dest)
+            + "[sizing_audits.dimensions]\n"
+            f"{dimensions}"
+        )
+
     def test_router_accepts_valid_sizing_audit_on_real_board(self) -> None:
         temp, project = self.copy_fixture()
         try:
@@ -714,6 +1065,76 @@ class SizingRouterPathTests(unittest.TestCase):
                 ("recovery", "recovery_boundary"),
             )
             self.assertIn("missing durable audit", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_router_recovers_on_lone_card_split_without_allocation(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.strip_fixture_audit(project)
+            self.install_audit(project, self.split_audit_toml(None, None))
+            routed = select_route(project, [ROUTER_MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("without durable allocation", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_router_recovers_on_split_allocating_everything_to_self(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.strip_fixture_audit(project)
+            self.install_audit(
+                project, self.split_audit_toml("card:M01-T04", "card:M01-T04")
+            )
+            routed = select_route(project, [ROUTER_MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("one destination", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_router_recovers_on_split_to_dangling_destination(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.strip_fixture_audit(project)
+            self.install_audit(
+                project, self.split_audit_toml("card:M01-T04", "card:M09-T99")
+            )
+            routed = select_route(project, [ROUTER_MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("unknown Card 'M09-T99'", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_router_split_to_waiting_trigger_routes_to_execution(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.strip_fixture_audit(project)
+            self.install_audit(
+                project,
+                self.split_audit_toml("card:M01-T04", "jit:after-M01-T04"),
+            )
+            self.install_audit(
+                project,
+                "[[jit_triggers]]\n"
+                "id = \"after-M01-T04\"\n"
+                "after_card = \"M01-T04\"\n"
+                "state = \"waiting\"\n"
+                "condition = \"Downstream boundary holds the second separable outcome.\"\n",
+            )
+            routed = select_route(project, [ROUTER_MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation, routed.subject),
+                ("route", "execution", "M01-T04"),
+            )
         finally:
             temp.cleanup()
 

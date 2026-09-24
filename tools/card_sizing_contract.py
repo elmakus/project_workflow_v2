@@ -20,6 +20,16 @@ invariant/contract family, dependency ordering, atomic mutation/migration
 constraints and cross-surface coupling. Omitted dimensions and generic or
 missing rebuttal evidence fail closed.
 
+A ``split`` decision never stands in for actual topology: every outcome in a
+split audit must durably allocate to a distinct real destination, either an
+existing materialized Card (``card:<id>``) or an existing JIT trigger
+(``jit:<id>``) for downstream scope whose Card id is not yet knowable. The
+allocation must cover every outcome, span at least two distinct destinations,
+retain at least one outcome in the audited Card itself, and resolve to
+executable Cards or unconsumed triggers bounded after the audited Card;
+historical DONE Cards are never valid split destinations, and future Card ids
+are never invented. A ``single`` decision must not claim split allocation.
+
 The semantic judgments (is this outcome falsifiable, substantial, separable)
 remain Execution Prep owned; this module only validates that the durable
 record is complete, internally coherent and honestly classified.
@@ -51,6 +61,8 @@ OUTCOME_KINDS = frozenset({"acceptance", "contract", "invariant", "useful_outcom
 STRUCTURAL_BOUNDARY_KINDS = frozenset({"file", "module", "layer", "test", "tool", "step"})
 
 SIZING_DECISIONS = frozenset({"single", "split"})
+
+ALLOCATION_KINDS = frozenset({"card", "jit"})
 
 AUDITED_STATUSES = frozenset({"planned", "ready", "in_progress"})
 
@@ -93,6 +105,24 @@ def _require_bool(value: Any, label: str) -> bool:
     return value
 
 
+def parse_allocation(value: Any, label: str) -> tuple[str, str]:
+    """Parse a durable split allocation of the form ``card:<id>`` or ``jit:<id>``.
+
+    Returns the ``(kind, ref)`` pair. Anything else fails closed: a split
+    allocation must name an existing materialized Card boundary or an existing
+    JIT trigger boundary, never a speculative future Card id.
+    """
+    if not isinstance(value, str):
+        raise CardSizingError(f"{label} must be a string")
+    kind, sep, ref = value.partition(":")
+    if sep != ":" or kind not in ALLOCATION_KINDS or not ref.strip():
+        raise CardSizingError(
+            f"{label}: invalid split allocation {value!r}; expected "
+            "card:<materialized Card id> or jit:<existing JIT trigger id>"
+        )
+    return kind, ref
+
+
 def validate_outcome(outcome: Mapping[str, Any], label: str) -> dict[str, Any]:
     """Validate one durable candidate outcome record.
 
@@ -102,7 +132,10 @@ def validate_outcome(outcome: Mapping[str, Any], label: str) -> dict[str, Any]:
     test/tool/step fragments are rejected: such boundaries alone neither force
     nor prevent a split. Outcomes that are not independently falsifiable or
     not substantial enough for their own lifecycle are rejected as meaningless
-    micro-Cards, as is scaffolding that is not independently consumed.
+    micro-Cards, as is scaffolding that is not independently consumed. An
+    optional ``allocated_to`` field carries a split allocation
+    (``card:<id>`` or ``jit:<id>``); its format is validated here while
+    destination resolution happens against the Task Board.
     """
     if not isinstance(outcome, Mapping):
         raise CardSizingError(f"{label}: outcome must be a table")
@@ -156,6 +189,9 @@ def validate_outcome(outcome: Mapping[str, Any], label: str) -> dict[str, Any]:
             f"{label}: scaffolding stays with the outcome it enables unless "
             "independently consumed"
         )
+    allocated_to = outcome.get("allocated_to", "")
+    if allocated_to != "":
+        parse_allocation(allocated_to, f"{label}: allocated_to")
     return {
         "id": outcome_id,
         "kind": str(kind),
@@ -167,6 +203,7 @@ def validate_outcome(outcome: Mapping[str, Any], label: str) -> dict[str, Any]:
         "substantial": substantial,
         "scaffolding_only": scaffolding_only,
         "independently_consumed": independently_consumed,
+        "allocated_to": allocated_to if isinstance(allocated_to, str) else "",
     }
 
 
@@ -256,7 +293,11 @@ def validate_sizing_decision(
     separable outcomes requires qualifying concrete rebuttal; a ``\"split\"``
     decision over a coherent non-separable scope is rejected as meaningless
     fragmentation; and a decision that follows the presumption must not claim
-    deviation rationale.
+    deviation rationale. A ``split`` decision must also durably allocate every
+    outcome to a real destination across at least two distinct destinations,
+    so the audit cannot stand in for actual topology; a ``single`` decision
+    must not claim split allocation. Destination resolution against materialized
+    Cards and JIT triggers happens at Task Board level.
     """
     records = validate_outcomes(list(outcomes), f"{label}.outcomes")
     if decision not in SIZING_DECISIONS:
@@ -265,6 +306,11 @@ def validate_sizing_decision(
         )
     if not isinstance(rebuttal_class, str) or not isinstance(rebuttal, str):
         raise CardSizingError(f"{label}: rebuttal_class and rebuttal must be strings")
+    if decision == "single" and any(record["allocated_to"] for record in records):
+        raise CardSizingError(
+            f"{label}: a single decision owns its scope in this Card and must not "
+            "claim split allocation"
+        )
     presumption = required_decision(records)
     if presumption == "split" and decision == "single":
         validate_rebuttal(rebuttal_class=rebuttal_class, rebuttal=rebuttal, label=label)
@@ -279,7 +325,36 @@ def validate_sizing_decision(
             f"{label}: a {decision} decision that follows the split presumption "
             "must not claim deviation rationale"
         )
+    if decision == "split":
+        validate_split_coverage(records, label)
     return decision
+
+
+def validate_split_coverage(
+    outcomes: Iterable[Mapping[str, Any]], label: str
+) -> list[str]:
+    """Require complete durable split allocation across distinct destinations.
+
+    Every outcome in a split decision must name its destination Card or JIT
+    trigger, and the destinations must span at least two distinct boundaries:
+    a split that allocates everything to one destination is not a split.
+    Returns the sorted distinct destinations.
+    """
+    records = list(outcomes)
+    uncovered = sorted(record["id"] for record in records if not record.get("allocated_to"))
+    if uncovered:
+        raise CardSizingError(
+            f"{label}: split decision leaves outcome(s) without durable allocation: "
+            + ", ".join(uncovered)
+        )
+    destinations = sorted({str(record["allocated_to"]) for record in records})
+    if len(destinations) < 2:
+        raise CardSizingError(
+            f"{label}: split decision allocates every outcome to one destination "
+            f"{destinations[0]!r}; a split must span at least two distinct Card or "
+            "JIT trigger boundaries"
+        )
+    return destinations
 
 
 def validate_audit_dimensions(
@@ -340,12 +415,87 @@ def validate_sizing_audit(audit: Mapping[str, Any], label: str) -> dict[str, Any
         label=label,
     )
     dimensions = validate_audit_dimensions(audit.get("dimensions", {}), f"{label}.dimensions")  # type: ignore[arg-type]
-    return {"card_id": card_id, "decision": validated_decision, "dimensions": dimensions}
+    outcomes = validate_outcomes(audit.get("outcomes", []), f"{label}.outcomes")  # type: ignore[arg-type]
+    return {
+        "card_id": card_id,
+        "decision": validated_decision,
+        "dimensions": dimensions,
+        "outcomes": outcomes,
+    }
+
+
+def validate_split_resolution(
+    outcomes: Iterable[Mapping[str, Any]],
+    cards_by_id: Mapping[str, Mapping[str, Any]],
+    triggers_by_id: Mapping[str, Mapping[str, Any]],
+    label: str,
+    audited_card_id: str,
+) -> None:
+    """Resolve every split allocation against real Task Board boundaries.
+
+    The audited Card must retain at least one outcome: a split audit that
+    allocates every outcome away leaves its own Card with no coherent outcome.
+    ``card:<id>`` destinations must name a materialized Card in an executable
+    lifecycle status: historical DONE Cards never own split scope, and blocked
+    Cards cannot accept new scope while blocked. ``jit:<id>`` destinations
+    must name an existing unconsumed JIT trigger bounded after the audited
+    Card itself, preserving valid JIT where the downstream Card id is not yet
+    knowable. Dangling destinations fail closed.
+    """
+    records = list(outcomes)
+    retained = f"card:{audited_card_id}"
+    if not any(record.get("allocated_to") == retained for record in records):
+        raise CardSizingError(
+            f"{label}: split audit must retain at least one outcome in the "
+            f"audited Card {retained!r}; a split audit cannot allocate every "
+            "outcome away"
+        )
+    for record in records:
+        outcome_label = f"{label}.outcomes[{record['id']}]"
+        kind, ref = parse_allocation(record.get("allocated_to"), f"{outcome_label}: allocated_to")
+        if kind == "card":
+            if ref not in cards_by_id:
+                raise CardSizingError(
+                    f"{outcome_label}: split allocation names unknown Card {ref!r}; "
+                    "split scope must land on a materialized Card boundary"
+                )
+            status = cards_by_id[ref].get("status")
+            if status == "done":
+                raise CardSizingError(
+                    f"{outcome_label}: split allocation names terminal DONE Card "
+                    f"{ref!r}; historical Cards never own split scope"
+                )
+            if status not in AUDITED_STATUSES:
+                raise CardSizingError(
+                    f"{outcome_label}: split allocation names {status} Card {ref!r}; "
+                    "split scope must land on a planned, ready or in_progress Card "
+                    "or an unconsumed JIT trigger"
+                )
+        else:
+            if ref not in triggers_by_id:
+                raise CardSizingError(
+                    f"{outcome_label}: split allocation names unknown JIT trigger "
+                    f"{ref!r}; split scope must land on an existing trigger boundary"
+                )
+            trigger = triggers_by_id[ref]
+            if trigger.get("state") == "consumed":
+                raise CardSizingError(
+                    f"{outcome_label}: split allocation names consumed JIT trigger "
+                    f"{ref!r}; allocate to the materialized Card instead"
+                )
+            if trigger.get("after_card") != audited_card_id:
+                raise CardSizingError(
+                    f"{outcome_label}: split allocation names JIT trigger {ref!r} "
+                    f"bounded after Card {trigger.get('after_card')!r}, not the "
+                    f"audited Card {audited_card_id!r}; split scope may only defer "
+                    "through the audited Card's own downstream triggers"
+                )
 
 
 def validate_sizing_audits(
     audits: Iterable[Mapping[str, Any]] | None,
     cards: Iterable[Mapping[str, Any]],
+    jit_triggers: Iterable[Mapping[str, Any]] | None = None,
 ) -> dict[str, str]:
     """Validate durable Task Board sizing audits against materialized Cards.
 
@@ -357,14 +507,17 @@ def validate_sizing_audits(
     and no separability; there is no silent omission path. ``done`` Cards are
     exempt so historical terminal state stays valid, as are ``blocked`` Cards
     while blocked so legacy migrated boards validate; any return to an
-    executable status re-triggers the gate. Returns the Card id to
-    validated-decision mapping.
+    executable status re-triggers the gate. Split allocations resolve against
+    materialized Cards and JIT triggers: unretained, dangling, terminal,
+    consumed or foreign-predecessor destinations fail closed. Returns the Card
+    id to validated-decision mapping.
     """
     if audits is None:
         audits = []
     if not isinstance(audits, list):
         raise CardSizingError("task_board sizing_audits must be an array of audit records")
     cards_by_id = {card["id"]: card for card in cards}
+    triggers_by_id = {trigger["id"]: trigger for trigger in (jit_triggers or [])}
     decisions: dict[str, str] = {}
     for index, audit in enumerate(audits):
         label = f"task_board.sizing_audits[{index}]"
@@ -384,6 +537,13 @@ def validate_sizing_audits(
             record = validate_sizing_audit(audit, label)
         except CardSizingError as exc:
             raise CardSizingError(f"{exc}") from exc
+        if record["decision"] == "split":
+            try:
+                validate_split_resolution(
+                    record["outcomes"], cards_by_id, triggers_by_id, label, card_id
+                )
+            except CardSizingError as exc:
+                raise CardSizingError(f"{exc}") from exc
         decisions[card_id] = record["decision"]
     missing = sorted(
         card_id
