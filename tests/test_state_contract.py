@@ -527,6 +527,68 @@ class StateEnvelopeTests(unittest.TestCase):
         closure["subject"]["blob"] = "4" * 40
         validate_review_history([source, closure])
 
+    def test_preconvergence_closure_cannot_cross_later_epoch_reset(self) -> None:
+        source = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        source.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": ["F1"],
+            "verdict": "red",
+        })
+
+        initial_closure = copy.deepcopy(source)
+        initial_closure.update({
+            "attempt": "R02",
+            "review_kind": "closure_verification",
+            "source_discovery_attempt": "R01",
+            "discovery_complete": False,
+            "material_finding_ids": ["F1"],
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": ["class-a"],
+            "failed_material_defect_class_ids": [],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "verdict": "green",
+        })
+        initial_closure["subject"]["blob"] = "4" * 40
+
+        reset_closure = copy.deepcopy(initial_closure)
+        reset_closure.update({
+            "attempt": "R03",
+            "review_epoch": "E02",
+            "epoch_reset_basis": "Accepted authority redesign R2 establishes a new review epoch.",
+            "epoch_reset_subject": {
+                "class": "accepted_redesign",
+                "repository": "owner/fixture-project",
+                "commit": "5" * 40,
+                "path": source["acceptance"]["path"],
+                "blob": "7" * 40,
+            },
+            "failed_material_defect_class_ids": ["class-a"],
+            "verdict": "red",
+        })
+        reset_closure["subject"]["commit"] = "5" * 40
+        reset_closure["subject"]["blob"] = "6" * 40
+
+        reset_path = source["acceptance"]["path"]
+        reset_blobs = {
+            ("owner/fixture-project", "5" * 40, reset_path): "7" * 40,
+            ("owner/fixture-project", initial_closure["subject"]["commit"], reset_path): "8" * 40,
+        }
+        with self.assertRaisesRegex(
+            ValidationError,
+            "initial convergence-aware epoch",
+        ):
+            validate_review_history(
+                [source, initial_closure, reset_closure],
+                exact_blob_reader=lambda repository, commit, path: reset_blobs.get(
+                    (repository, commit, path)
+                ),
+            )
+
     def test_terminal_post_convergence_red_forbids_same_epoch_review_continuation(self) -> None:
         attempts = []
         for index in range(5):
