@@ -329,11 +329,11 @@ class PolicyKernel:
         obligation: Mapping[str, Any],
         *,
         current_freshness_material: Mapping[str, Any],
-        safe_reuse_proof: Mapping[str, Any] | None = None,
+        stale_resolution: Mapping[str, Any] | None = None,
     ) -> str:
         return reconcile_execution_result(
             result,
             obligation,
             current_freshness_material=current_freshness_material,
-            safe_reuse_proof=safe_reuse_proof,
+            stale_resolution=stale_resolution,
         )
