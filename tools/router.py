@@ -185,10 +185,34 @@ def classify_jit_refinement(change_class: str) -> tuple[str, str]:
             "research",
             "Missing factual evidence must be resolved by Research before preparation continues",
         ),
+        "required_seam_challenge": (
+            "planning",
+            "Evidence that a required seam is wrong returns to Strategic Planning "
+            "for accepted revision; Execution Prep cannot silently override it",
+        ),
+        "preferred_seam_deviation": (
+            "execution_prep",
+            "Preferred-seam merge/split deviation stays in Execution Prep only with "
+            "qualifying durable technical rationale",
+        ),
     }
     if change_class not in routes:
         raise ValidationError(f"unknown JIT refinement class {change_class!r}")
     return routes[change_class]
+
+
+def accepted_planning_seams(reads: Reads, workstream: dict) -> list[dict] | None:
+    """Return accepted Planning seam declarations for Task Board fidelity validation.
+
+    Returns None when the workstream binds no Planning record or the accepted
+    record declares no seams (legacy plans stay valid). Otherwise the Task
+    Board must carry exactly one durable JIT decision per declared seam.
+    """
+    if "planning" not in workstream:
+        return None
+    planning = read_toml(reads.project(workstream["planning"]["path"]))
+    validate_planning(planning, workstream["workstream_id"])
+    return planning.get("seams")
 
 
 def refresh_ready_card(
@@ -547,7 +571,9 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             )
 
         board = read_toml(reads.project(workstream["task_board"]["path"]))
-        validate_board(board, workstream)
+        validate_board(
+            board, workstream, planning_seams=accepted_planning_seams(reads, workstream)
+        )
 
         if board.get("research_obligation") is not None:
             research_ref = board["research_obligation"]

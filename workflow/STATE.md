@@ -11,9 +11,9 @@ M01 established common ownership/binding. M02 adds concrete pre-execution state.
 - BRAINSTORM.toml owns one exploratory revision, challenge audit, explicit user stop and exact Definition-promotion authorization.
 - RESEARCH.toml owns one factual obligation, source accounting, exact return owner and once-only reconciliation.
 - DEFINITION.toml owns exact promoted scope, accepted authority, completeness and premium-A state.
-- PLANNING.toml owns one material planning cycle, plan revision/artifact, planner audit, immutable frozen subject, exact premium A/B/C gate subjects, and any bounded editorial-review exemption classification/base.
+- PLANNING.toml owns one material planning cycle, plan revision/artifact, planner audit, immutable frozen subject, exact premium A/B/C gate subjects, any bounded editorial-review exemption classification/base, and any durable decomposition seam declarations (`required_seam`/`preferred_seam`/`illustrative`, without speculative future Card IDs).
 - PLAN_REVIEW.toml owns one independent Stage-6 attempt for one immutable plan subject.
-- TASK_BOARD.toml is materialized only when implementation state exists and then owns mutable Card/milestone execution state plus bounded predecessor-dependent JIT triggers.
+- TASK_BOARD.toml is materialized only when implementation state exists and then owns mutable Card/milestone execution state, bounded predecessor-dependent JIT triggers, and any durable JIT seam decisions bound to declared Planning seams.
 - Stable Task Cards own bounded authority/scope/acceptance/tests/review and optional technical-contract refs; implementation/final review attempts remain exact-subject records.
 - External-effect records are obligation-local; V2 has no universal event/action ledger.
 
@@ -46,6 +46,8 @@ Each material Planning entry has an exact cycle/entry subject; stale A cannot au
 READY means the stable Card has current accepted authority, complete testable scope, and exact dependency results; it does not depend on whether a runtime worker/model/session exists. Each predecessor dependency is bound to its result path plus immutable commit/blob identity. Launch refresh rereads the exact Card, authority refs, DONE predecessor results and only the optional technical contract named by that Card. Missing/stale or same-path-changed dependency inputs fail closed before execution.
 
 Predecessor-dependent downstream work remains a Task Board JIT trigger until its stable Card contract becomes knowable. Simple Cards do not load a second technical contract.
+
+A declared `required_seam` can never be merged into another Card boundary: a JIT merge attempt is rejected, and evidence that the seam is wrong returns to Strategic Planning for accepted revision. A `preferred_seam` survives JIT by default; merge/split deviation carries durable technical rationale from exactly the qualifying classes (coupling, atomicity, invalid intermediate state, non-separable acceptance, new predecessor evidence), and generic convenience/same-milestone rationale is rejected. `illustrative` intent is non-binding. Seam decisions naming an undeclared seam, decisions without accepted Planning seams to validate against, and Boards that omit any declared seam decision, fail closed.
 
 ## Execution / semantic result
 

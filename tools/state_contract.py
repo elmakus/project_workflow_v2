@@ -27,6 +27,11 @@ try:
         review_kind,
         validate_finding_severity,
     )
+    from tools.seam_contract import (
+        SeamContractError,
+        validate_seam_decisions,
+        validate_seam_declarations,
+    )
 except ModuleNotFoundError:  # direct script execution from tools/
     from review_contract import (
         CONVERGENCE_FIELDS,
@@ -43,6 +48,11 @@ except ModuleNotFoundError:  # direct script execution from tools/
         review_convergence_state,
         review_kind,
         validate_finding_severity,
+    )
+    from seam_contract import (
+        SeamContractError,
+        validate_seam_decisions,
+        validate_seam_declarations,
     )
 
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
@@ -491,6 +501,12 @@ def validate_planning(data: dict[str, Any], workstream_id: str) -> None:
     _require(premium_a in {"due", "satisfied"} and premium_a_subject == entry_subject,
              "planning: current cycle requires exact premium A gate subject")
 
+    if "seams" in data:
+        try:
+            validate_seam_declarations(data["seams"])
+        except SeamContractError as exc:
+            raise ValidationError(f"{exc}") from exc
+
     subject = data.get("subject")
     if state == "draft":
         _require(review_mode == "independent",
@@ -714,6 +730,7 @@ def validate_board(
     data: dict[str, Any],
     workstream: dict[str, Any],
     expected_revision: int | None = None,
+    planning_seams: list[dict[str, Any]] | None = None,
 ) -> None:
     reject_prohibited_keys(data, "task_board")
     _require(data.get("workstream_id") == workstream["workstream_id"], "task_board: wrong workstream_id")
@@ -800,6 +817,21 @@ def validate_board(
             predecessor = cards_by_id[after_card]
             _require(predecessor["status"] == "done" and "result" in predecessor,
                      f"{label}: satisfied trigger requires DONE predecessor result")
+
+    if planning_seams:
+        _require(
+            "seam_decisions" in data,
+            "task_board: declared Planning seams require durable per-seam JIT decisions",
+        )
+    if "seam_decisions" in data:
+        _require(
+            planning_seams is not None,
+            "task_board: seam_decisions require accepted Planning seams for fidelity validation",
+        )
+        try:
+            validate_seam_decisions(data["seam_decisions"], planning_seams)
+        except SeamContractError as exc:
+            raise ValidationError(f"{exc}") from exc
 
 
 def validate_blocker(data: dict[str, Any], workstream_id: str, card_id: str) -> None:

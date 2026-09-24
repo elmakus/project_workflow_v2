@@ -38,6 +38,16 @@ A GREEN independent Plan Review for the exact frozen subject is consumed by Plan
 
 Premium C must be satisfied before Execution Prep. RED never mutates the failed review subject; material correction creates a new planning cycle/revision and repeats A/B/C. Pure mechanical/editorial correction may remain in the same accepted cycle only when strategy, milestone structure, requirement coverage and gates do not change. It may use `editorial_exempt` only when the cycle already has an exact prior GREEN Plan Review and satisfied C: the new subject is different, the exemption records that prior reviewed subject plus a bounded semantic basis, and prior B/C subjects remain bound to the reviewed base. No new B/Plan Review/C sequence is created for that editorial-only change.
 
+## Decomposition seam intent
+
+Strategic Planning may durably classify meaningful decomposition intent as seams. Each seam carries a stable id, exactly one class, and a durable intent statement:
+
+- `required_seam`: a topology boundary whose preservation is part of accepted strategy/correctness;
+- `preferred_seam`: preserve by default, with justified JIT deviation allowed;
+- `illustrative`: a non-binding implementation example.
+
+Planning expresses seam intent without speculative future Card IDs: it never invents Card identities, and Execution Prep owns exact JIT Card materialization. Canonical state stores seams in `PLANNING.toml`; absent seams mean no declared seam intent, and historical states without seams remain valid.
+
 ## Human-facing premium recommendations
 
 The premium stops carry recommendation semantics without storing runtime identity:

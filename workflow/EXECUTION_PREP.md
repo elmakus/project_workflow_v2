@@ -43,9 +43,21 @@ L1/L2 execution-detail refinement may change only not-yet-started Card contracts
 - bounded execution detail -> remain in Execution Prep;
 - milestone strategy/order/outcome change -> Strategic Planning;
 - accepted product/global intent change -> Project Definition;
-- missing facts needed to classify/prepare -> Research.
+- missing facts needed to classify/prepare -> Research;
+- evidence that a required seam is wrong -> Strategic Planning for accepted revision, never a silent JIT override.
 
 Do not silently rewrite an in-progress Card through JIT refinement.
+
+## Seam fidelity
+
+Execution Prep materializes Cards against the accepted Planning seam declarations from `workflow/PLANNING.md`:
+
+- a `required_seam` must not be merged into another Card boundary; splitting within the seam boundary is allowed because the boundary itself survives;
+- a `preferred_seam` is preserved by default; merge/split deviation is permitted only with durable technical rationale whose class is exactly one of `coupling`, `atomicity`, `invalid_intermediate_state`, `non_separable_acceptance` or `new_predecessor_evidence`, plus a non-empty rationale statement;
+- generic convenience, same-milestone or fewer-cards rationale is insufficient and rejected;
+- `illustrative` intent is non-binding and needs no rationale.
+
+JIT seam decisions are recorded durably in `TASK_BOARD.toml` (`preserved`/`merged`/`split` per declared seam id); a decision naming an undeclared seam is rejected, and every declared seam needs exactly one decision — silently omitting a seam is a bypass, not preservation. Deterministic helpers live in `tools/seam_contract.py`.
 
 ## Selective technical contract
 
