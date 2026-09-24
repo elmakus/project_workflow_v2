@@ -8,6 +8,7 @@ reasoning remains in the workflow modules/roles.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import dataclass
@@ -15,6 +16,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Mapping, Protocol
 
 from tools.obligation_contract import (
+    canonical_json,
     compile_execution_obligation,
     reconcile_execution_result,
     validate_execution_result,
@@ -336,6 +338,19 @@ class PolicyKernel:
             raise KernelContractError(f"unknown mechanical rule {rule_id!r}")
         return PurePosixPath(rule["outcome"]["owner_module"]).stem.lower()
 
+    def _rule_fingerprint(self, rule_id: str) -> str:
+        rule = self._rules_by_id.get(rule_id)
+        if rule is None:
+            raise KernelContractError(f"unknown mechanical rule {rule_id!r}")
+        material = {
+            "id": rule["id"],
+            "precedence": rule["precedence"],
+            "predicate": rule["predicate"],
+            "inputs": rule["inputs"],
+            "outcome": rule["outcome"],
+        }
+        return "sha256:" + hashlib.sha256(canonical_json(material)).hexdigest()
+
     def compile_obligations(
         self,
         rule_id: str,
@@ -348,9 +363,17 @@ class PolicyKernel:
             raise KernelContractError(
                 f"{rule_id}: cannot compile obligation because the registered rule does not match current canonical state"
             )
+        if decision.disposition != "route":
+            raise KernelContractError(
+                f"{rule_id}: cannot compile Execution Obligation for {decision.disposition!r} decision"
+            )
         if "determining_inputs" in kwargs:
             raise KernelContractError(
                 "determining_inputs are kernel-derived from the registered rule and canonical state"
+            )
+        if "rule_fingerprint" in kwargs:
+            raise KernelContractError(
+                "rule_fingerprint is kernel-derived from the registered rule"
             )
         expected_role = self._rule_role(rule_id)
         supplied_role = kwargs.pop("role", expected_role)
@@ -360,6 +383,7 @@ class PolicyKernel:
             )
         return compile_execution_obligation(
             rule_id=rule_id,
+            rule_fingerprint=self._rule_fingerprint(rule_id),
             role=expected_role,
             determining_inputs=self._rule_inputs(rule_id, canonical_state),
             **kwargs,
@@ -392,6 +416,7 @@ class PolicyKernel:
         if not isinstance(current_freshness_material, Mapping):
             raise KernelContractError("current_freshness_material must be a mapping")
         current_material = json.loads(json.dumps(current_freshness_material))
+        current_material["rule_fingerprint"] = self._rule_fingerprint(rule_id)
         current_material["inputs"] = self._rule_inputs(rule_id, canonical_state)
         return reconcile_execution_result(
             result,
