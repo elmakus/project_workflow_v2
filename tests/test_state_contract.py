@@ -31,6 +31,13 @@ VALID = ROOT / "tests" / "fixtures" / "state" / "valid"
 INVALID = ROOT / "tests" / "fixtures" / "state" / "invalid"
 
 
+def _severity(*finding_ids: str) -> list[dict[str, str]]:
+    return [
+        {"id": finding_id, "surface": "correctness", "evidence": f"evidence/review-R01.md#{finding_id}"}
+        for finding_id in finding_ids
+    ]
+
+
 class StateEnvelopeTests(unittest.TestCase):
     def setUp(self) -> None:
         self.workstream = read_toml(VALID / "WORKSTREAM.toml")
@@ -187,6 +194,7 @@ class StateEnvelopeTests(unittest.TestCase):
             "source_discovery_attempt": "",
             "discovery_complete": True,
             "material_finding_ids": ["F1", "F2"],
+            "finding_severity": _severity("F1", "F2"),
             "review_scope": "card",
             "review_epoch": "E01",
             "epoch_reset_basis": "",
@@ -207,6 +215,7 @@ class StateEnvelopeTests(unittest.TestCase):
             "material_defect_class_ids": ["class-a"],
             "verdict": "green",
         })
+        closure.pop("finding_severity", None)
         closure["subject"]["blob"] = "4" * 40
         validate_review_history([base, closure])
 
@@ -221,6 +230,7 @@ class StateEnvelopeTests(unittest.TestCase):
             "verdict": "pending",
             "evidence_path": "",
         })
+        premature_discovery.pop("finding_severity", None)
         premature_discovery["subject"]["blob"] = "4" * 40
         with self.assertRaisesRegex(ValidationError, "before all known material findings"):
             validate_review_history([base, closure, premature_discovery])
@@ -300,6 +310,7 @@ class StateEnvelopeTests(unittest.TestCase):
             "source_discovery_attempt": "",
             "discovery_complete": True,
             "material_finding_ids": ["F1", "F2"],
+            "finding_severity": _severity("F1", "F2"),
             "review_scope": "card",
             "review_epoch": "E01",
             "epoch_reset_basis": "",
@@ -340,6 +351,7 @@ class StateEnvelopeTests(unittest.TestCase):
             "source_discovery_attempt": "",
             "discovery_complete": True,
             "material_finding_ids": ["F1"],
+            "finding_severity": _severity("F1"),
             "review_scope": "card",
             "review_epoch": "E01",
             "epoch_reset_basis": "",
@@ -359,6 +371,7 @@ class StateEnvelopeTests(unittest.TestCase):
             "verdict": "pending",
             "evidence_path": "",
         })
+        reset.pop("finding_severity", None)
         reset["subject"]["commit"] = "4" * 40
         reset["subject"]["blob"] = "4" * 40
         with self.assertRaisesRegex(ValidationError, "changed review_epoch requires"):
@@ -440,6 +453,7 @@ class StateEnvelopeTests(unittest.TestCase):
             "verdict": "pending",
             "evidence_path": "",
         })
+        same_epoch_claim.pop("finding_severity", None)
         same_epoch_claim["subject"]["blob"] = "4" * 40
         with self.assertRaisesRegex(ValidationError, "unchanged review_epoch"):
             validate_review_history([base, same_epoch_claim])
@@ -454,6 +468,7 @@ class StateEnvelopeTests(unittest.TestCase):
                 "source_discovery_attempt": "",
                 "discovery_complete": True,
                 "material_finding_ids": [f"F{index}"],
+                "finding_severity": _severity(f"F{index}"),
                 "review_scope": "card",
                 "review_epoch": "E01",
                 "epoch_reset_basis": "",
@@ -487,6 +502,7 @@ class StateEnvelopeTests(unittest.TestCase):
             "verdict": "pending",
             "evidence_path": "",
         })
+        post.pop("finding_severity", None)
         validate_review_history(attempts + [post])
 
         terminal_post = copy.deepcopy(post)
@@ -507,6 +523,7 @@ class StateEnvelopeTests(unittest.TestCase):
             "source_discovery_attempt": "",
             "discovery_complete": True,
             "material_finding_ids": ["F1"],
+            "finding_severity": _severity("F1"),
             "verdict": "red",
         })
         closure = copy.deepcopy(source)
@@ -534,6 +551,7 @@ class StateEnvelopeTests(unittest.TestCase):
             "source_discovery_attempt": "",
             "discovery_complete": True,
             "material_finding_ids": ["F1"],
+            "finding_severity": _severity("F1"),
             "verdict": "red",
         })
 
@@ -599,6 +617,7 @@ class StateEnvelopeTests(unittest.TestCase):
                 "source_discovery_attempt": "",
                 "discovery_complete": True,
                 "material_finding_ids": [f"F{index}"],
+                "finding_severity": _severity(f"F{index}"),
                 "review_scope": "card",
                 "review_epoch": "E01",
                 "epoch_reset_basis": "",
@@ -626,6 +645,7 @@ class StateEnvelopeTests(unittest.TestCase):
             "source_discovery_attempt": "",
             "discovery_complete": True,
             "material_finding_ids": ["F-post"],
+            "finding_severity": _severity("F-post"),
             "material_defect_class_ids": ["class-post"],
             "post_convergence_validation": True,
             "convergence_basis": "Main convergence/root-cause analysis C01",
@@ -648,6 +668,7 @@ class StateEnvelopeTests(unittest.TestCase):
             validate_review_history(attempts + [forbidden])
 
         new_epoch = copy.deepcopy(post_red)
+        new_epoch.pop("finding_severity", None)
         new_epoch.update({
             "attempt": "R12",
             "review_kind": "discovery",
@@ -793,6 +814,7 @@ class StateEnvelopeTests(unittest.TestCase):
             "source_discovery_attempt": "",
             "discovery_complete": True,
             "material_finding_ids": ["F1"],
+            "finding_severity": _severity("F1"),
             "review_scope": "card",
             "review_epoch": "E01",
             "epoch_reset_basis": "",
@@ -842,6 +864,7 @@ class StateEnvelopeTests(unittest.TestCase):
             "source_discovery_attempt": "",
             "discovery_complete": True,
             "material_finding_ids": ["F1"],
+            "finding_severity": _severity("F1"),
             "review_epoch": "E01",
             "epoch_reset_basis": "",
             "material_defect_class_ids": ["class-a"],
@@ -1338,6 +1361,53 @@ class ReviewObservationStateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "unknown blocking finding"):
             validate_review(foreign_id)
 
+    def test_terminal_red_discovery_requires_severity_without_advisory_carrier(self) -> None:
+        absent = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        absent.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": ["F1"],
+            "verdict": "red",
+        })
+        self.assertNotIn("finding_severity", absent)
+        with self.assertRaisesRegex(ValidationError, "load-bearing evidence"):
+            validate_review(absent)
+
+        empty = copy.deepcopy(absent)
+        empty["finding_severity"] = []
+        with self.assertRaisesRegex(ValidationError, "load-bearing evidence"):
+            validate_review(empty)
+
+    def test_observation_evidence_must_bind_originating_review_evidence(self) -> None:
+        base = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        base.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": [],
+            "verdict": "green",
+        })
+        self.assertEqual(base["evidence_path"], "evidence/review-R01.md")
+
+        mismatched = copy.deepcopy(base)
+        mismatched["observations"] = [{
+            "id": "O1", "category": "advisory",
+            "evidence": "unrelated/R99.md#O1",
+            "disposition": "open", "disposition_basis": "",
+        }]
+        with self.assertRaisesRegex(ValidationError, "bind"):
+            validate_review(mismatched)
+
+        missing_source = copy.deepcopy(base)
+        missing_source["observations"] = [{
+            "id": "O1", "category": "advisory",
+            "evidence": "#O1",
+            "disposition": "open", "disposition_basis": "",
+        }]
+        with self.assertRaisesRegex(ValidationError, "bind"):
+            validate_review(missing_source)
+
     def test_green_discovery_may_carry_advisory_only_observations(self) -> None:
         base = read_toml(VALID / "REVIEW_ATTEMPT.toml")
         base.update({
@@ -1455,6 +1525,7 @@ class ReviewObservationStateTests(unittest.TestCase):
 
         duplicate_intro = copy.deepcopy(rediscovery)
         duplicate_intro.pop("observation_updates", None)
+        duplicate_intro["evidence_path"] = "evidence/review-R03.md"
         duplicate_intro["observations"] = [{
             "id": "O1", "category": "preference",
             "evidence": "evidence/review-R03.md#O1",
@@ -1482,6 +1553,7 @@ class ReviewObservationStateTests(unittest.TestCase):
             "source_discovery_attempt": "",
             "discovery_complete": True,
             "material_finding_ids": [],
+            "evidence_path": "evidence/review-R03.md",
             "observations": [{
                 "id": "F1", "category": "preference",
                 "evidence": "evidence/review-R03.md#F1",

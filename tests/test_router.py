@@ -1198,6 +1198,14 @@ class RouterTests(unittest.TestCase):
                 f'post_convergence_validation = {"true" if post_convergence_validation else "false"}\n'
                 f'convergence_basis = "{convergence_basis}"\n'
             )
+            if review_kind == "discovery" and verdict == "red":
+                for finding_id in finding_ids:
+                    extra += (
+                        "[[finding_severity]]\n"
+                        f'id = "{finding_id}"\n'
+                        'surface = "correctness"\n'
+                        f'evidence = "{evidence}#{finding_id}"\n'
+                    )
         path.write_text(
             'workstream_id = "sample-workstream"\n'
             'card_id = "M01-T04"\n'

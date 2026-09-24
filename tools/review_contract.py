@@ -76,6 +76,7 @@ TRACKER_PROVENANCE_MARKERS = (
     "issue #",
     "github.com",
 )
+OBSERVATION_EVIDENCE_SEPARATORS = ("#", ":", "@", "?", " ")
 OBSERVATION_AWARENESS_KEYS = (
     "finding_severity",
     "observations",
@@ -554,7 +555,12 @@ def validate_observation_provenance(
     evidence: object,
     origin_evidence_path: object,
 ) -> str:
-    """Require canonical review evidence; tracker pointers are never provenance."""
+    """Require canonical review evidence bound to the originating review file.
+
+    Tracker pointers are never provenance, and the observation locator must
+    name the originating terminal attempt's review evidence file, optionally
+    with a fragment or equivalent suffix.
+    """
     if not isinstance(evidence, str) or not evidence.strip():
         raise ReviewContractError("observation requires concrete originating evidence")
     if not isinstance(origin_evidence_path, str) or not origin_evidence_path.strip():
@@ -565,6 +571,17 @@ def validate_observation_provenance(
             raise ReviewContractError(
                 "tracker/Issue pointers cannot serve as observation provenance or evidence"
             )
+    locator = evidence.strip()
+    origin = origin_evidence_path.strip()
+    bound = locator == origin or any(
+        locator.startswith(origin + separator)
+        for separator in OBSERVATION_EVIDENCE_SEPARATORS
+    )
+    if not bound:
+        raise ReviewContractError(
+            f"observation evidence {evidence!r} must bind to the originating "
+            f"review evidence {origin_evidence_path!r}"
+        )
     return evidence
 
 
@@ -602,7 +619,8 @@ def observation_records(attempt: Mapping[str, object]) -> list[dict[str, str]]:
                 f"observation {observation_id!r} lacks concrete originating evidence"
             )
         validate_observation_provenance(
-            evidence=evidence, origin_evidence_path=evidence
+            evidence=evidence,
+            origin_evidence_path=attempt.get("evidence_path", ""),
         )
         if disposition != OPEN_OBSERVATION_DISPOSITION and disposition not in OBSERVATION_DISPOSITIONS:
             raise ReviewContractError(

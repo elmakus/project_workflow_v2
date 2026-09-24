@@ -714,6 +714,7 @@ class ObservationSeverityTests(unittest.TestCase):
     def test_observation_introduction_requires_canonical_provenance_and_disposition(self) -> None:
         attempt = {
             "verdict": "green",
+            "evidence_path": "evidence/review-R01.md",
             "observations": [
                 {
                     "id": "O1",
@@ -732,7 +733,7 @@ class ObservationSeverityTests(unittest.TestCase):
                 attempt["observations"][0]["category"] = category
                 self.assertEqual(observation_records(attempt)[0]["category"], category)
 
-        bad_category = {"verdict": "green", "observations": [{
+        bad_category = {"verdict": "green", "evidence_path": "evidence/review-R01.md", "observations": [{
             "id": "O1", "category": "load_bearing", "evidence": "evidence/review-R01.md#O1",
             "disposition": "open", "disposition_basis": "",
         }]}
@@ -746,19 +747,19 @@ class ObservationSeverityTests(unittest.TestCase):
         ):
             with self.subTest(evidence=tracker_evidence):
                 with self.assertRaisesRegex(ReviewContractError, "tracker"):
-                    observation_records({"verdict": "green", "observations": [{
+                    observation_records({"verdict": "green", "evidence_path": "evidence/review-R01.md", "observations": [{
                         "id": "O1", "category": "advisory", "evidence": tracker_evidence,
                         "disposition": "open", "disposition_basis": "",
                     }]})
 
-        terminal_without_basis = {"verdict": "green", "observations": [{
+        terminal_without_basis = {"verdict": "green", "evidence_path": "evidence/review-R01.md", "observations": [{
             "id": "O1", "category": "advisory", "evidence": "evidence/review-R01.md#O1",
             "disposition": "resolved", "disposition_basis": "",
         }]}
         with self.assertRaisesRegex(ReviewContractError, "disposition_basis"):
             observation_records(terminal_without_basis)
 
-        open_with_basis = {"verdict": "green", "observations": [{
+        open_with_basis = {"verdict": "green", "evidence_path": "evidence/review-R01.md", "observations": [{
             "id": "O1", "category": "advisory", "evidence": "evidence/review-R01.md#O1",
             "disposition": "open", "disposition_basis": "not yet triaged",
         }]}
@@ -777,6 +778,58 @@ class ObservationSeverityTests(unittest.TestCase):
                 evidence="evidence/review-R01.md#O1",
                 origin_evidence_path="TRACKER.toml",
             )
+
+    def test_observation_evidence_must_reference_originating_evidence_file(self) -> None:
+        self.assertEqual(
+            validate_observation_provenance(
+                evidence="evidence/review-R01.md#O1",
+                origin_evidence_path="evidence/review-R01.md",
+            ),
+            "evidence/review-R01.md#O1",
+        )
+        with self.assertRaisesRegex(ReviewContractError, "bind"):
+            validate_observation_provenance(
+                evidence="unrelated/R99.md#O1",
+                origin_evidence_path="evidence/review-R01.md",
+            )
+        with self.assertRaisesRegex(ReviewContractError, "bind"):
+            validate_observation_provenance(
+                evidence="#O1",
+                origin_evidence_path="evidence/review-R01.md",
+            )
+
+    def test_observation_without_source_evidence_path_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ReviewContractError, "originating review evidence path"):
+            observation_records({
+                "verdict": "green",
+                "observations": [{
+                    "id": "O1", "category": "advisory",
+                    "evidence": "evidence/review-R01.md#O1",
+                    "disposition": "open", "disposition_basis": "",
+                }],
+            })
+        with self.assertRaisesRegex(ReviewContractError, "originating review evidence path"):
+            validate_observation_provenance(
+                evidence="evidence/review-R01.md#O1",
+                origin_evidence_path="",
+            )
+
+    def test_derivation_rejects_observation_pointing_away_from_origin(self) -> None:
+        attempt = {
+            "attempt": "R01",
+            "verdict": "green",
+            "review_kind": "discovery",
+            "review_epoch": "E01",
+            "material_finding_ids": [],
+            "evidence_path": "evidence/review-R01.md",
+            "observations": [{
+                "id": "O1", "category": "advisory",
+                "evidence": "unrelated/R99.md#O1",
+                "disposition": "open", "disposition_basis": "",
+            }],
+        }
+        with self.assertRaisesRegex(ReviewContractError, "bind"):
+            derive_observation_state([attempt])
 
     def test_derived_observations_stay_open_until_terminal_reconciliation(self) -> None:
         attempts = [

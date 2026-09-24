@@ -16,7 +16,6 @@ try:
         REVIEW_KINDS,
         REVIEW_SCOPE_DISCOVERY_CEILINGS,
         ReviewContractError,
-        attempt_is_observation_aware,
         convergence_fields_present,
         derive_observation_state,
         failed_material_defect_classes,
@@ -34,7 +33,6 @@ except ModuleNotFoundError:  # direct script execution from tools/
         REVIEW_KINDS,
         REVIEW_SCOPE_DISCOVERY_CEILINGS,
         ReviewContractError,
-        attempt_is_observation_aware,
         convergence_fields_present,
         derive_observation_state,
         failed_material_defect_classes,
@@ -933,25 +931,24 @@ def validate_review(data: dict[str, Any], *, expected_review_scope: str | None =
             "review: observation ids downgrade load-bearing findings: "
             + ", ".join(sorted(overlap)),
         )
-        if attempt_is_observation_aware(data):
-            if kind == "discovery" and verdict == "red":
-                try:
-                    validate_finding_severity(
-                        material_finding_ids=finding_ids,
-                        severity=severity,
-                        require_complete=True,
-                    )
-                except ReviewContractError as exc:
-                    raise ValidationError(f"review: {exc}") from exc
-            elif severity:
-                try:
-                    validate_finding_severity(
-                        material_finding_ids=finding_ids,
-                        severity=severity,
-                        require_complete=False,
-                    )
-                except ReviewContractError as exc:
-                    raise ValidationError(f"review: {exc}") from exc
+        if kind == "discovery" and verdict == "red":
+            try:
+                validate_finding_severity(
+                    material_finding_ids=finding_ids,
+                    severity=severity,
+                    require_complete=True,
+                )
+            except ReviewContractError as exc:
+                raise ValidationError(f"review: {exc}") from exc
+        elif severity:
+            try:
+                validate_finding_severity(
+                    material_finding_ids=finding_ids,
+                    severity=severity,
+                    require_complete=False,
+                )
+            except ReviewContractError as exc:
+                raise ValidationError(f"review: {exc}") from exc
     convergence_aware = convergence_fields_present(data)
     _require(
         convergence_aware or not any(key in data for key in CONVERGENCE_FIELDS - {"review_epoch"}),

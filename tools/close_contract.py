@@ -4,13 +4,33 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Mapping
+import tomllib
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
 
 try:
-    from tools.review_contract import OBSERVATION_DISPOSITIONS
+    from tools.review_contract import (
+        OBSERVATION_DISPOSITIONS,
+        ReviewContractError,
+        derive_observation_state,
+    )
+    from tools.state_contract import (
+        ValidationError,
+        validate_locator,
+        validate_review_history,
+    )
 except ModuleNotFoundError:  # direct script execution from tools/
-    from review_contract import OBSERVATION_DISPOSITIONS
+    from review_contract import (
+        OBSERVATION_DISPOSITIONS,
+        ReviewContractError,
+        derive_observation_state,
+    )
+    from state_contract import (
+        ValidationError,
+        validate_locator,
+        validate_review_history,
+    )
 
 
 class CloseContractError(ValueError):
@@ -261,10 +281,18 @@ def validate_cleanup_work(
             raise CloseContractError(
                 f"cleanup work {work_id!r} requires an exact subject {label} (40-hex)"
             )
+    if isinstance(tests_evidence, str) or not isinstance(tests_evidence, Iterable):
+        raise CloseContractError(
+            f"cleanup work {work_id!r} requires non-empty tests/evidence"
+        )
     evidence = [item for item in tests_evidence if isinstance(item, str) and item.strip()]
     if not evidence:
         raise CloseContractError(
             f"cleanup work {work_id!r} requires non-empty tests/evidence"
+        )
+    if isinstance(covers_observation_ids, str) or not isinstance(covers_observation_ids, Iterable):
+        raise CloseContractError(
+            f"cleanup work {work_id!r} must be grounded in non-empty unique cleanup-candidate observation ids"
         )
     covers = list(covers_observation_ids)
     if (
@@ -290,17 +318,69 @@ def validate_cleanup_work(
     return "cleanup_work_complete"
 
 
+def _canonical_final_dispositions(
+    *,
+    review_attempts: Iterable[Mapping[str, object]] | None,
+    derived_state: Mapping[str, object] | None,
+) -> dict[str, str]:
+    """Return canonical dispositions from history or a completeness-bound snapshot."""
+    if (review_attempts is None) == (derived_state is None):
+        raise CloseContractError(
+            "Final reconciliation requires canonical review_attempts or a "
+            "completeness-bound derived_state snapshot, exactly one, as its "
+            "completeness proof"
+        )
+    if review_attempts is not None:
+        try:
+            canonical = derive_observation_state(review_attempts)
+        except ReviewContractError as exc:
+            raise CloseContractError(
+                f"Final reconciliation history invalid: {exc}"
+            ) from exc
+        return {
+            observation_id: entry["disposition"]
+            for observation_id, entry in canonical.items()
+        }
+    assert derived_state is not None
+    if not isinstance(derived_state, Mapping):
+        raise CloseContractError("Final reconciliation derived_state snapshot must be a table")
+    canonical: dict[str, str] = {}
+    for observation_id, entry in derived_state.items():
+        if (
+            not isinstance(observation_id, str)
+            or not observation_id.strip()
+            or not isinstance(entry, Mapping)
+            or entry.get("id") != observation_id
+        ):
+            raise CloseContractError(
+                "Final reconciliation snapshot entries must be derived-state tables keyed by observation id"
+            )
+        disposition = entry.get("disposition")
+        if not isinstance(disposition, str) or not disposition.strip():
+            raise CloseContractError(
+                f"snapshot observation {observation_id!r} lacks an explicit disposition"
+            )
+        canonical[observation_id] = disposition
+    return canonical
+
+
 def verify_final_observation_reconciliation(
     *,
     observations: Iterable[Mapping[str, object]],
+    review_attempts: Iterable[Mapping[str, object]] | None = None,
+    derived_state: Mapping[str, object] | None = None,
     cleanup_works: Iterable[Mapping[str, object]] = (),
     further_advisory_improvement_conceivable: bool = False,
 ) -> str:
-    """Gate Final Integration on reconciled observations and completed cleanup.
+    """Check a proposed Final set against supplied canonical dispositions.
 
-    Every still-open observation must reconcile to exactly one of the five
-    terminal dispositions, and every cleanup candidate must be covered by a
-    completed independently reviewed cleanup work.
+    This is the relative-consistency engine: the proposal must exactly match
+    the given review_attempts derivation or derived_state snapshot, every
+    entry must carry a terminal disposition, and every cleanup candidate must
+    be covered by a fully validated completed cleanup work. It proves nothing
+    about the completeness of its own inputs; truncation-proof completeness
+    against durable state is provided only by
+    verify_final_observation_reconciliation_from_board.
     """
 
     # Deliberately do not branch on further_advisory_improvement_conceivable.
@@ -334,6 +414,29 @@ def verify_final_observation_reconciliation(
             )
         dispositions[observation_id] = str(disposition)
 
+    canonical = _canonical_final_dispositions(
+        review_attempts=review_attempts, derived_state=derived_state
+    )
+    omitted = set(canonical) - set(dispositions)
+    if omitted:
+        raise CloseContractError(
+            "Final reconciliation omits known observations from canonical history: "
+            + ", ".join(sorted(omitted))
+        )
+    fabricated = set(dispositions) - set(canonical)
+    if fabricated:
+        raise CloseContractError(
+            "Final reconciliation proposes unknown observations absent from canonical history: "
+            + ", ".join(sorted(fabricated))
+        )
+    for observation_id, disposition in dispositions.items():
+        if disposition != canonical[observation_id]:
+            raise CloseContractError(
+                f"observation {observation_id!r} proposed disposition {disposition!r} "
+                "does not match canonical derived disposition "
+                f"{canonical[observation_id]!r}"
+            )
+
     covered: set[str] = set()
     for work in cleanup_works:
         if not isinstance(work, Mapping):
@@ -358,10 +461,15 @@ def verify_final_observation_reconciliation(
                     "not cleanup_candidate"
                 )
         if work.get("complete") is True:
-            if work.get("independent_review_green") is not True:
-                raise CloseContractError(
-                    f"cleanup work {work_id!r} requires GREEN independent review before Final Integration"
-                )
+            validate_cleanup_work(
+                work_id=work.get("work_id", ""),
+                subject=work.get("subject", {}),
+                tests_evidence=work.get("tests_evidence", []),
+                independent_review_green=work.get("independent_review_green", False),
+                covers_observation_ids=covers,
+                speculative_redesign=work.get("speculative_redesign", False),
+                new_product_scope=work.get("new_product_scope", False),
+            )
             covered.update(covers)
 
     pending_cleanup = {
@@ -376,6 +484,123 @@ def verify_final_observation_reconciliation(
             + ", ".join(sorted(pending_cleanup))
         )
     return "final_observation_reconciliation_complete"
+
+
+def _read_project_toml(root: Path, raw_path: str, label: str) -> dict:
+    """Read a worktree TOML file, failing closed on escape, absence or corruption."""
+    rel = PurePosixPath(raw_path)
+    if rel.is_absolute() or "." in rel.parts or ".." in rel.parts:
+        raise CloseContractError(f"{label} path escapes the project worktree: {raw_path!r}")
+    path = (root / Path(*rel.parts)).resolve()
+    try:
+        path.relative_to(root)
+    except ValueError as exc:
+        raise CloseContractError(
+            f"{label} path escapes the project worktree: {raw_path!r}"
+        ) from exc
+    try:
+        with path.open("rb") as handle:
+            data = tomllib.load(handle)
+    except OSError as exc:
+        raise CloseContractError(f"{label} {raw_path!r} is unreadable: {exc}") from exc
+    except tomllib.TOMLDecodeError as exc:
+        raise CloseContractError(f"{label} {raw_path!r} is not valid TOML: {exc}") from exc
+    if not isinstance(data, dict):
+        raise CloseContractError(f"{label} {raw_path!r} must be a TOML table")
+    return data
+
+
+def verify_final_observation_reconciliation_from_board(
+    *,
+    project_root: Path | str,
+    board_path: str,
+    card_id: str,
+    observations: Iterable[Mapping[str, object]],
+    cleanup_works: Iterable[Mapping[str, object]] = (),
+    accepted_authority_paths: set[str] | None = None,
+    exact_blob_reader: Callable[[str, str, str], str | None] | None = None,
+    expected_review_scope: str | None = None,
+    further_advisory_improvement_conceivable: bool = False,
+) -> str:
+    """Authoritatively gate Final Integration on durable board-bound review history.
+
+    This is the truncation-proof entry point: it enumerates the Card's review
+    attempts from the durable Task Board locators, reads each attempt file,
+    validates the full history and derives the canonical observation set
+    itself. Omitting a known open observation from the proposal, or pointing
+    the proposal at a forged disposition, fails against durable truth. Only a
+    board that genuinely lists no review attempts may reconcile vacuously.
+    Callers must not substitute in-memory caller-supplied histories when
+    durable state is available.
+    """
+    root = Path(project_root).resolve()
+    try:
+        board = _read_project_toml(root, board_path, "task board")
+    except CloseContractError as exc:
+        raise CloseContractError(f"Final gate cannot read durable Task Board: {exc}") from exc
+    workstream_id = board.get("workstream_id")
+    if not isinstance(workstream_id, str) or not workstream_id.strip():
+        raise CloseContractError("Final gate Task Board lacks workstream_id")
+    try:
+        validate_locator(
+            {"class": "task_board", "path": board_path},
+            "task_board",
+            "final gate board",
+            workstream_id,
+        )
+    except ValidationError as exc:
+        raise CloseContractError(f"Final gate Task Board locator invalid: {exc}") from exc
+
+    cards = board.get("cards")
+    if not isinstance(cards, list):
+        raise CloseContractError("Final gate Task Board has no card array")
+    card = next(
+        (entry for entry in cards if isinstance(entry, dict) and entry.get("id") == card_id),
+        None,
+    )
+    if card is None:
+        raise CloseContractError(f"Final gate Task Board has no Card {card_id!r}")
+    refs = card.get("review_attempts", [])
+    if not isinstance(refs, list):
+        raise CloseContractError(f"Final gate Card {card_id!r} has no review_attempts array")
+
+    attempts: list[dict] = []
+    for index, ref in enumerate(refs):
+        label = f"final gate review_attempts[{index}]"
+        try:
+            attempt_path = validate_locator(
+                ref, "review_attempt", label, workstream_id
+            )
+        except ValidationError as exc:
+            raise CloseContractError(f"Final gate review attempt locator invalid: {exc}") from exc
+        try:
+            attempts.append(_read_project_toml(root, attempt_path, "review attempt"))
+        except CloseContractError as exc:
+            raise CloseContractError(
+                f"Final gate cannot read durable review attempt {attempt_path!r}: {exc}"
+            ) from exc
+
+    if attempts:
+        try:
+            validate_review_history(
+                attempts,
+                expected_card_id=card_id,
+                workstream_id=workstream_id,
+                accepted_authority_paths=accepted_authority_paths,
+                exact_blob_reader=exact_blob_reader,
+                expected_review_scope=expected_review_scope,
+            )
+        except ValidationError as exc:
+            raise CloseContractError(
+                f"Final gate durable review history invalid: {exc}"
+            ) from exc
+
+    return verify_final_observation_reconciliation(
+        observations=observations,
+        review_attempts=attempts,
+        cleanup_works=cleanup_works,
+        further_advisory_improvement_conceivable=further_advisory_improvement_conceivable,
+    )
 
 
 def close_continuation(
