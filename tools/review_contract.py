@@ -33,6 +33,7 @@ CONVERGENCE_FIELDS = frozenset({
     "epoch_reset_basis",
     "epoch_reset_subject",
     "material_defect_class_ids",
+    "failed_material_defect_class_ids",
     "post_convergence_validation",
     "convergence_basis",
 })
@@ -94,6 +95,20 @@ def material_defect_classes(attempt: Mapping[str, object]) -> frozenset[str]:
         )
     if len(set(raw)) != len(raw):
         raise ReviewContractError("material_defect_class_ids must be unique")
+    return frozenset(raw)
+
+
+def failed_material_defect_classes(attempt: Mapping[str, object]) -> frozenset[str]:
+    """Read the material defect classes that actually failed a RED closure pass."""
+    raw = attempt.get("failed_material_defect_class_ids", [])
+    if not isinstance(raw, list) or not all(
+        isinstance(item, str) and item.strip() for item in raw
+    ):
+        raise ReviewContractError(
+            "failed_material_defect_class_ids must contain non-empty strings"
+        )
+    if len(set(raw)) != len(raw):
+        raise ReviewContractError("failed_material_defect_class_ids must be unique")
     return frozenset(raw)
 
 
@@ -183,6 +198,15 @@ def review_convergence_state(
             # must not count as a new discovery epoch if it later recurs.
             seen_classes.update(classes)
             if verdict == "red":
+                failed_classes = failed_material_defect_classes(attempt)
+                if not failed_classes:
+                    raise ReviewContractError(
+                        "RED closure verification must record failed_material_defect_class_ids"
+                    )
+                if not failed_classes.issubset(classes):
+                    raise ReviewContractError(
+                        "failed_material_defect_class_ids must be a subset of verified material defect classes"
+                    )
                 source_id = attempt.get("source_discovery_attempt")
                 source = attempts_by_id.get(source_id) if isinstance(source_id, str) else None
                 if source is None or source is attempt:
@@ -191,7 +215,7 @@ def review_convergence_state(
                     )
                 repaired_content = _review_subject_content_identity(attempt)
                 source_content = _review_subject_content_identity(source)
-                for defect_class in classes:
+                for defect_class in failed_classes:
                     round_key = (defect_class, str(source_id))
                     previous_content = last_failed_round_content.get(
                         round_key, source_content
