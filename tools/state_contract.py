@@ -9,6 +9,8 @@ import tomllib
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from tools.review_contract import REVIEW_KINDS, review_kind
+
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 CARD_STATUSES = {"planned", "ready", "in_progress", "blocked", "done"}
 INTAKE_KINDS = {"issue", "feature", "change"}
@@ -823,6 +825,47 @@ def validate_review(data: dict[str, Any]) -> None:
     else:
         _require(evidence_path == "", "review: non-terminal attempt must not claim terminal evidence")
 
+    v21_fields = {
+        "review_kind", "source_discovery_attempt", "discovery_complete", "material_finding_ids",
+    }
+    explicit_v21 = "review_kind" in data
+    _require(explicit_v21 or not any(key in data for key in v21_fields - {"review_kind"}),
+             "review: PWv2.1 review fields require explicit review_kind")
+    if explicit_v21:
+        kind = data.get("review_kind")
+        _require(kind in REVIEW_KINDS, f"review: invalid review_kind {kind!r}")
+        source = data.get("source_discovery_attempt")
+        _require(isinstance(source, str), "review: source_discovery_attempt must be a string")
+        discovery_complete = data.get("discovery_complete")
+        _require(isinstance(discovery_complete, bool), "review: discovery_complete must be boolean")
+        finding_ids = data.get("material_finding_ids")
+        _require(isinstance(finding_ids, list), "review: material_finding_ids must be an array")
+        _require(
+            all(isinstance(item, str) and item.strip() for item in finding_ids),
+            "review: material_finding_ids must contain non-empty strings",
+        )
+        _require(len(set(finding_ids)) == len(finding_ids),
+                 "review: material_finding_ids must be unique")
+
+        if kind == "discovery":
+            _require(source == "", "review: discovery attempt must not name source_discovery_attempt")
+            if verdict in {"green", "red"}:
+                _require(discovery_complete,
+                         "review: terminal discovery attempt requires complete acceptance-surface discovery")
+            if verdict == "green":
+                _require(not finding_ids,
+                         "review: GREEN discovery attempt cannot retain material blocking findings")
+            if verdict == "red":
+                _require(bool(finding_ids),
+                         "review: RED discovery attempt must record the complete material finding set")
+        else:
+            _require(bool(source.strip()),
+                     "review: closure_verification requires source_discovery_attempt")
+            _require(not discovery_complete,
+                     "review: closure_verification cannot claim full discovery completion")
+            _require(bool(finding_ids),
+                     "review: closure_verification must name the known material findings it verifies")
+
 
 def validate_review_history(
     attempts: list[dict[str, Any]],
@@ -833,6 +876,7 @@ def validate_review_history(
     _require(isinstance(attempts, list) and attempts,
              "review_history: at least one attempt is required")
     seen_ids: set[str] = set()
+    attempts_by_id: dict[str, dict[str, Any]] = {}
     nonterminal = 0
     for index, attempt in enumerate(attempts):
         validate_review(attempt)
@@ -845,6 +889,23 @@ def validate_review_history(
         if workstream_id is not None:
             _require(attempt.get("workstream_id") == workstream_id,
                      "review_history: attempt belongs to another workstream")
+
+        if attempt.get("review_kind") == "closure_verification":
+            source_id = attempt["source_discovery_attempt"]
+            source = attempts_by_id.get(source_id)
+            _require(source is not None,
+                     "review_history: closure source discovery must be an earlier attempt")
+            _require(review_kind(source) == "discovery",
+                     "review_history: closure source must be a discovery attempt")
+            _require(source["verdict"] == "red",
+                     "review_history: closure source discovery must be RED")
+            source_findings = source.get("material_finding_ids")
+            _require(isinstance(source_findings, list),
+                     "review_history: PWv2.1 closure source must record material_finding_ids")
+            _require(set(attempt["material_finding_ids"]).issubset(set(source_findings)),
+                     "review_history: closure may verify only findings frozen by its source discovery")
+
+        attempts_by_id[attempt_id] = attempt
         if attempt["verdict"] in {"pending", "in_progress"}:
             nonterminal += 1
             _require(index == len(attempts) - 1,
