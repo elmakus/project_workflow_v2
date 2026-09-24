@@ -1,0 +1,279 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/project-workflow-v2/execution-obligation.schema.json",
+  "title": "PWv2.1 Execution Obligation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "schema_version",
+    "obligation_id",
+    "rule_id",
+    "role",
+    "subject",
+    "authority_bundle",
+    "prerequisites",
+    "constraints",
+    "completion",
+    "freshness",
+    "mutation"
+  ],
+  "properties": {
+    "kind": {
+      "const": "pwv2_execution_obligation"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "obligation_id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "rule_id": {
+      "type": "string",
+      "pattern": "^PWV21-K[0-9]{3}$"
+    },
+    "role": {
+      "type": "string",
+      "minLength": 1
+    },
+    "subject": {
+      "$ref": "#/$defs/exact_ref"
+    },
+    "authority_bundle": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/authority_source"
+      }
+    },
+    "prerequisites": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "completion": {
+      "$ref": "#/$defs/completion"
+    },
+    "freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fingerprint",
+        "material"
+      ],
+      "properties": {
+        "fingerprint": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "material": {
+          "$ref": "#/$defs/freshness_material"
+        }
+      }
+    },
+    "mutation": {
+      "$ref": "#/$defs/mutation"
+    }
+  },
+  "$defs": {
+    "exact_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "commit",
+        "path",
+        "blob"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[^/]+/[^/]+$"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "blob": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      }
+    },
+    "authority_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "commit",
+        "path",
+        "blob",
+        "content_sha256",
+        "content"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[^/]+/[^/]+$"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "blob": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "content": {
+          "type": "string"
+        }
+      }
+    },
+    "completion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "acceptance",
+        "tests",
+        "evidence"
+      ],
+      "properties": {
+        "acceptance": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "mutation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preconditions",
+        "postconditions"
+      ],
+      "properties": {
+        "preconditions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "postconditions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "freshness_material": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subject",
+        "authority",
+        "prerequisites",
+        "constraints",
+        "completion",
+        "mutation",
+        "inputs"
+      ],
+      "properties": {
+        "subject": {
+          "$ref": "#/$defs/exact_ref"
+        },
+        "authority": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/exact_ref"
+          }
+        },
+        "prerequisites": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "completion": {
+          "$ref": "#/$defs/completion"
+        },
+        "mutation": {
+          "$ref": "#/$defs/mutation"
+        },
+        "inputs": {
+          "type": "object",
+          "propertyNames": {
+            "not": {
+              "enum": [
+                "provider",
+                "model",
+                "model_id",
+                "worker",
+                "worker_id",
+                "session",
+                "session_id",
+                "retry",
+                "retries",
+                "worktree",
+                "paseo",
+                "runtime",
+                "invocation",
+                "scheduler"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}
