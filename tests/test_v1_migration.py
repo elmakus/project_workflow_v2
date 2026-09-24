@@ -369,6 +369,7 @@ class V1MigrationDryRunTests(unittest.TestCase):
         self.assertEqual(attempts[-1]["review_epoch"], "E01")
         self.assertEqual(attempts[-1]["epoch_reset_basis"], "")
         self.assertEqual(attempts[-1]["material_defect_class_ids"], [])
+        self.assertEqual(attempts[-1]["failed_material_defect_class_ids"], [])
         self.assertFalse(attempts[-1]["post_convergence_validation"])
         self.assertEqual(attempts[-1]["convergence_basis"], "")
         self.assertEqual(bundle["task_board"]["cards"][0]["status"], "blocked")
