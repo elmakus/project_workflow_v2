@@ -11,3 +11,30 @@ status = "in_progress"
 [cards.contract]
 class = "task_card"
 path = "implementation/workstreams/sample-workstream/cards/M01-T04.md"
+
+# sizing audit for M01-T04: retained by router tests proving the valid path,
+# stripped by tests proving the missing-audit gate.
+[[sizing_audits]]
+card_id = "M01-T04"
+decision = "single"
+rebuttal_class = ""
+rebuttal = ""
+[[sizing_audits.outcomes]]
+id = "router-precedence"
+kind = "invariant"
+statement = "Approved-plan board precedence with durable fixtures."
+family = "routing"
+independently_verifiable = true
+independently_useful = true
+falsifiable = true
+substantial = true
+scaffolding_only = false
+independently_consumed = false
+[sizing_audits.dimensions]
+independent_implementability = "Durable independent implementability statement for M01-T04."
+falsifiability_testability = "Durable falsifiability testability statement for M01-T04."
+reviewability = "Durable reviewability statement for M01-T04."
+invariant_contract_family = "Durable invariant contract family statement for M01-T04."
+dependency_ordering = "Durable dependency ordering statement for M01-T04."
+atomic_mutation_migration = "Durable atomic mutation migration statement for M01-T04."
+cross_surface_coupling = "Durable cross surface coupling statement for M01-T04."

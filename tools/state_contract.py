@@ -32,6 +32,10 @@ try:
         validate_seam_decisions,
         validate_seam_declarations,
     )
+    from tools.card_sizing_contract import (
+        CardSizingError,
+        validate_sizing_audits,
+    )
 except ModuleNotFoundError:  # direct script execution from tools/
     from review_contract import (
         CONVERGENCE_FIELDS,
@@ -53,6 +57,10 @@ except ModuleNotFoundError:  # direct script execution from tools/
         SeamContractError,
         validate_seam_decisions,
         validate_seam_declarations,
+    )
+    from card_sizing_contract import (
+        CardSizingError,
+        validate_sizing_audits,
     )
 
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
@@ -832,6 +840,11 @@ def validate_board(
             validate_seam_decisions(data["seam_decisions"], planning_seams)
         except SeamContractError as exc:
             raise ValidationError(f"{exc}") from exc
+
+    try:
+        validate_sizing_audits(data.get("sizing_audits"), cards)
+    except CardSizingError as exc:
+        raise ValidationError(f"{exc}") from exc
 
 
 def validate_blocker(data: dict[str, Any], workstream_id: str, card_id: str) -> None:

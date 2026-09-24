@@ -20,3 +20,28 @@ status = "in_progress"
 [cards.contract]
 class = "task_card"
 path = "implementation/workstreams/sample-workstream/cards/M01-T02.md"
+
+[[sizing_audits]]
+card_id = "M01-T02"
+decision = "single"
+rebuttal_class = ""
+rebuttal = ""
+[[sizing_audits.outcomes]]
+id = "state-envelope"
+kind = "invariant"
+statement = "Durable state envelope validation with passing contract fixtures."
+family = "state-envelope"
+independently_verifiable = true
+independently_useful = true
+falsifiable = true
+substantial = true
+scaffolding_only = false
+independently_consumed = false
+[sizing_audits.dimensions]
+independent_implementability = "State helpers build and pass alone against the envelope fixtures."
+falsifiability_testability = "Contract tests fail before the fix and pass after it."
+reviewability = "One bounded Card review covers helpers plus contract text."
+invariant_contract_family = "Single state-envelope invariant family with named bindings."
+dependency_ordering = "No DONE predecessor result is consumed; launch order is free."
+atomic_mutation_migration = "No atomic multi-path mutation; migration stays lazy per workstream."
+cross_surface_coupling = "Helpers, docs and fixtures share no mutable surface."
