@@ -1374,7 +1374,7 @@ class RouterTests(unittest.TestCase):
             for attempt, subject_blob in (
                 ("R02", "4" * 40),
                 ("R03", "5" * 40),
-                ("R04", "b" * 40),
+                ("R04", "6" * 40),
             ):
                 self.add_review_attempt(
                     project,
