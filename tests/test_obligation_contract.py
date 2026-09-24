@@ -138,6 +138,14 @@ class TypedExecutionContractTests(unittest.TestCase):
         self.assertNotEqual(first["freshness"]["fingerprint"], material_change["freshness"]["fingerprint"])
         self.assertNotEqual(first["obligation_id"], material_change["obligation_id"])
 
+    def test_canonical_json_rejects_non_finite_determining_inputs(self) -> None:
+        for value in (float("nan"), float("inf"), float("-inf")):
+            with self.subTest(value=value), self.assertRaisesRegex(
+                ExecutionEnvelopeError,
+                "canonical JSON value must be finite",
+            ):
+                self.obligation(inputs={"card_id": "M02-T01", "non_finite": value})
+
     def test_authority_resolution_requires_exact_refs_and_bundles_only_selected_sources(self) -> None:
         obligation = self.obligation()
         self.assertEqual(len(obligation["authority_bundle"]), 2)
@@ -212,6 +220,8 @@ class TypedExecutionContractTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ExecutionEnvelopeError, "telemetry key"):
             self.obligation(inputs={"card_id": "M02-T01", "worker_id": "worker-7"})
+        with self.assertRaisesRegex(ExecutionEnvelopeError, "telemetry key"):
+            self.obligation(inputs={"card_id": "M02-T01", "Model": "must-not-be-canonical"})
 
         result = self.result(obligation)
         result["schema_version"] = 2
@@ -369,6 +379,20 @@ class TypedExecutionContractTests(unittest.TestCase):
             "card": {"provider": "must-not-be-canonical"}
         }
         invalid_obligations.append(("nested telemetry input", candidate))
+
+        candidate = copy.deepcopy(obligation)
+        candidate["freshness"]["material"]["inputs"] = {
+            "card": {"Model": "must-not-be-canonical"}
+        }
+        invalid_obligations.append(("case-variant nested telemetry input", candidate))
+
+        candidate = copy.deepcopy(obligation)
+        candidate["freshness"]["material"]["prerequisites"] = ["   "]
+        invalid_obligations.append(("blank freshness prerequisite", candidate))
+
+        candidate = copy.deepcopy(obligation)
+        candidate["freshness"]["material"]["constraints"] = ["   "]
+        invalid_obligations.append(("blank freshness constraint", candidate))
 
         candidate = copy.deepcopy(obligation)
         candidate["mutation"]["preconditions"][0]["equals"] = {
