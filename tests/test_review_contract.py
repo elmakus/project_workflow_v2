@@ -225,12 +225,19 @@ class ReviewContractTests(unittest.TestCase):
             "review_epoch": "E01",
             "material_defect_class_ids": ["class-a"],
             "post_convergence_validation": False,
+            "subject": {
+                "repository": "owner/repo",
+                "commit": "1" * 40,
+                "path": "results/card.md",
+                "blob": "2" * 40,
+            },
         }]
         for number in range(2, 5):
             attempts.append({
                 "attempt": f"R{number:02d}",
                 "verdict": "red",
                 "review_kind": "closure_verification",
+                "source_discovery_attempt": "R01",
                 "review_scope": "card",
                 "review_epoch": "E01",
                 "material_defect_class_ids": ["class-a"],
@@ -261,17 +268,104 @@ class ReviewContractTests(unittest.TestCase):
             "review_epoch": "E01",
             "material_defect_class_ids": ["class-a"],
             "post_convergence_validation": False,
+            "subject": {
+                "repository": "owner/repo",
+                "commit": "1" * 40,
+                "path": "results/card.md",
+                "blob": "2" * 40,
+            },
         }]
         for number in range(2, 5):
             attempts.append({
                 "attempt": f"R{number:02d}",
                 "verdict": "red",
                 "review_kind": "closure_verification",
+                "source_discovery_attempt": "R01",
                 "review_scope": "card",
                 "review_epoch": "E01",
                 "material_defect_class_ids": ["class-a"],
                 "post_convergence_validation": False,
                 "subject": repaired_subject,
+            })
+        state = review_convergence_state(attempts)
+        self.assertEqual(state.failed_closure_rounds["class-a"], 1)
+        self.assertFalse(state.convergence_required)
+
+
+    def test_source_discovery_content_does_not_count_as_repair_round(self) -> None:
+        source_subject = {
+            "repository": "owner/repo",
+            "commit": "1" * 40,
+            "path": "results/card.md",
+            "blob": "2" * 40,
+        }
+        attempts = [{
+            "attempt": "R01",
+            "verdict": "red",
+            "review_kind": "discovery",
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "material_defect_class_ids": ["class-a"],
+            "post_convergence_validation": False,
+            "subject": source_subject,
+        }]
+        for attempt_id, commit, blob in (
+            ("R02", "3" * 40, "4" * 40),
+            ("R03", "5" * 40, "6" * 40),
+            ("R04", "7" * 40, "2" * 40),
+        ):
+            attempts.append({
+                "attempt": attempt_id,
+                "verdict": "red",
+                "review_kind": "closure_verification",
+                "source_discovery_attempt": "R01",
+                "review_scope": "card",
+                "review_epoch": "E01",
+                "material_defect_class_ids": ["class-a"],
+                "post_convergence_validation": False,
+                "subject": {
+                    "repository": "owner/repo",
+                    "commit": commit,
+                    "path": "results/card.md",
+                    "blob": blob,
+                },
+            })
+        state = review_convergence_state(attempts)
+        self.assertEqual(state.failed_closure_rounds["class-a"], 2)
+        self.assertFalse(state.convergence_required)
+
+    def test_same_content_different_commit_counts_one_repair_round(self) -> None:
+        attempts = [{
+            "attempt": "R01",
+            "verdict": "red",
+            "review_kind": "discovery",
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "material_defect_class_ids": ["class-a"],
+            "post_convergence_validation": False,
+            "subject": {
+                "repository": "owner/repo",
+                "commit": "1" * 40,
+                "path": "results/card.md",
+                "blob": "2" * 40,
+            },
+        }]
+        for attempt_id, commit in (("R02", "3" * 40), ("R03", "4" * 40)):
+            attempts.append({
+                "attempt": attempt_id,
+                "verdict": "red",
+                "review_kind": "closure_verification",
+                "source_discovery_attempt": "R01",
+                "review_scope": "card",
+                "review_epoch": "E01",
+                "material_defect_class_ids": ["class-a"],
+                "post_convergence_validation": False,
+                "subject": {
+                    "repository": "owner/repo",
+                    "commit": commit,
+                    "path": "results/card.md",
+                    "blob": "5" * 40,
+                },
             })
         state = review_convergence_state(attempts)
         self.assertEqual(state.failed_closure_rounds["class-a"], 1)
