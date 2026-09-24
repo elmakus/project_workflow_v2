@@ -38,9 +38,9 @@ A causal category may be empty only when no materially implicated member exists;
 
 Repair targets the defect class/root cause and materially adjacent sibling/negative-space cases rather than only the literal reported example.
 
-After all known material findings from a RED discovery are closure-verified, one new fresh `discovery` attempt over the exact current subject is mandatory. A GREEN closure attempt therefore routes to a new discovery attempt and cannot finalize the Card. Only a GREEN discovery attempt can satisfy the review obligation.
+After all known material findings from a RED discovery are closure-verified, one new fresh `discovery` attempt over the exact current subject is mandatory. A GREEN closure attempt that covers only part of the source discovery set therefore keeps the lifecycle in closure verification for the remaining known findings; only after cumulative GREEN closure covers the full frozen set does the router freeze the fresh discovery attempt. Closure can never finalize the Card. Only a GREEN discovery attempt can satisfy the review obligation.
 
-Historical review attempts that predate the explicit `review_kind` fields are interpreted as discovery attempts so existing terminal history remains valid. New PWv2.1 attempts use the explicit fields.
+Historical terminal review attempts that predate the explicit `review_kind` fields remain valid as an initial legacy history prefix and are interpreted as discovery. A new PWv2.1 attempt begins as pending/in-progress with the explicit fields; active legacy-shaped attempts are invalid, and once explicit PWv2.1 history begins later attempts cannot return to legacy shape.
 
 ## Semantic independence
 
