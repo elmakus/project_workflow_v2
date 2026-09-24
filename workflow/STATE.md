@@ -63,6 +63,8 @@ New PWv2.1 attempts also bind an explicit review kind. A `discovery` attempt rec
 
 For REQUIRED/activated RECOMMENDED review, pending/in-progress/RED blocks terminal Card completion. GREEN closure attempts cumulatively close only the named findings from their source RED discovery. If any source finding remains unverified, the next review obligation remains closure verification; after the full frozen set is closure-verified, the router freezes one fresh full-scope discovery attempt. Only a GREEN discovery attempt for the exact current subject permits deterministic post-review finalization. A context that materially produced/repaired the subject cannot issue its independent verdict, and runtime reviewer identity is never canonical state.
 
+Convergence-aware attempts also bind `review_scope`, one stable `review_epoch`, material defect-class IDs, and whether the attempt is the single post-convergence validation. Discovery-epoch and per-class closure-failure counts are derived from immutable attempt history; no mutable counter store is canonical. An epoch change requires a durable accepted-redesign reset basis. Card/Milestone/Final discovery ceilings are 5/4/3 and each material defect class permits at most 3 failed repair→closure-verification rounds before Main convergence analysis. A post-convergence validation records its convergence basis; a RED result routes to structural resolution rather than another ordinary review cycle.
+
 ## Mutation guard / one-Card invariant
 
 Mutable Task Board revision rejects stale expected writes. At most one Project Workflow Card may be in_progress. Runtime-internal topology remains outside canonical state.
