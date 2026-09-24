@@ -556,6 +556,30 @@ class ReviewContractTests(unittest.TestCase):
         }))
         self.assertTrue(can_finalize_review_obligation({"verdict": "green"}))
 
+    def test_expected_review_scope_binds_convergence_owner(self) -> None:
+        for scope, ceiling in REVIEW_SCOPE_DISCOVERY_CEILINGS.items():
+            attempts = [
+                {
+                    "attempt": f"R{index + 1:02d}",
+                    "verdict": "red",
+                    "review_kind": "discovery",
+                    "review_scope": scope,
+                    "review_epoch": "E01",
+                    "material_defect_class_ids": [f"class-{index}"],
+                    "post_convergence_validation": False,
+                }
+                for index in range(ceiling)
+            ]
+            bound = review_convergence_state(attempts, expected_review_scope=scope)
+            self.assertEqual(bound.discovery_ceiling, ceiling)
+            self.assertTrue(bound.convergence_required, scope)
+            other = "final" if scope == "card" else "card"
+            with self.subTest(scope=scope):
+                with self.assertRaisesRegex(ReviewContractError, "does not match expected"):
+                    review_convergence_state(attempts, expected_review_scope=other)
+        with self.assertRaisesRegex(ReviewContractError, "unsupported expected review scope"):
+            review_convergence_state([], expected_review_scope="program")
+
 
 if __name__ == "__main__":
     unittest.main()

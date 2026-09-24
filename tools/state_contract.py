@@ -802,7 +802,12 @@ def _review_subject_key(data: dict[str, Any]) -> str:
     return f"{subject['repository']}@{subject['commit']}:{subject['path']}@{subject['blob']}"
 
 
-def validate_review(data: dict[str, Any]) -> None:
+def validate_review(data: dict[str, Any], *, expected_review_scope: str | None = None) -> None:
+    if expected_review_scope is not None:
+        _require(
+            expected_review_scope in REVIEW_SCOPE_DISCOVERY_CEILINGS,
+            f"review: invalid expected_review_scope {expected_review_scope!r}",
+        )
     reject_prohibited_keys(data, "review")
     _require(isinstance(data.get("attempt"), str) and data["attempt"], "review: missing attempt")
     verdict = data.get("verdict")
@@ -900,6 +905,11 @@ def validate_review(data: dict[str, Any]) -> None:
         scope = data.get("review_scope")
         _require(scope in REVIEW_SCOPE_DISCOVERY_CEILINGS,
                  f"review: invalid review_scope {scope!r}")
+        if expected_review_scope is not None:
+            _require(
+                scope == expected_review_scope,
+                f"review: review_scope {scope!r} does not match expected review owner scope {expected_review_scope!r}",
+            )
         epoch = data.get("review_epoch")
         _require(isinstance(epoch, str) and epoch.strip(),
                  "review: review_epoch must be a non-empty string")
@@ -999,9 +1009,17 @@ def validate_review_history(
     workstream_id: str | None = None,
     accepted_authority_paths: set[str] | None = None,
     exact_blob_reader: Callable[[str, str, str], str | None] | None = None,
+    expected_review_scope: str | None = None,
 ) -> None:
     _require(isinstance(attempts, list) and attempts,
              "review_history: at least one attempt is required")
+    if expected_review_scope is None and expected_card_id is not None:
+        expected_review_scope = "card"
+    if expected_review_scope is not None:
+        _require(
+            expected_review_scope in REVIEW_SCOPE_DISCOVERY_CEILINGS,
+            f"review_history: invalid expected_review_scope {expected_review_scope!r}",
+        )
     accepted_authorities = {
         _safe_relative_path(path, "review_history.accepted_authority_paths")
         for path in (accepted_authority_paths or set())
@@ -1017,7 +1035,7 @@ def validate_review_history(
     post_convergence_terminal_epoch: str | None = None
     nonterminal = 0
     for index, attempt in enumerate(attempts):
-        validate_review(attempt)
+        validate_review(attempt, expected_review_scope=expected_review_scope)
         attempt_id = attempt["attempt"]
         explicit_v21 = "review_kind" in attempt
         convergence_aware = convergence_fields_present(attempt)
@@ -1130,7 +1148,9 @@ def validate_review_history(
             )
             if convergence_aware:
                 try:
-                    prior = review_convergence_state(attempts[:index])
+                    prior = review_convergence_state(
+                        attempts[:index], expected_review_scope=expected_review_scope
+                    )
                 except ReviewContractError as exc:
                     raise ValidationError(f"review_history: {exc}") from exc
                 is_post = attempt["post_convergence_validation"]
@@ -1198,7 +1218,7 @@ def validate_review_history(
                      "review_history: only the latest attempt may be non-terminal")
     _require(nonterminal <= 1, "review_history: multiple active attempts are forbidden")
     try:
-        review_convergence_state(attempts)
+        review_convergence_state(attempts, expected_review_scope=expected_review_scope)
     except ReviewContractError as exc:
         raise ValidationError(f"review_history: {exc}") from exc
 

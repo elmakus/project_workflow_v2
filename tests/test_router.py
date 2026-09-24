@@ -1521,6 +1521,71 @@ class RouterTests(unittest.TestCase):
         finally:
             temp.cleanup()
 
+    def test_card_scope_mismatch_cannot_trigger_milestone_or_final_ceiling(self) -> None:
+        for scope, discoveries in (("final", 3), ("milestone", 4)):
+            with self.subTest(review_scope=scope):
+                temp, project = self.copy_fixture()
+                try:
+                    self.install_reviewable_result(project, "required")
+                    for index in range(discoveries):
+                        discovery_id = f"R{index * 2 + 1:02d}"
+                        self.add_review_attempt(
+                            project,
+                            "red",
+                            discovery_id,
+                            finding_ids=(f"F{index}",),
+                            defect_class_ids=(f"class-{index}",),
+                            review_scope=scope,
+                        )
+                        if index < discoveries - 1:
+                            self.add_review_attempt(
+                                project,
+                                "green",
+                                f"R{index * 2 + 2:02d}",
+                                review_kind="closure_verification",
+                                source_discovery_attempt=discovery_id,
+                                finding_ids=(f"F{index}",),
+                                defect_class_ids=(f"class-{index}",),
+                                review_scope=scope,
+                            )
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertEqual(
+                        (routed.disposition, routed.obligation),
+                        ("recovery", "recovery_boundary"),
+                    )
+                    self.assertIn("expected", routed.reason)
+                finally:
+                    temp.cleanup()
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            for index in range(3):
+                discovery_id = f"R{index * 2 + 1:02d}"
+                self.add_review_attempt(
+                    project,
+                    "red",
+                    discovery_id,
+                    finding_ids=(f"F{index}",),
+                    defect_class_ids=(f"class-{index}",),
+                )
+                if index < 2:
+                    self.add_review_attempt(
+                        project,
+                        "green",
+                        f"R{index * 2 + 2:02d}",
+                        review_kind="closure_verification",
+                        source_discovery_attempt=discovery_id,
+                        finding_ids=(f"F{index}",),
+                        defect_class_ids=(f"class-{index}",),
+                    )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("route", "execution_resolution"),
+            )
+        finally:
+            temp.cleanup()
+
     def test_known_class_recurrence_does_not_consume_new_discovery_epoch(self) -> None:
         temp, project = self.copy_fixture()
         try:

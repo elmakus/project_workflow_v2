@@ -630,6 +630,7 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                         reads.project_root,
                         project["repository"],
                     ),
+                    expected_review_scope="card",
                 )
                 current_subject = exact_result_subject(project["repository"], card["result"])
                 verdict = attempts[-1]["verdict"]
@@ -664,7 +665,9 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                                 "Some known findings remain unverified; freeze another closure-verification attempt before fresh discovery",
                                 subject=card["id"], owner_module="workflow/REVIEW.md",
                             )
-                        convergence = review_convergence_state(attempts)
+                        convergence = review_convergence_state(
+                            attempts, expected_review_scope="card"
+                        )
                         if (
                             convergence.convergence_required
                             and convergence.post_convergence_attempt is None
@@ -680,7 +683,9 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                             subject=card["id"], owner_module="workflow/REVIEW.md",
                         )
 
-                convergence = review_convergence_state(attempts)
+                convergence = review_convergence_state(
+                    attempts, expected_review_scope="card"
+                )
                 if attempts[-1].get("post_convergence_validation") is True:
                     return result(
                         reads, "route", "review_structural_resolution",

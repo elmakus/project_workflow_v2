@@ -129,13 +129,19 @@ def _review_subject_content_identity(attempt: Mapping[str, object]) -> tuple[str
 
 def review_convergence_state(
     attempts: Iterable[Mapping[str, object]],
+    *,
+    expected_review_scope: str | None = None,
 ) -> ReviewConvergenceState:
     """Derive review-loop accounting from durable attempt history.
 
     Pre-convergence terminal history is intentionally ignored. A changed
     review_epoch resets derived counters; state-contract validation owns the
     requirement that such a reset has an accepted durable redesign basis.
+    When expected_review_scope is set, every convergence-aware attempt must
+    bind to that review obligation owner instead of a self-declared scope.
     """
+    if expected_review_scope is not None and expected_review_scope not in REVIEW_SCOPE_DISCOVERY_CEILINGS:
+        raise ReviewContractError(f"unsupported expected review scope {expected_review_scope!r}")
     scope: str | None = None
     epoch: str | None = None
     discovery_epochs = 0
@@ -157,6 +163,10 @@ def review_convergence_state(
         raw_epoch = attempt.get("review_epoch")
         if raw_scope not in REVIEW_SCOPE_DISCOVERY_CEILINGS:
             raise ReviewContractError(f"unsupported review scope {raw_scope!r}")
+        if expected_review_scope is not None and raw_scope != expected_review_scope:
+            raise ReviewContractError(
+                f"review scope {raw_scope!r} does not match expected review owner scope {expected_review_scope!r}"
+            )
         if not isinstance(raw_epoch, str) or not raw_epoch.strip():
             raise ReviewContractError("review_epoch must be a non-empty string")
 

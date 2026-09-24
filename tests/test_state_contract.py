@@ -782,6 +782,89 @@ class StateEnvelopeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "not semantically independent"):
             validate_review(self_review)
 
+    def test_card_owned_history_requires_card_review_scope(self) -> None:
+        review = {
+            "workstream_id": "sample-workstream",
+            "card_id": "M03-T03",
+            "attempt": "R01",
+            "verdict": "red",
+            "evidence_path": "evidence/review-R01.md",
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": ["F1"],
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": ["class-a"],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "subject": {
+                "class": "git_blob",
+                "repository": "owner/repo",
+                "commit": "a" * 40,
+                "path": "workflow/STATE.md",
+                "blob": "b" * 40,
+            },
+            "acceptance": {
+                "class": "task_card",
+                "path": "implementation/workstreams/sample-workstream/cards/M03-T03.md",
+            },
+            "independence": {
+                "materially_produced_or_repaired_subject": False,
+                "basis": "Reviewer did not materially produce or repair the exact subject.",
+            },
+        }
+        validate_review_history(
+            [review],
+            expected_card_id="M03-T03",
+            workstream_id="sample-workstream",
+        )
+        for wrong_scope in ("milestone", "final"):
+            with self.subTest(review_scope=wrong_scope):
+                wrong = copy.deepcopy(review)
+                wrong["review_scope"] = wrong_scope
+                with self.assertRaisesRegex(ValidationError, "does not match expected"):
+                    validate_review(wrong, expected_review_scope="card")
+                with self.assertRaisesRegex(ValidationError, "does not match expected"):
+                    validate_review_history(
+                        [wrong],
+                        expected_card_id="M03-T03",
+                        workstream_id="sample-workstream",
+                    )
+                with self.assertRaisesRegex(ValidationError, "does not match expected"):
+                    validate_review_history([wrong], expected_review_scope="card")
+
+    def test_expected_review_scope_seam_binds_milestone_and_final(self) -> None:
+        base = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        base.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": ["F1"],
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": ["class-a"],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "verdict": "red",
+        })
+        for scope in ("card", "milestone", "final"):
+            with self.subTest(scope=scope):
+                attempt = copy.deepcopy(base)
+                attempt["review_scope"] = scope
+                validate_review(attempt, expected_review_scope=scope)
+                validate_review_history([attempt], expected_review_scope=scope)
+                other = "final" if scope == "card" else "card"
+                mismatch = copy.deepcopy(base)
+                mismatch["review_scope"] = other
+                with self.assertRaisesRegex(ValidationError, "does not match expected"):
+                    validate_review(mismatch, expected_review_scope=scope)
+                with self.assertRaisesRegex(ValidationError, "does not match expected"):
+                    validate_review_history([mismatch], expected_review_scope=scope)
+        with self.assertRaisesRegex(ValidationError, "invalid expected_review_scope"):
+            validate_review_history([copy.deepcopy(base)], expected_review_scope="program")
+
     def test_issue_intake_alignment_is_exact_and_stale_subject_fails(self) -> None:
         intake = read_toml(VALID / "INTAKE.toml")
         validate_intake(intake, "sample-workstream")
