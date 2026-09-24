@@ -170,6 +170,49 @@ class StateEnvelopeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "terminal verdict"):
             validate_review(terminal_without_evidence)
 
+    def test_pw21_discovery_and_closure_history_is_explicit_and_bounded(self) -> None:
+        base = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        base.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": ["F1", "F2"],
+            "verdict": "red",
+        })
+        validate_review(base)
+
+        closure = copy.deepcopy(base)
+        closure.update({
+            "attempt": "R02",
+            "review_kind": "closure_verification",
+            "source_discovery_attempt": "R01",
+            "discovery_complete": False,
+            "material_finding_ids": ["F1"],
+            "verdict": "green",
+        })
+        closure["subject"]["blob"] = "4" * 40
+        validate_review_history([base, closure])
+
+        unknown_source = copy.deepcopy(closure)
+        unknown_source["source_discovery_attempt"] = "R99"
+        with self.assertRaisesRegex(ValidationError, "earlier attempt"):
+            validate_review_history([base, unknown_source])
+
+        foreign_finding = copy.deepcopy(closure)
+        foreign_finding["material_finding_ids"] = ["F3"]
+        with self.assertRaisesRegex(ValidationError, "only findings frozen"):
+            validate_review_history([base, foreign_finding])
+
+        incomplete_discovery = copy.deepcopy(base)
+        incomplete_discovery["discovery_complete"] = False
+        with self.assertRaisesRegex(ValidationError, "complete acceptance-surface"):
+            validate_review(incomplete_discovery)
+
+        green_with_blocker = copy.deepcopy(base)
+        green_with_blocker["verdict"] = "green"
+        with self.assertRaisesRegex(ValidationError, "cannot retain material blocking"):
+            validate_review(green_with_blocker)
+
     def test_task_card_review_acceptance_is_exact_and_semantic(self) -> None:
         review = {
             "workstream_id": "sample-workstream",
