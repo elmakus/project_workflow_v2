@@ -59,7 +59,9 @@ An incomplete/incorrect return with a still-valid Card remains `in_progress` for
 
 Implementation review attempts are append-only workstream-local records referenced by the Card. Each attempt binds one immutable Git subject to its exact acceptance surface and stores only semantic independence provenance.
 
-For REQUIRED/activated RECOMMENDED review, pending/in-progress/RED blocks terminal Card completion. GREEN for the exact current subject permits deterministic post-review finalization; it is not a verdict-only user stop. A context that materially produced/repaired the subject cannot issue its independent verdict, and runtime reviewer identity is never canonical state.
+New PWv2.1 attempts also bind an explicit review kind. A `discovery` attempt records whether complete acceptance-surface discovery finished and the complete material finding IDs frozen by that pass. A `closure_verification` attempt names its earlier RED discovery source plus the subset of frozen finding IDs it is verifying. Historical attempts without these fields remain valid and are interpreted as discovery attempts.
+
+For REQUIRED/activated RECOMMENDED review, pending/in-progress/RED blocks terminal Card completion. A GREEN closure verification proves known-finding closure but still routes to a new fresh full-scope discovery attempt; only a GREEN discovery attempt for the exact current subject permits deterministic post-review finalization. A context that materially produced/repaired the subject cannot issue its independent verdict, and runtime reviewer identity is never canonical state.
 
 ## Mutation guard / one-Card invariant
 
