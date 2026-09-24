@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 
@@ -108,6 +109,40 @@ def recovery(reads: Reads, reason: str) -> RouteResult:
         reason += "; recovery module unreadable"
     return result(reads, "recovery", "recovery_boundary", reason,
                   owner_module="workflow/RECOVERY.md")
+
+
+def project_git_blob_reader(project_root: Path, project_repository: str):
+    """Return an exact blob reader for immutable subjects in the selected project Git repository."""
+    def read_blob(repository: str, commit: str, path: str) -> str | None:
+        if repository != project_repository:
+            return None
+        try:
+            resolved = subprocess.run(
+                ["git", "-C", str(project_root), "rev-parse", "--verify", f"{commit}:{path}"],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=5,
+            )
+            if resolved.returncode != 0:
+                return None
+            sha = resolved.stdout.strip()
+            if len(sha) != 40 or any(char not in "0123456789abcdef" for char in sha):
+                return None
+            kind = subprocess.run(
+                ["git", "-C", str(project_root), "cat-file", "-t", sha],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=5,
+            )
+            if kind.returncode != 0 or kind.stdout.strip() != "blob":
+                return None
+            return sha
+        except (OSError, subprocess.SubprocessError):
+            return None
+
+    return read_blob
 
 
 def policy_result(
@@ -591,6 +626,10 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     expected_card_id=card["id"],
                     workstream_id=workstream["workstream_id"],
                     accepted_authority_paths=set(contract["authority_refs"]),
+                    exact_blob_reader=project_git_blob_reader(
+                        reads.project_root,
+                        project["repository"],
+                    ),
                 )
                 current_subject = exact_result_subject(project["repository"], card["result"])
                 verdict = attempts[-1]["verdict"]
