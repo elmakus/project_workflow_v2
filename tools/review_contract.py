@@ -97,12 +97,16 @@ def material_defect_classes(attempt: Mapping[str, object]) -> frozenset[str]:
     return frozenset(raw)
 
 
-def _review_subject_identity(attempt: Mapping[str, object]) -> tuple[str, str, str, str]:
-    """Return exact immutable reviewed-subject identity for repair-round accounting."""
+def _review_subject_content_identity(attempt: Mapping[str, object]) -> tuple[str, str, str]:
+    """Return reviewed content identity for repair-round accounting.
+
+    Commit-only movement of the same repository/path/blob is not a new repaired
+    content state and therefore must not consume another repair/closure round.
+    """
     subject = attempt.get("subject")
     if not isinstance(subject, Mapping):
         raise ReviewContractError("RED closure verification requires exact reviewed subject")
-    values = tuple(subject.get(key) for key in ("repository", "commit", "path", "blob"))
+    values = tuple(subject.get(key) for key in ("repository", "path", "blob"))
     if not all(isinstance(value, str) and value for value in values):
         raise ReviewContractError("RED closure verification requires exact reviewed subject")
     return values  # type: ignore[return-value]
@@ -122,11 +126,15 @@ def review_convergence_state(
     discovery_epochs = 0
     seen_classes: set[str] = set()
     failed_rounds: dict[str, int] = {}
-    failed_round_subjects: dict[str, set[tuple[str, str, str, str]]] = {}
+    failed_round_subjects: dict[str, set[tuple[str, str, str]]] = {}
+    attempts_by_id: dict[str, Mapping[str, object]] = {}
     post_attempt: str | None = None
     post_verdict: str | None = None
 
     for attempt in attempts:
+        attempt_id = attempt.get("attempt")
+        if isinstance(attempt_id, str) and attempt_id:
+            attempts_by_id[attempt_id] = attempt
         if not convergence_fields_present(attempt):
             continue
 
@@ -175,11 +183,19 @@ def review_convergence_state(
             # must not count as a new discovery epoch if it later recurs.
             seen_classes.update(classes)
             if verdict == "red":
-                subject_identity = _review_subject_identity(attempt)
-                for defect_class in classes:
-                    subjects = failed_round_subjects.setdefault(defect_class, set())
-                    subjects.add(subject_identity)
-                    failed_rounds[defect_class] = len(subjects)
+                source_id = attempt.get("source_discovery_attempt")
+                source = attempts_by_id.get(source_id) if isinstance(source_id, str) else None
+                if source is None or source is attempt:
+                    raise ReviewContractError(
+                        "RED closure verification requires an earlier source discovery attempt"
+                    )
+                repaired_content = _review_subject_content_identity(attempt)
+                source_content = _review_subject_content_identity(source)
+                if repaired_content != source_content:
+                    for defect_class in classes:
+                        subjects = failed_round_subjects.setdefault(defect_class, set())
+                        subjects.add(repaired_content)
+                        failed_rounds[defect_class] = len(subjects)
 
     if scope is None or epoch is None:
         return ReviewConvergenceState(
