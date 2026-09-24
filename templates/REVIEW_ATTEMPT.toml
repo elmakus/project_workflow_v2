@@ -11,6 +11,14 @@ material_finding_ids = []
 review_scope = "card"
 review_epoch = "E01"
 epoch_reset_basis = ""
+# On a changed epoch only, epoch_reset_basis must be non-empty and bind one exact
+# accepted authority/acceptance redesign subject, for example:
+# [epoch_reset_subject]
+# class = "accepted_redesign"
+# repository = "owner/repository"
+# commit = "0000000000000000000000000000000000000000"
+# path = "requirements/ACCEPTED_REQUIREMENTS.md"
+# blob = "0000000000000000000000000000000000000000"
 material_defect_class_ids = []
 post_convergence_validation = false
 convergence_basis = ""
