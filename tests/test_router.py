@@ -1371,7 +1371,11 @@ class RouterTests(unittest.TestCase):
                 project, "red", "R01",
                 finding_ids=("F1",), defect_class_ids=("class-a",),
             )
-            for index, attempt in enumerate(("R02", "R03", "R04"), start=4):
+            for attempt, subject_blob in (
+                ("R02", "4" * 40),
+                ("R03", "5" * 40),
+                ("R04", "b" * 40),
+            ):
                 self.add_review_attempt(
                     project,
                     "red",
@@ -1380,7 +1384,7 @@ class RouterTests(unittest.TestCase):
                     source_discovery_attempt="R01",
                     finding_ids=("F1",),
                     defect_class_ids=("class-a",),
-                    subject_blob=str(index) * 40,
+                    subject_blob=subject_blob,
                 )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("route", "review_convergence"))
@@ -1404,7 +1408,7 @@ class RouterTests(unittest.TestCase):
                     source_discovery_attempt="R01",
                     finding_ids=("F1",),
                     defect_class_ids=("class-a",),
-                    subject_blob="4" * 40,
+                    subject_blob="b" * 40,
                 )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_resolution"))
