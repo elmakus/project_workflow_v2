@@ -162,6 +162,12 @@ class StateEnvelopeTests(unittest.TestCase):
         pending["source_discovery_attempt"] = ""
         pending["discovery_complete"] = False
         pending["material_finding_ids"] = []
+        pending["review_scope"] = "card"
+        pending["review_epoch"] = "E01"
+        pending["epoch_reset_basis"] = ""
+        pending["material_defect_class_ids"] = []
+        pending["post_convergence_validation"] = False
+        pending["convergence_basis"] = ""
         pending["subject"]["blob"] = "4" * 40
         validate_review_history([base, pending])
 
@@ -181,6 +187,12 @@ class StateEnvelopeTests(unittest.TestCase):
             "source_discovery_attempt": "",
             "discovery_complete": True,
             "material_finding_ids": ["F1", "F2"],
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": ["class-a", "class-b"],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
             "verdict": "red",
         })
         validate_review(base)
@@ -192,6 +204,7 @@ class StateEnvelopeTests(unittest.TestCase):
             "source_discovery_attempt": "R01",
             "discovery_complete": False,
             "material_finding_ids": ["F1"],
+            "material_defect_class_ids": ["class-a"],
             "verdict": "green",
         })
         closure["subject"]["blob"] = "4" * 40
@@ -204,6 +217,7 @@ class StateEnvelopeTests(unittest.TestCase):
             "source_discovery_attempt": "",
             "discovery_complete": False,
             "material_finding_ids": [],
+            "material_defect_class_ids": [],
             "verdict": "pending",
             "evidence_path": "",
         })
@@ -215,6 +229,7 @@ class StateEnvelopeTests(unittest.TestCase):
         closure_two.update({
             "attempt": "R03",
             "material_finding_ids": ["F2"],
+            "material_defect_class_ids": ["class-b"],
         })
         validate_review_history([base, closure, closure_two])
 
@@ -256,6 +271,12 @@ class StateEnvelopeTests(unittest.TestCase):
             "source_discovery_attempt": "",
             "discovery_complete": False,
             "material_finding_ids": [],
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": [],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
             "verdict": "pending",
             "evidence_path": "",
         })
@@ -272,6 +293,105 @@ class StateEnvelopeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "initial historical prefix"):
             validate_review_history([historical, explicit_terminal, legacy_after_explicit])
 
+    def test_review_epoch_reset_requires_material_accepted_redesign_basis(self) -> None:
+        base = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        base.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": ["F1"],
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": ["class-a"],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "verdict": "red",
+        })
+
+        reset = copy.deepcopy(base)
+        reset.update({
+            "attempt": "R02",
+            "review_epoch": "E02",
+            "material_finding_ids": [],
+            "material_defect_class_ids": [],
+            "discovery_complete": False,
+            "verdict": "pending",
+            "evidence_path": "",
+        })
+        reset["subject"]["blob"] = "4" * 40
+        with self.assertRaisesRegex(ValidationError, "changed review_epoch requires"):
+            validate_review_history([base, reset])
+
+        reset["epoch_reset_basis"] = (
+            "Accepted authority/acceptance redesign revision R4 replaces the prior epoch."
+        )
+        validate_review_history([base, reset])
+
+        same_epoch_claim = copy.deepcopy(base)
+        same_epoch_claim.update({
+            "attempt": "R02",
+            "epoch_reset_basis": "repair convenience is not a redesign",
+            "material_finding_ids": [],
+            "material_defect_class_ids": [],
+            "discovery_complete": False,
+            "verdict": "pending",
+            "evidence_path": "",
+        })
+        same_epoch_claim["subject"]["blob"] = "4" * 40
+        with self.assertRaisesRegex(ValidationError, "unchanged review_epoch"):
+            validate_review_history([base, same_epoch_claim])
+
+    def test_post_convergence_validation_requires_threshold_and_is_single(self) -> None:
+        attempts = []
+        for index in range(5):
+            discovery = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+            discovery.update({
+                "attempt": f"R{index * 2 + 1:02d}",
+                "review_kind": "discovery",
+                "source_discovery_attempt": "",
+                "discovery_complete": True,
+                "material_finding_ids": [f"F{index}"],
+                "review_scope": "card",
+                "review_epoch": "E01",
+                "epoch_reset_basis": "",
+                "material_defect_class_ids": [f"class-{index}"],
+                "post_convergence_validation": False,
+                "convergence_basis": "",
+                "verdict": "red",
+            })
+            discovery["subject"]["blob"] = chr(ord("4") + index) * 40
+            attempts.append(discovery)
+            closure = copy.deepcopy(discovery)
+            closure.update({
+                "attempt": f"R{index * 2 + 2:02d}",
+                "review_kind": "closure_verification",
+                "source_discovery_attempt": discovery["attempt"],
+                "discovery_complete": False,
+                "verdict": "green",
+            })
+            attempts.append(closure)
+
+        post = copy.deepcopy(attempts[-1])
+        post.update({
+            "attempt": "R11",
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": False,
+            "material_finding_ids": [],
+            "material_defect_class_ids": [],
+            "post_convergence_validation": True,
+            "convergence_basis": "Main convergence/root-cause analysis C01",
+            "verdict": "pending",
+            "evidence_path": "",
+        })
+        validate_review_history(attempts + [post])
+
+        second = copy.deepcopy(post)
+        second["attempt"] = "R12"
+        with self.assertRaisesRegex(ValidationError, "only one post-convergence"):
+            validate_review_history(attempts + [post | {"verdict": "green", "discovery_complete": True, "evidence_path": base_evidence if False else attempts[0]["evidence_path"]}, second])
+
     def test_task_card_review_acceptance_is_exact_and_semantic(self) -> None:
         review = {
             "workstream_id": "sample-workstream",
@@ -283,6 +403,12 @@ class StateEnvelopeTests(unittest.TestCase):
             "source_discovery_attempt": "",
             "discovery_complete": False,
             "material_finding_ids": [],
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": [],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
             "subject": {
                 "class": "git_blob",
                 "repository": "owner/repo",
