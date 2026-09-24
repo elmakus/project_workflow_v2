@@ -49,6 +49,7 @@ class TypedExecutionContractTests(unittest.TestCase):
             "path": "implementation/cards/M02-T01.md",
             "blob": "c" * 40,
         }
+        self.rule_fingerprint = "sha256:65c334ebb3b1164b9f2918b3af0447cd976082be77e3b36436a5ea9f31a16539"
 
     def ref(self, path: str, content: bytes, commit: str) -> dict[str, str]:
         return {
@@ -70,6 +71,7 @@ class TypedExecutionContractTests(unittest.TestCase):
     ) -> dict:
         return compile_execution_obligation(
             rule_id="PWV21-K011",
+                rule_fingerprint=self.rule_fingerprint,
             role="execution_prep",
             subject=self.subject,
             authority_refs=self.authority_refs,
@@ -177,6 +179,7 @@ class TypedExecutionContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ExecutionEnvelopeError, "commit must be exact"):
             compile_execution_obligation(
                 rule_id="PWV21-K011",
+                rule_fingerprint=self.rule_fingerprint,
                 role="execution_prep",
                 subject=self.subject,
                 authority_refs=inexact,
@@ -196,6 +199,7 @@ class TypedExecutionContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ExecutionEnvelopeError, "repository must be owner/name"):
             compile_execution_obligation(
                 rule_id="PWV21-K011",
+                rule_fingerprint=self.rule_fingerprint,
                 role="execution_prep",
                 subject=invalid_subject,
                 authority_refs=self.authority_refs,
@@ -238,6 +242,7 @@ class TypedExecutionContractTests(unittest.TestCase):
                 ):
                     compile_execution_obligation(
                         rule_id="PWV21-K011",
+                rule_fingerprint=self.rule_fingerprint,
                         role="execution_prep",
                         subject=invalid_subject,
                         authority_refs=self.authority_refs,
@@ -257,6 +262,7 @@ class TypedExecutionContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ExecutionEnvelopeError, "blob mismatch"):
             compile_execution_obligation(
                 rule_id="PWV21-K011",
+                rule_fingerprint=self.rule_fingerprint,
                 role="execution_prep",
                 subject=self.subject,
                 authority_refs=wrong_blob,
@@ -342,6 +348,91 @@ class TypedExecutionContractTests(unittest.TestCase):
                 changed[field] = replacement
                 with self.assertRaisesRegex(ExecutionEnvelopeError, f"{field}/freshness drift"):
                     validate_execution_obligation(changed)
+
+
+    def test_result_semantic_acceptance_gate_blocks_non_success_and_failed_outcomes(self) -> None:
+        obligation = self.obligation(
+            mutation_preconditions=[],
+            mutation_postconditions=[],
+        )
+
+        for status, blocker in (("failed", None), ("blocked", "real blocker")):
+            with self.subTest(status=status):
+                result = self.result(obligation)
+                result["status"] = status
+                result["blocker"] = blocker
+                with self.assertRaisesRegex(ExecutionEnvelopeError, "not eligible for acceptance"):
+                    reconcile_execution_result(
+                        result,
+                        obligation,
+                        current_freshness_material=obligation["freshness"]["material"],
+                    )
+
+        result = self.result(obligation)
+        result["blocker"] = "must not coexist with success"
+        with self.assertRaisesRegex(ExecutionEnvelopeError, "successful result cannot carry a blocker"):
+            reconcile_execution_result(
+                result,
+                obligation,
+                current_freshness_material=obligation["freshness"]["material"],
+            )
+
+        for test_status in ("red", "not_run"):
+            with self.subTest(test_status=test_status):
+                result = self.result(obligation)
+                result["tests"][0]["status"] = test_status
+                with self.assertRaisesRegex(ExecutionEnvelopeError, "non-green test outcome"):
+                    reconcile_execution_result(
+                        result,
+                        obligation,
+                        current_freshness_material=obligation["freshness"]["material"],
+                    )
+
+        result = self.result(obligation)
+        result["tests"] = []
+        with self.assertRaisesRegex(ExecutionEnvelopeError, "required test outcomes are missing"):
+            reconcile_execution_result(
+                result,
+                obligation,
+                current_freshness_material=obligation["freshness"]["material"],
+            )
+
+        result = self.result(obligation)
+        result["evidence"] = []
+        with self.assertRaisesRegex(ExecutionEnvelopeError, "required evidence is missing"):
+            reconcile_execution_result(
+                result,
+                obligation,
+                current_freshness_material=obligation["freshness"]["material"],
+            )
+
+        result = self.result(obligation)
+        result["readback"][0]["status"] = "failed"
+        with self.assertRaisesRegex(ExecutionEnvelopeError, "failed readback"):
+            reconcile_execution_result(
+                result,
+                obligation,
+                current_freshness_material=obligation["freshness"]["material"],
+            )
+
+        stale_material = copy.deepcopy(obligation["freshness"]["material"])
+        stale_material["inputs"]["board_revision"] = 9
+        proof = {
+            "prior_fingerprint": obligation["freshness"]["fingerprint"],
+            "current_fingerprint": freshness_fingerprint(stale_material),
+            "action": "reuse",
+            "safety_proven": True,
+            "basis": "Freshness proof cannot convert a semantically failed Result into success.",
+        }
+        result = self.result(obligation)
+        result["status"] = "failed"
+        with self.assertRaisesRegex(ExecutionEnvelopeError, "not eligible for acceptance"):
+            reconcile_execution_result(
+                result,
+                obligation,
+                current_freshness_material=stale_material,
+                stale_resolution=proof,
+            )
 
     def test_result_binding_staleness_and_safe_reuse_are_explicit(self) -> None:
         obligation = self.obligation()
@@ -769,8 +860,42 @@ class TypedExecutionContractTests(unittest.TestCase):
         )
         self.assertEqual(obligation["role"], "execution_prep")
         self.assertEqual(
+            obligation["freshness"]["material"]["rule_fingerprint"],
+            self.rule_fingerprint,
+        )
+        self.assertEqual(
             obligation["freshness"]["material"]["inputs"],
             {"board.cards": canonical_state["board"]["cards"]},
+        )
+
+        registry_payload = json.loads(REGISTRY.read_text(encoding="utf-8"))
+        drifted_registry = copy.deepcopy(registry_payload)
+        drifted_rule = next(rule for rule in drifted_registry["rules"] if rule["id"] == "PWV21-K011")
+        drifted_rule["outcome"]["obligation"] = "different_execution_prep"
+        drifted_kernel = PolicyKernel.from_mapping(drifted_registry)
+        drifted_obligation = drifted_kernel.compile_obligations(
+            "PWV21-K011",
+            canonical_state=canonical_state,
+            **compile_args,
+        )
+        self.assertNotEqual(
+            obligation["freshness"]["material"]["rule_fingerprint"],
+            drifted_obligation["freshness"]["material"]["rule_fingerprint"],
+        )
+        self.assertNotEqual(
+            obligation["freshness"]["fingerprint"],
+            drifted_obligation["freshness"]["fingerprint"],
+        )
+        self.assertNotEqual(obligation["obligation_id"], drifted_obligation["obligation_id"])
+        self.assertEqual(
+            drifted_kernel.reconcile(
+                self.result(obligation),
+                obligation,
+                canonical_state=canonical_state,
+                current_freshness_material=obligation["freshness"]["material"],
+                observed_canonical_state={"board": {"revision": 9}},
+            ),
+            "reexecute",
         )
 
         unrelated_runtime_change = copy.deepcopy(canonical_state)
@@ -814,6 +939,26 @@ class TypedExecutionContractTests(unittest.TestCase):
                 determining_inputs={"board_revision": 8},
                 **compile_args,
             )
+        with self.assertRaisesRegex(Exception, "rule_fingerprint is kernel-derived"):
+            kernel.compile_obligations(
+                "PWV21-K011",
+                canonical_state=canonical_state,
+                rule_fingerprint="sha256:" + ("0" * 64),
+                **compile_args,
+            )
+        for rule_id, state in (
+            ("PWV21-K008", {"planning": {"state": "approved", "premium_c": "due"}}),
+            ("PWV21-K001", {"tracker": {"state": "ambiguous"}}),
+        ):
+            with self.subTest(non_route_rule=rule_id), self.assertRaisesRegex(
+                Exception,
+                "cannot compile Execution Obligation",
+            ):
+                kernel.compile_obligations(
+                    rule_id,
+                    canonical_state=state,
+                    **compile_args,
+                )
         with self.assertRaisesRegex(Exception, "does not match current canonical state"):
             kernel.compile_obligations(
                 "PWV21-K011",
