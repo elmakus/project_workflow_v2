@@ -19,7 +19,7 @@ An obligation binds:
 
 The obligation is derived and disposable. It is not a second project-state store. Canonical JSON serialization rejects non-finite numeric values and any value that cannot be represented as standard JSON.
 
-`obligation_id` is content-derived from the registered rule, exact role, exact subject and current relevant freshness fingerprint. The production kernel derives the rule-owned determining inputs from the registered rule's declared canonical input paths and the current canonical state; it also derives the semantic role from the rule's registered owner module. Callers cannot substitute an arbitrary determining-input projection or a role that disagrees with that owner. Equivalent determining inputs serialize byte-identically. Unrelated repository state is excluded from the fingerprint rather than hashed for convenience.
+`obligation_id` is content-derived from the registered rule, exact role, exact subject and current relevant freshness fingerprint. The freshness material includes a deterministic fingerprint of the mechanically determining registered-rule metadata (rule ID, precedence, predicate, declared input paths and outcome) plus the current values of that rule's declared canonical inputs. The production kernel derives both that rule fingerprint and the input projection from the registry/current canonical state, and derives the semantic role from the rule's registered owner module. Callers cannot substitute any of them. Explanatory prose is not hashed as a mechanical input. Equivalent determining inputs serialize byte-identically, while a material registered-rule change invalidates the old obligation. Unrelated repository state is excluded from the fingerprint rather than hashed for convenience.
 
 ## Authority resolution
 
@@ -44,7 +44,7 @@ Provider, model, worker, session, retry, worktree, Paseo, scheduler, invocation 
 
 ## Freshness and stale-result reconciliation
 
-Before acceptance, PW validates the result against the exact obligation and recomputes the relevant freshness fingerprint from current canonical inputs.
+Before acceptance, PW first requires a semantically successful Result: `status` must be `success`, it cannot carry a blocker, required test/evidence outcomes must be present, every reported test must be GREEN, and no readback may be failed. Freshness or a stale-result safety proof can never convert a failed/blocked/non-GREEN Result into success. PW then validates the exact obligation binding and recomputes the relevant freshness fingerprint from current registered-rule metadata plus current canonical inputs.
 
 - unchanged fingerprint -> eligible for `accept`, subject to any mandatory governed-mutation readback;
 - stale without a bounded safety proof -> `reexecute`;
@@ -69,4 +69,4 @@ Blind duplicate external effects are forbidden.
 
 ## Kernel seams
 
-`PolicyKernel.compile_obligations()`, `validate_results()`, and `reconcile()` are the M02 entry points. Compilation accepts only an existing registered rule ID that matches current canonical state, binds the semantic role to the registered owner module, and derives the rule's declared canonical determining inputs itself; it does not create a second rule vocabulary or general workflow DSL. Reconciliation refreshes those registered rule inputs from current canonical state before recomputing freshness.
+`PolicyKernel.compile_obligations()`, `validate_results()`, and `reconcile()` are the M02 entry points. Compilation accepts only an existing registered `route` rule ID that matches current canonical state; matching `stop` or `recovery` decisions are not executable obligations. It binds the semantic role to the registered owner module and derives both the mechanically determining rule fingerprint and the rule's declared canonical input values itself; it does not create a second rule vocabulary or general workflow DSL. Reconciliation refreshes both the registered rule fingerprint and those input values before recomputing freshness.
