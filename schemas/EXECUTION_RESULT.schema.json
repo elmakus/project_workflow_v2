@@ -62,7 +62,8 @@
         "properties": {
           "name": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           },
           "status": {
             "enum": [
@@ -81,7 +82,8 @@
       "type": "array",
       "items": {
         "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "pattern": "\\S"
       }
     },
     "readback": {
@@ -97,7 +99,8 @@
         "properties": {
           "target": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           },
           "status": {
             "enum": [
@@ -108,7 +111,8 @@
           },
           "observation": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           }
         }
       }
@@ -117,11 +121,13 @@
       "type": [
         "string",
         "null"
-      ]
+      ],
+      "pattern": "\\S"
     },
     "semantic_outcome": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "pattern": "\\S"
     }
   },
   "$defs": {
@@ -145,7 +151,8 @@
         },
         "path": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
         },
         "blob": {
           "type": "string",
@@ -153,5 +160,27 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "blocked"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "blocker": {
+            "type": "string",
+            "pattern": "\\S"
+          }
+        }
+      }
+    }
+  ]
 }
