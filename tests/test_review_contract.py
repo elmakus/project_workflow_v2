@@ -241,6 +241,7 @@ class ReviewContractTests(unittest.TestCase):
                 "review_scope": "card",
                 "review_epoch": "E01",
                 "material_defect_class_ids": ["class-a"],
+                "failed_material_defect_class_ids": ["class-a"],
                 "post_convergence_validation": False,
                 "subject": {
                     "repository": "owner/repo",
@@ -284,6 +285,7 @@ class ReviewContractTests(unittest.TestCase):
                 "review_scope": "card",
                 "review_epoch": "E01",
                 "material_defect_class_ids": ["class-a"],
+                "failed_material_defect_class_ids": ["class-a"],
                 "post_convergence_validation": False,
                 "subject": repaired_subject,
             })
@@ -322,6 +324,7 @@ class ReviewContractTests(unittest.TestCase):
                 "review_scope": "card",
                 "review_epoch": "E01",
                 "material_defect_class_ids": ["class-a"],
+                "failed_material_defect_class_ids": ["class-a"],
                 "post_convergence_validation": False,
                 "subject": {
                     "repository": "owner/repo",
@@ -359,6 +362,7 @@ class ReviewContractTests(unittest.TestCase):
                 "review_scope": "card",
                 "review_epoch": "E01",
                 "material_defect_class_ids": ["class-a"],
+                "failed_material_defect_class_ids": ["class-a"],
                 "post_convergence_validation": False,
                 "subject": {
                     "repository": "owner/repo",
@@ -482,6 +486,7 @@ class ReviewContractTests(unittest.TestCase):
                 "review_scope": "card",
                 "review_epoch": "E01",
                 "material_defect_class_ids": ["class-a"],
+                "failed_material_defect_class_ids": ["class-a"],
                 "post_convergence_validation": False,
                 "subject": {
                     "repository": "owner/repo",
@@ -494,6 +499,46 @@ class ReviewContractTests(unittest.TestCase):
         state = review_convergence_state(attempts)
         self.assertEqual(state.failed_closure_rounds["class-a"], 3)
         self.assertTrue(state.convergence_required)
+
+
+    def test_multi_class_red_closure_counts_only_classes_that_failed(self) -> None:
+        source = {
+            "attempt": "R01",
+            "verdict": "red",
+            "review_kind": "discovery",
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "material_defect_class_ids": ["class-a", "class-b"],
+            "post_convergence_validation": False,
+            "subject": {
+                "repository": "owner/repo",
+                "commit": "1" * 40,
+                "path": "results/card.md",
+                "blob": "2" * 40,
+            },
+        }
+        closure = {
+            "attempt": "R02",
+            "verdict": "red",
+            "review_kind": "closure_verification",
+            "source_discovery_attempt": "R01",
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "material_defect_class_ids": ["class-a", "class-b"],
+            "failed_material_defect_class_ids": ["class-b"],
+            "post_convergence_validation": False,
+            "subject": {
+                "repository": "owner/repo",
+                "commit": "3" * 40,
+                "path": "results/card.md",
+                "blob": "4" * 40,
+            },
+        }
+
+        state = review_convergence_state([source, closure])
+        self.assertNotIn("class-a", state.failed_closure_rounds)
+        self.assertEqual(state.failed_closure_rounds["class-b"], 1)
+        self.assertFalse(state.convergence_required)
 
 
     def test_closure_cannot_finalize_review_obligation(self) -> None:
