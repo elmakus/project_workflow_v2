@@ -17,7 +17,7 @@ An obligation binds:
 - a freshness fingerprint over only the canonical inputs that materially determined this obligation;
 - expected canonical mutation preconditions and postconditions.
 
-The obligation is derived and disposable. It is not a second project-state store.
+The obligation is derived and disposable. It is not a second project-state store. Canonical JSON serialization rejects non-finite numeric values and any value that cannot be represented as standard JSON.
 
 `obligation_id` is content-derived from the registered rule, exact role, exact subject and current relevant freshness fingerprint. Equivalent determining inputs serialize byte-identically. Unrelated repository state is excluded from the fingerprint rather than hashed for convenience.
 
