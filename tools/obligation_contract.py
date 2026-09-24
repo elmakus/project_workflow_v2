@@ -65,10 +65,23 @@ def git_blob_sha(content: bytes) -> str:
 
 def _safe_path(raw: Any, label: str) -> str:
     _require(isinstance(raw, str) and raw, f"{label}: path must be non-empty string")
+    _require("\x00" not in raw, f"{label}: unsafe repository path")
     path = PurePosixPath(raw)
-    _require(not path.is_absolute() and "." not in path.parts and ".." not in path.parts,
+    _require(not path.is_absolute() and ".." not in path.parts,
              f"{label}: unsafe repository path")
+    canonical = path.as_posix()
+    _require(
+        canonical != "." and raw == canonical,
+        f"{label}: path must use canonical repo-relative POSIX spelling",
+    )
     return raw
+
+
+def _is_canonical_pw_state_path(path: str) -> bool:
+    if path == "PROJECT.md":
+        return True
+    parts = PurePosixPath(path).parts
+    return len(parts) >= 3 and parts[0] == "implementation" and parts[1] == "workstreams"
 
 
 def _reject_telemetry_keys(value: Any, where: str = "$") -> None:
@@ -423,12 +436,19 @@ def validate_execution_result(payload: Any) -> None:
         _require(isinstance(payload[key], str) and SHA256.fullmatch(payload[key]) is not None,
                  f"result: invalid {key}")
     _require(payload["status"] in RESULT_STATUSES, "result: invalid status")
-    validate_exact_ref(payload["subject"], "result.subject")
+    subject = validate_exact_ref(payload["subject"], "result.subject")
     validate_git_subject(payload["result_subject"], "result.result_subject")
     changed = payload["changed_artifacts"]
     _require(isinstance(changed, list), "result.changed_artifacts must be array")
     for index, ref in enumerate(changed):
-        validate_exact_ref(ref, f"result.changed_artifacts[{index}]")
+        normalized = validate_exact_ref(ref, f"result.changed_artifacts[{index}]")
+        _require(
+            not (
+                normalized["repository"] == subject["repository"]
+                and _is_canonical_pw_state_path(normalized["path"])
+            ),
+            f"result.changed_artifacts[{index}]: direct canonical PW-state mutation is forbidden",
+        )
     tests = payload["tests"]
     _require(isinstance(tests, list), "result.tests must be array")
     for index, item in enumerate(tests):
@@ -469,6 +489,7 @@ def reconcile_execution_result(
     *,
     current_freshness_material: Mapping[str, Any],
     stale_resolution: Mapping[str, Any] | None = None,
+    observed_canonical_state: Mapping[str, Any] | None = None,
 ) -> str:
     validate_execution_obligation(obligation)
     validate_execution_result(result)
@@ -481,6 +502,24 @@ def reconcile_execution_result(
     current = freshness_fingerprint(current_freshness_material)
     prior = obligation["freshness"]["fingerprint"]
     if current == prior:
+        postconditions = obligation["mutation"]["postconditions"]
+        if postconditions:
+            _require(
+                observed_canonical_state is not None,
+                "result: governed mutation readback state is required before acceptance",
+            )
+            _verify_conditions(
+                postconditions,
+                observed_canonical_state,
+                "mutation readback",
+            )
+            readback = result["readback"]
+            _require(
+                readback
+                and any(item["status"] == "verified" for item in readback)
+                and not any(item["status"] == "failed" for item in readback),
+                "result: verified readback evidence is required before acceptance",
+            )
         return "accept"
     if stale_resolution is None:
         return "reexecute"
