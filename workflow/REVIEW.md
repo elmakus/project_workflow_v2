@@ -44,6 +44,16 @@ After all known material findings from a RED discovery are closure-verified, one
 
 Historical terminal review attempts that predate the explicit `review_kind` fields remain valid as an initial legacy history prefix and are interpreted as discovery. A new PWv2.1 attempt begins as pending/in-progress with the explicit fields; active legacy-shaped attempts are invalid, and once explicit PWv2.1 history begins later attempts cannot return to legacy shape.
 
+## Review epochs and convergence
+
+Convergence-aware PWv2.1 attempts bind a stable `review_scope` (`card`, `milestone`, or `final`) and `review_epoch`. Ordinary implementation, test and finding repair stays inside the same epoch. A changed epoch is legal only after a material accepted authority/acceptance redesign and records a non-empty durable `epoch_reset_basis`; repair convenience never resets review accounting.
+
+Discovery/convergence counters are derived from append-only attempt history rather than stored as mutable authority. A fresh RED discovery consumes one discovery epoch only when it discovers at least one material defect class not previously discovered in the same review epoch. Closure verification, ordinary repair, GREEN fresh discovery and persistence/recurrence of already-known classes do not consume a discovery epoch. The default hard ceilings are 5 Card discovery epochs, 4 Milestone discovery epochs and 3 Final Integration discovery epochs.
+
+Each material defect class also has a default ceiling of 3 failed repair→closure-verification rounds in the same review epoch. Reaching either the applicable discovery ceiling or a per-class closure-failure ceiling switches the lifecycle into Main convergence/root-cause analysis; it never turns RED into GREEN and does not authorize another ordinary discovery loop.
+
+After convergence analysis, exactly one fresh full-scope post-convergence discovery may be run, bound to durable `convergence_basis`. A GREEN post-convergence discovery satisfies the normal fresh-discovery rule. A RED post-convergence discovery routes to broader structural classification through Recovery/Planning/Definition as appropriate rather than opening another ordinary repair/review cycle.
+
 ## Semantic independence
 
 Independence is about material production/repair of the exact subject, not runtime identity.
