@@ -1,0 +1,12 @@
+audit_kind = "pwv2_adversarial_swarm"
+audit_suffix = "jyxmfic5ggkl2cok7gu7ng4w"
+repository = "elmakus/project_workflow_v2"
+subject_commit = "4fb4bfb7d7b1481d6f347c182fc96a5a1135e045"
+branch = "audit/pwv2-swarm-jyxmfic5ggkl2cok7gu7ng4w"
+blind_discovery = true
+selected_attack_lenses = [
+  "review independence / review bypass / result mutation",
+  "Close / finalization / end-of-approved-scope",
+  "stale commit/blob/path/result/review identity",
+  "Research / Intake / tracker / external-side-effect recovery",
+]
