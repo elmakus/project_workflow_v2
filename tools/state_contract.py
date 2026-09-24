@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import re
 import tomllib
+from collections.abc import Callable
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -16,6 +17,7 @@ try:
         REVIEW_SCOPE_DISCOVERY_CEILINGS,
         ReviewContractError,
         convergence_fields_present,
+        failed_material_defect_classes,
         material_defect_classes,
         review_convergence_state,
         review_kind,
@@ -27,6 +29,7 @@ except ModuleNotFoundError:  # direct script execution from tools/
         REVIEW_SCOPE_DISCOVERY_CEILINGS,
         ReviewContractError,
         convergence_fields_present,
+        failed_material_defect_classes,
         material_defect_classes,
         review_convergence_state,
         review_kind,
@@ -940,6 +943,7 @@ def validate_review(data: dict[str, Any]) -> None:
             )
         try:
             defect_classes = material_defect_classes(data)
+            failed_defect_classes = failed_material_defect_classes(data)
         except ReviewContractError as exc:
             raise ValidationError(f"review: {exc}") from exc
         is_post = data.get("post_convergence_validation")
@@ -959,6 +963,10 @@ def validate_review(data: dict[str, Any]) -> None:
                      "review: ordinary attempt must not claim convergence_basis")
 
         if kind == "discovery":
+            _require(
+                not failed_defect_classes,
+                "review: discovery attempt must not claim failed_material_defect_class_ids",
+            )
             if verdict == "red":
                 _require(bool(defect_classes),
                          "review: RED discovery must record material_defect_class_ids")
@@ -968,6 +976,20 @@ def validate_review(data: dict[str, Any]) -> None:
         else:
             _require(bool(defect_classes),
                      "review: closure verification must record material_defect_class_ids")
+            if verdict == "red":
+                _require(
+                    bool(failed_defect_classes),
+                    "review: RED closure verification must record failed_material_defect_class_ids",
+                )
+                _require(
+                    failed_defect_classes.issubset(defect_classes),
+                    "review: failed_material_defect_class_ids must be a subset of material_defect_class_ids",
+                )
+            else:
+                _require(
+                    not failed_defect_classes,
+                    "review: non-RED closure must not claim failed material defect classes",
+                )
 
 
 def validate_review_history(
@@ -976,6 +998,7 @@ def validate_review_history(
     expected_card_id: str | None = None,
     workstream_id: str | None = None,
     accepted_authority_paths: set[str] | None = None,
+    exact_blob_reader: Callable[[str, str, str], str | None] | None = None,
 ) -> None:
     _require(isinstance(attempts, list) and attempts,
              "review_history: at least one attempt is required")
@@ -1036,6 +1059,39 @@ def validate_review_history(
                          "review_history: review_scope cannot change across epoch reset in one review history")
                 _require(epoch not in seen_epoch_ids,
                          "review_history: review_epoch identity cannot be reused after reset")
+                _require(
+                    exact_blob_reader is not None,
+                    "review_history: changed review_epoch requires exact Git redesign readback",
+                )
+                reset_blob = exact_blob_reader(
+                    reset_subject["repository"],
+                    reset_subject["commit"],
+                    reset_path,
+                )
+                _require(
+                    reset_blob == reset_subject["blob"],
+                    "review_history: epoch reset subject exact Git readback does not match claimed blob",
+                )
+                current_subject = attempt["subject"]
+                accepted_blob = exact_blob_reader(
+                    current_subject["repository"],
+                    current_subject["commit"],
+                    reset_path,
+                )
+                _require(
+                    accepted_blob == reset_subject["blob"],
+                    "review_history: epoch reset subject is not the accepted redesign content at the current reviewed subject",
+                )
+                previous_subject = attempts[index - 1]["subject"]
+                previous_blob = exact_blob_reader(
+                    previous_subject["repository"],
+                    previous_subject["commit"],
+                    reset_path,
+                )
+                _require(
+                    previous_blob != reset_subject["blob"],
+                    "review_history: epoch reset requires a material accepted redesign; accepted content is unchanged",
+                )
                 current_epoch = epoch
                 seen_epoch_ids.add(epoch)
                 post_convergence_terminal_epoch = None
