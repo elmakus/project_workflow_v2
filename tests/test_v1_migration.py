@@ -362,6 +362,9 @@ class V1MigrationDryRunTests(unittest.TestCase):
             workstream_id="migrated-chatgpt",
         )
         self.assertEqual(attempts[-1]["verdict"], "pending")
+        self.assertEqual(attempts[-1]["review_kind"], "discovery")
+        self.assertFalse(attempts[-1]["discovery_complete"])
+        self.assertEqual(attempts[-1]["material_finding_ids"], [])
         self.assertEqual(bundle["task_board"]["cards"][0]["status"], "blocked")
         self.assertIn("pending review remains outstanding", bundle["review_obligations"][0]["reason"])
 
