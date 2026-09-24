@@ -16,6 +16,7 @@ from tools.obligation_contract import (
     serialize_result,
     validate_execution_obligation,
     validate_execution_result,
+    verify_mutation_preconditions,
     verify_mutation_readback,
 )
 from tools.policy_kernel import PolicyKernel
@@ -70,8 +71,8 @@ class TypedExecutionContractTests(unittest.TestCase):
             tests=["contract suite GREEN"],
             evidence_requirements=["durable evidence"],
             determining_inputs=inputs or {"board_revision": 8, "card_id": "M02-T01"},
-            mutation_preconditions=["board revision is 8"],
-            mutation_postconditions=["result read back exactly"],
+            mutation_preconditions=[{"path": "board.revision", "equals": 8}],
+            mutation_postconditions=[{"path": "board.revision", "equals": 9}],
         )
 
     def result(self, obligation: dict) -> dict:
@@ -224,30 +225,37 @@ class TypedExecutionContractTests(unittest.TestCase):
             "reexecute",
         )
         current = freshness_fingerprint(stale_material)
-        proof = {
+        for action in ("reuse", "rebase", "reconcile"):
+            proof = {
+                "prior_fingerprint": obligation["freshness"]["fingerprint"],
+                "current_fingerprint": current,
+                "action": action,
+                "safety_proven": True,
+                "basis": "The stale delta was bounded and independently proven safe for this resolution.",
+            }
+            self.assertEqual(
+                reconcile_execution_result(
+                    result,
+                    obligation,
+                    current_freshness_material=stale_material,
+                    stale_resolution=proof,
+                ),
+                action,
+            )
+
+        unsafe = {
             "prior_fingerprint": obligation["freshness"]["fingerprint"],
             "current_fingerprint": current,
-            "materially_unchanged": True,
-            "basis": "The changed canonical input was independently proven not to invalidate this result.",
+            "action": "reuse",
+            "safety_proven": False,
+            "basis": "No positive safety proof.",
         }
-        self.assertEqual(
-            reconcile_execution_result(
-                result,
-                obligation,
-                current_freshness_material=stale_material,
-                safe_reuse_proof=proof,
-            ),
-            "reuse",
-        )
-
-        unsafe = dict(proof)
-        unsafe["materially_unchanged"] = False
         with self.assertRaisesRegex(ExecutionEnvelopeError, "does not establish safety"):
             reconcile_execution_result(
                 result,
                 obligation,
                 current_freshness_material=stale_material,
-                safe_reuse_proof=unsafe,
+                stale_resolution=unsafe,
             )
 
         mismatched = self.result(obligation)
@@ -274,16 +282,20 @@ class TypedExecutionContractTests(unittest.TestCase):
         self.assertEqual(
             obligation["mutation"],
             {
-                "preconditions": ["board revision is 8"],
-                "postconditions": ["result read back exactly"],
+                "preconditions": [{"path": "board.revision", "equals": 8}],
+                "postconditions": [{"path": "board.revision", "equals": 9}],
             },
         )
         self.assertEqual(
-            verify_mutation_readback(obligation, ["result read back exactly"]),
+            verify_mutation_preconditions(obligation, {"board": {"revision": 8}}),
             "verified",
         )
-        with self.assertRaisesRegex(ExecutionEnvelopeError, "missing expected postconditions"):
-            verify_mutation_readback(obligation, ["different observation"])
+        self.assertEqual(
+            verify_mutation_readback(obligation, {"board": {"revision": 9}}),
+            "verified",
+        )
+        with self.assertRaisesRegex(ExecutionEnvelopeError, "condition failed"):
+            verify_mutation_readback(obligation, {"board": {"revision": 8}})
 
     def test_unknown_external_effect_never_authorizes_blind_retry(self) -> None:
         self.assertEqual(
@@ -339,8 +351,8 @@ class TypedExecutionContractTests(unittest.TestCase):
             tests=["contract suite GREEN"],
             evidence_requirements=["durable evidence"],
             determining_inputs={"board_revision": 8, "card_id": "M02-T01"},
-            mutation_preconditions=["board revision is 8"],
-            mutation_postconditions=["result read back exactly"],
+            mutation_preconditions=[{"path": "board.revision", "equals": 8}],
+            mutation_postconditions=[{"path": "board.revision", "equals": 9}],
         )
         result = self.result(obligation)
         kernel.validate_results(result)
