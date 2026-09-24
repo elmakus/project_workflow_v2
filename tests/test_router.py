@@ -1122,36 +1122,68 @@ class RouterTests(unittest.TestCase):
         )
         return result_path
 
-    def add_review_attempt(self, project: Path, verdict: str, attempt: str = "R01") -> str:
+    def add_review_attempt(
+        self,
+        project: Path,
+        verdict: str,
+        attempt: str = "R01",
+        *,
+        review_kind: str | None = None,
+        source_discovery_attempt: str = "",
+        discovery_complete: bool = False,
+        finding_ids: tuple[str, ...] = (),
+        subject_blob: str | None = None,
+    ) -> str:
         review_path = f"implementation/workstreams/sample-workstream/reviews/M01-T04-{attempt}.toml"
+        locator = f'{{ class = "review_attempt", path = "{review_path}" }}'
         board = project / BOARD
-        board.write_text(
-            board.read_text().replace(
+        board_text = board.read_text()
+        lines = board_text.splitlines()
+        for index, line in enumerate(lines):
+            if line.startswith("review_attempts = ["):
+                existing = line.removeprefix("review_attempts = [").removesuffix("]")
+                lines[index] = f"review_attempts = [{existing}, {locator}]"
+                break
+        else:
+            board_text = board_text.replace(
                 'status = "in_progress"\n',
                 'status = "in_progress"\n'
-                f'review_attempts = [{{ class = "review_attempt", path = "{review_path}" }}]\n',
+                f'review_attempts = [{locator}]\n',
                 1,
             )
-        )
+            lines = board_text.splitlines()
+        board.write_text("\n".join(lines) + "\n")
+
         path = project / review_path
         path.parent.mkdir(parents=True, exist_ok=True)
-        evidence = "" if verdict in {"pending", "in_progress"} else "implementation/workstreams/sample-workstream/evidence/review-R01.md"
+        evidence = "" if verdict in {"pending", "in_progress"} else f"implementation/workstreams/sample-workstream/evidence/review-{attempt}.md"
         if evidence:
             evidence_path = project / evidence
             evidence_path.parent.mkdir(parents=True, exist_ok=True)
             evidence_path.write_text("# Review evidence\n")
+        blob = subject_blob or ("b" * 40)
+        extra = ""
+        if review_kind is not None:
+            ids = ", ".join(f'"{item}"' for item in finding_ids)
+            extra = (
+                f'review_kind = "{review_kind}"\n'
+                f'source_discovery_attempt = "{source_discovery_attempt}"\n'
+                f'discovery_complete = {"true" if discovery_complete else "false"}\n'
+                f'material_finding_ids = [{ids}]\n'
+            )
         path.write_text(
             'workstream_id = "sample-workstream"\n'
             'card_id = "M01-T04"\n'
             f'attempt = "{attempt}"\n'
             f'verdict = "{verdict}"\n'
             f'evidence_path = "{evidence}"\n'
-            '[subject]\n'
+            + extra
+            + '[subject]\n'
             'class = "git_blob"\n'
             'repository = "owner/router-fixture"\n'
             f'commit = "{"a" * 40}"\n'
             'path = "implementation/workstreams/sample-workstream/results/M01-T04.md"\n'
-            f'blob = "{"b" * 40}"\n'
+            f'blob = "{blob}"\n'
             '[acceptance]\n'
             'class = "task_card"\n'
             f'path = "{CARD}"\n'
@@ -1178,6 +1210,56 @@ class RouterTests(unittest.TestCase):
                 self.assertEqual((routed.disposition, routed.obligation), ("route", expected))
             finally:
                 temp.cleanup()
+
+    def test_green_closure_requires_fresh_discovery_before_finalization(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            self.add_review_attempt(
+                project,
+                "red",
+                "R01",
+                review_kind="discovery",
+                discovery_complete=True,
+                finding_ids=("F1",),
+            )
+
+            board = project / BOARD
+            board.write_text(
+                board.read_text().replace(
+                    'blob = "' + ("b" * 40) + '"',
+                    'blob = "' + ("c" * 40) + '"',
+                )
+            )
+            self.add_review_attempt(
+                project,
+                "green",
+                "R02",
+                review_kind="closure_verification",
+                source_discovery_attempt="R01",
+                finding_ids=("F1",),
+                subject_blob="c" * 40,
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "review_freeze"))
+            self.assertIn("fresh full-scope discovery", routed.reason)
+
+            self.add_review_attempt(
+                project,
+                "green",
+                "R03",
+                review_kind="discovery",
+                discovery_complete=True,
+                finding_ids=(),
+                subject_blob="c" * 40,
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("route", "post_review_finalization"),
+            )
+        finally:
+            temp.cleanup()
 
     def test_changed_result_after_terminal_review_requires_new_attempt(self) -> None:
         temp, project = self.copy_fixture()
