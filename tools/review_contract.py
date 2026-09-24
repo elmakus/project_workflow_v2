@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
-"""Runtime-neutral review-context and review-pass semantic helpers."""
+"""Runtime-neutral review-context, pass and convergence semantic helpers."""
 
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 
 
 REVIEW_KINDS = frozenset({"discovery", "closure_verification"})
+REVIEW_SCOPE_DISCOVERY_CEILINGS = {
+    "card": 5,
+    "milestone": 4,
+    "final": 3,
+}
+PER_CLASS_CLOSURE_FAILURE_CEILING = 3
 CAUSAL_SCOPE_KEYS = (
     "known_findings",
     "defect_classes",
@@ -20,10 +27,33 @@ CAUSAL_SCOPE_KEYS = (
     "sibling_representations",
     "negative_space",
 )
+CONVERGENCE_FIELDS = frozenset({
+    "review_scope",
+    "review_epoch",
+    "epoch_reset_basis",
+    "material_defect_class_ids",
+    "post_convergence_validation",
+    "convergence_basis",
+})
 
 
 class ReviewContractError(ValueError):
     """Raised when review-pass semantic evidence is incomplete or contradictory."""
+
+
+@dataclass(frozen=True)
+class ReviewConvergenceState:
+    """Derived convergence state for the latest stable authority/acceptance epoch."""
+
+    review_scope: str | None
+    review_epoch: str | None
+    discovery_epochs: int
+    discovery_ceiling: int | None
+    seen_defect_classes: frozenset[str]
+    failed_closure_rounds: Mapping[str, int]
+    convergence_required: bool
+    post_convergence_attempt: str | None
+    post_convergence_verdict: str | None
 
 
 def select_review_realization(
@@ -45,6 +75,122 @@ def review_kind(attempt: Mapping[str, object]) -> str:
     if kind not in REVIEW_KINDS:
         raise ReviewContractError(f"unsupported review kind {kind!r}")
     return str(kind)
+
+
+def convergence_fields_present(attempt: Mapping[str, object]) -> bool:
+    """Return whether an attempt uses the PWv2.1 convergence-aware shape."""
+    return "review_epoch" in attempt
+
+
+def material_defect_classes(attempt: Mapping[str, object]) -> frozenset[str]:
+    """Read the durable material defect-class identity set from an aware attempt."""
+    raw = attempt.get("material_defect_class_ids")
+    if not isinstance(raw, list) or not all(
+        isinstance(item, str) and item.strip() for item in raw
+    ):
+        raise ReviewContractError(
+            "convergence-aware review attempt must record material_defect_class_ids"
+        )
+    if len(set(raw)) != len(raw):
+        raise ReviewContractError("material_defect_class_ids must be unique")
+    return frozenset(raw)
+
+
+def review_convergence_state(
+    attempts: Iterable[Mapping[str, object]],
+) -> ReviewConvergenceState:
+    """Derive review-loop accounting from durable attempt history.
+
+    Pre-convergence terminal history is intentionally ignored. A changed
+    review_epoch resets derived counters; state-contract validation owns the
+    requirement that such a reset has an accepted durable redesign basis.
+    """
+    scope: str | None = None
+    epoch: str | None = None
+    discovery_epochs = 0
+    seen_classes: set[str] = set()
+    failed_rounds: dict[str, int] = {}
+    post_attempt: str | None = None
+    post_verdict: str | None = None
+
+    for attempt in attempts:
+        if not convergence_fields_present(attempt):
+            continue
+
+        raw_scope = attempt.get("review_scope")
+        raw_epoch = attempt.get("review_epoch")
+        if raw_scope not in REVIEW_SCOPE_DISCOVERY_CEILINGS:
+            raise ReviewContractError(f"unsupported review scope {raw_scope!r}")
+        if not isinstance(raw_epoch, str) or not raw_epoch.strip():
+            raise ReviewContractError("review_epoch must be a non-empty string")
+
+        if epoch is None or raw_epoch != epoch:
+            scope = str(raw_scope)
+            epoch = raw_epoch
+            discovery_epochs = 0
+            seen_classes = set()
+            failed_rounds = {}
+            post_attempt = None
+            post_verdict = None
+        elif raw_scope != scope:
+            raise ReviewContractError("review scope cannot change inside one review epoch")
+
+        classes = material_defect_classes(attempt)
+        kind = review_kind(attempt)
+        verdict = attempt.get("verdict")
+        is_post = attempt.get("post_convergence_validation") is True
+
+        if is_post:
+            attempt_id = attempt.get("attempt")
+            if not isinstance(attempt_id, str) or not attempt_id:
+                raise ReviewContractError("post-convergence validation requires attempt identity")
+            if post_attempt is not None:
+                raise ReviewContractError(
+                    "only one post-convergence validation is allowed per review epoch"
+                )
+            post_attempt = attempt_id
+            post_verdict = str(verdict) if isinstance(verdict, str) else None
+
+        if kind == "discovery" and verdict == "red" and not is_post:
+            if classes - seen_classes:
+                discovery_epochs += 1
+            seen_classes.update(classes)
+        elif kind == "closure_verification" and verdict == "red":
+            for defect_class in classes:
+                failed_rounds[defect_class] = failed_rounds.get(defect_class, 0) + 1
+
+    if scope is None or epoch is None:
+        return ReviewConvergenceState(
+            review_scope=None,
+            review_epoch=None,
+            discovery_epochs=0,
+            discovery_ceiling=None,
+            seen_defect_classes=frozenset(),
+            failed_closure_rounds={},
+            convergence_required=False,
+            post_convergence_attempt=None,
+            post_convergence_verdict=None,
+        )
+
+    ceiling = REVIEW_SCOPE_DISCOVERY_CEILINGS[scope]
+    required = (
+        discovery_epochs >= ceiling
+        or any(
+            rounds >= PER_CLASS_CLOSURE_FAILURE_CEILING
+            for rounds in failed_rounds.values()
+        )
+    )
+    return ReviewConvergenceState(
+        review_scope=scope,
+        review_epoch=epoch,
+        discovery_epochs=discovery_epochs,
+        discovery_ceiling=ceiling,
+        seen_defect_classes=frozenset(seen_classes),
+        failed_closure_rounds=dict(failed_rounds),
+        convergence_required=required,
+        post_convergence_attempt=post_attempt,
+        post_convergence_verdict=post_verdict,
+    )
 
 
 def validate_discovery_surface(
@@ -70,8 +216,9 @@ def required_closure_scope(scope: Mapping[str, Iterable[str]]) -> frozenset[str]
     """Build the complete materially implicated closure surface.
 
     Every causal category must be explicitly accounted for. Categories may be
-    empty when no material member exists, while known findings, repair diff and
-    regression evidence must each contain at least one concrete item.
+    empty when no material member exists, while known findings, defect class,
+    root-cause evidence, repair diff and regression evidence must each contain
+    at least one concrete item.
     """
     missing_keys = [key for key in CAUSAL_SCOPE_KEYS if key not in scope]
     if missing_keys:
