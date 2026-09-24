@@ -6,6 +6,7 @@ from tools.review_contract import (
     ReviewContractError,
     can_finalize_review_obligation,
     required_closure_scope,
+    remaining_closure_findings,
     select_review_realization,
     validate_closure_surface,
     validate_discovery_surface,
@@ -84,6 +85,38 @@ class ReviewContractTests(unittest.TestCase):
         incomplete.pop("providers")
         with self.assertRaisesRegex(ReviewContractError, "omitted causal categories"):
             required_closure_scope(incomplete)
+
+    def test_cumulative_closure_reports_remaining_source_findings(self) -> None:
+        attempts = [
+            {
+                "attempt": "R01",
+                "verdict": "red",
+                "review_kind": "discovery",
+                "material_finding_ids": ["F1", "F2"],
+            },
+            {
+                "attempt": "R02",
+                "verdict": "green",
+                "review_kind": "closure_verification",
+                "source_discovery_attempt": "R01",
+                "material_finding_ids": ["F1"],
+            },
+        ]
+        self.assertEqual(
+            remaining_closure_findings(attempts, "R01"),
+            frozenset({"F2"}),
+        )
+        attempts.append({
+            "attempt": "R03",
+            "verdict": "green",
+            "review_kind": "closure_verification",
+            "source_discovery_attempt": "R01",
+            "material_finding_ids": ["F2"],
+        })
+        self.assertEqual(
+            remaining_closure_findings(attempts, "R01"),
+            frozenset(),
+        )
 
     def test_closure_cannot_finalize_review_obligation(self) -> None:
         self.assertTrue(can_finalize_review_obligation({
