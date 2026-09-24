@@ -1,8 +1,8 @@
 workstream_id = "issue-router-board-precedence"
 card_id = "M01-T01"
 attempt = "R01"
-verdict = "pending"
-evidence_path = ""
+verdict = "green"
+evidence_path = "implementation/workstreams/issue-router-board-precedence/evidence/M01-T01_REVIEW_R01_2026-09-24.md"
 
 [subject]
 class = "git_blob"
