@@ -3,6 +3,9 @@ from __future__ import annotations
 import copy
 import json
 import unittest
+
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 from pathlib import Path
 
 from tools.obligation_contract import (
@@ -337,6 +340,73 @@ class TypedExecutionContractTests(unittest.TestCase):
             serialize_result(result),
             (json.dumps(golden, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n").encode("utf-8"),
         )
+
+    def test_json_schemas_validate_golden_and_reject_invalid_matrix(self) -> None:
+        obligation_schema = json.loads(OBLIGATION_SCHEMA.read_text(encoding="utf-8"))
+        result_schema = json.loads(RESULT_SCHEMA.read_text(encoding="utf-8"))
+        Draft202012Validator.check_schema(obligation_schema)
+        Draft202012Validator.check_schema(result_schema)
+        obligation_validator = Draft202012Validator(obligation_schema)
+        result_validator = Draft202012Validator(result_schema)
+
+        obligation = json.loads(OBLIGATION_GOLDEN.read_text(encoding="utf-8"))
+        result = json.loads(RESULT_GOLDEN.read_text(encoding="utf-8"))
+        obligation_validator.validate(obligation)
+        result_validator.validate(result)
+
+        invalid_obligations: list[tuple[str, dict]] = []
+
+        candidate = copy.deepcopy(obligation)
+        candidate["schema_version"] = 2
+        invalid_obligations.append(("breaking version", candidate))
+
+        candidate = copy.deepcopy(obligation)
+        candidate["subject"]["path"] = "../outside.md"
+        invalid_obligations.append(("parent path", candidate))
+
+        candidate = copy.deepcopy(obligation)
+        candidate["freshness"]["material"]["inputs"] = {
+            "card": {"provider": "must-not-be-canonical"}
+        }
+        invalid_obligations.append(("nested telemetry input", candidate))
+
+        candidate = copy.deepcopy(obligation)
+        candidate["mutation"]["preconditions"][0]["equals"] = {
+            "nested": {"session_id": "must-not-be-canonical"}
+        }
+        candidate["freshness"]["material"]["mutation"] = copy.deepcopy(candidate["mutation"])
+        invalid_obligations.append(("nested telemetry mutation", candidate))
+
+        candidate = copy.deepcopy(obligation)
+        candidate["role"] = "   "
+        invalid_obligations.append(("blank role", candidate))
+
+        for label, candidate in invalid_obligations:
+            with self.subTest(obligation_case=label), self.assertRaises(JsonSchemaValidationError):
+                obligation_validator.validate(candidate)
+
+        invalid_results: list[tuple[str, dict]] = []
+
+        candidate = copy.deepcopy(result)
+        candidate["schema_version"] = 2
+        invalid_results.append(("breaking version", candidate))
+
+        candidate = copy.deepcopy(result)
+        candidate["subject"]["path"] = "/absolute/result.md"
+        invalid_results.append(("absolute path", candidate))
+
+        candidate = copy.deepcopy(result)
+        candidate["status"] = "blocked"
+        candidate["blocker"] = None
+        invalid_results.append(("blocked without blocker", candidate))
+
+        candidate = copy.deepcopy(result)
+        candidate["semantic_outcome"] = "   "
+        invalid_results.append(("blank semantic outcome", candidate))
+
+        for label, candidate in invalid_results:
+            with self.subTest(result_case=label), self.assertRaises(JsonSchemaValidationError):
+                result_validator.validate(candidate)
 
     def test_mutation_is_governed_by_preconditions_postconditions_and_readback(self) -> None:
         obligation = self.obligation()
