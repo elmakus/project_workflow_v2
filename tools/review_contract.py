@@ -126,7 +126,7 @@ def review_convergence_state(
     discovery_epochs = 0
     seen_classes: set[str] = set()
     failed_rounds: dict[str, int] = {}
-    failed_round_subjects: dict[str, set[tuple[str, str, str]]] = {}
+    last_failed_round_content: dict[tuple[str, str], tuple[str, str, str]] = {}
     attempts_by_id: dict[str, Mapping[str, object]] = {}
     post_attempt: str | None = None
     post_verdict: str | None = None
@@ -151,7 +151,7 @@ def review_convergence_state(
             discovery_epochs = 0
             seen_classes = set()
             failed_rounds = {}
-            failed_round_subjects = {}
+            last_failed_round_content = {}
             post_attempt = None
             post_verdict = None
         elif raw_scope != scope:
@@ -191,11 +191,21 @@ def review_convergence_state(
                     )
                 repaired_content = _review_subject_content_identity(attempt)
                 source_content = _review_subject_content_identity(source)
-                if repaired_content != source_content:
-                    for defect_class in classes:
-                        subjects = failed_round_subjects.setdefault(defect_class, set())
-                        subjects.add(repaired_content)
-                        failed_rounds[defect_class] = len(subjects)
+                for defect_class in classes:
+                    round_key = (defect_class, str(source_id))
+                    previous_content = last_failed_round_content.get(
+                        round_key, source_content
+                    )
+                    if (
+                        repaired_content != source_content
+                        and repaired_content != previous_content
+                    ):
+                        failed_rounds[defect_class] = failed_rounds.get(defect_class, 0) + 1
+                    # A RED closure over source content is not itself a repair round,
+                    # but it still becomes the preceding reviewed state. Returning
+                    # later to an older repaired state is therefore another failed
+                    # repair transition rather than a globally deduplicated no-op.
+                    last_failed_round_content[round_key] = repaired_content
 
     if scope is None or epoch is None:
         return ReviewConvergenceState(
