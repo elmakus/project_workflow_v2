@@ -228,6 +228,30 @@ class TypedExecutionContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ExecutionEnvelopeError, "invalid keys"):
             validate_execution_obligation(summary_only)
 
+        for alias_path in ("a//b.md", "a/./b.md", "./a.md", "a/"):
+            with self.subTest(alias_path=alias_path):
+                invalid_subject = copy.deepcopy(self.subject)
+                invalid_subject["path"] = alias_path
+                with self.assertRaisesRegex(
+                    ExecutionEnvelopeError,
+                    "canonical repo-relative POSIX spelling",
+                ):
+                    compile_execution_obligation(
+                        rule_id="PWV21-K011",
+                        role="execution_prep",
+                        subject=invalid_subject,
+                        authority_refs=self.authority_refs,
+                        authority_reader=self.reader,
+                        prerequisites=[],
+                        constraints=[],
+                        acceptance=[],
+                        tests=[],
+                        evidence_requirements=[],
+                        determining_inputs={"card_id": "M02-T01"},
+                        mutation_preconditions=[],
+                        mutation_postconditions=[],
+                    )
+
         wrong_blob = copy.deepcopy(self.authority_refs)
         wrong_blob[0]["blob"] = "d" * 40
         with self.assertRaisesRegex(ExecutionEnvelopeError, "blob mismatch"):
@@ -328,6 +352,7 @@ class TypedExecutionContractTests(unittest.TestCase):
                 result,
                 obligation,
                 current_freshness_material=obligation["freshness"]["material"],
+                observed_canonical_state={"board": {"revision": 9}},
             ),
             "accept",
         )
@@ -388,6 +413,7 @@ class TypedExecutionContractTests(unittest.TestCase):
                 mismatched_subject,
                 obligation,
                 current_freshness_material=obligation["freshness"]["material"],
+                observed_canonical_state={"board": {"revision": 9}},
             )
 
         mismatched = self.result(obligation)
@@ -397,6 +423,7 @@ class TypedExecutionContractTests(unittest.TestCase):
                 mismatched,
                 obligation,
                 current_freshness_material=obligation["freshness"]["material"],
+                observed_canonical_state={"board": {"revision": 9}},
             )
 
     def test_result_carries_distinct_immutable_subject_and_rejects_direct_mutation_payload(self) -> None:
@@ -413,6 +440,7 @@ class TypedExecutionContractTests(unittest.TestCase):
                 result,
                 obligation,
                 current_freshness_material=obligation["freshness"]["material"],
+                observed_canonical_state={"board": {"revision": 9}},
             ),
             "accept",
         )
@@ -424,6 +452,34 @@ class TypedExecutionContractTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(ExecutionEnvelopeError, "invalid top-level keys"):
             validate_execution_result(direct_mutation)
+
+        for canonical_path in (
+            "PROJECT.md",
+            "implementation/workstreams/example/TASK_BOARD.toml",
+            "implementation/workstreams/example/results/M02-T01.md",
+        ):
+            with self.subTest(canonical_path=canonical_path):
+                changed = self.result(obligation)
+                changed["changed_artifacts"] = [{
+                    "repository": self.subject["repository"],
+                    "commit": "d" * 40,
+                    "path": canonical_path,
+                    "blob": "e" * 40,
+                }]
+                with self.assertRaisesRegex(
+                    ExecutionEnvelopeError,
+                    "direct canonical PW-state mutation is forbidden",
+                ):
+                    validate_execution_result(changed)
+
+        cross_repository = self.result(obligation)
+        cross_repository["changed_artifacts"] = [{
+            "repository": "owner/implementation-target",
+            "commit": "d" * 40,
+            "path": "implementation/workstreams/example/TASK_BOARD.toml",
+            "blob": "e" * 40,
+        }]
+        validate_execution_result(cross_repository)
 
     def test_result_matches_golden_and_is_canonical(self) -> None:
         obligation = self.obligation()
@@ -461,6 +517,12 @@ class TypedExecutionContractTests(unittest.TestCase):
         candidate = copy.deepcopy(obligation)
         candidate["subject"]["path"] = "../outside.md"
         invalid_obligations.append(("parent path", candidate))
+
+        for alias_path in ("a//b.md", "a/./b.md", "./a.md", "a/"):
+            candidate = copy.deepcopy(obligation)
+            candidate["subject"]["path"] = alias_path
+            candidate["freshness"]["material"]["subject"]["path"] = alias_path
+            invalid_obligations.append((f"non-canonical path {alias_path}", candidate))
 
         candidate = copy.deepcopy(obligation)
         candidate["freshness"]["material"]["inputs"] = {
@@ -529,6 +591,11 @@ class TypedExecutionContractTests(unittest.TestCase):
         candidate["subject"]["path"] = "/absolute/result.md"
         invalid_results.append(("absolute path", candidate))
 
+        for alias_path in ("a//b.md", "a/./b.md", "./a.md", "a/"):
+            candidate = copy.deepcopy(result)
+            candidate["subject"]["path"] = alias_path
+            invalid_results.append((f"non-canonical path {alias_path}", candidate))
+
         candidate = copy.deepcopy(result)
         candidate["status"] = "blocked"
         candidate["blocker"] = None
@@ -570,6 +637,52 @@ class TypedExecutionContractTests(unittest.TestCase):
             verify_mutation_preconditions(typed_obligation, {"board": {"revision": True}})
         with self.assertRaisesRegex(ExecutionEnvelopeError, "condition failed"):
             verify_mutation_readback(typed_obligation, {"board": {"revision": False}})
+
+        result = self.result(obligation)
+        missing_readback = copy.deepcopy(result)
+        missing_readback["readback"] = []
+        with self.assertRaisesRegex(
+            ExecutionEnvelopeError,
+            "verified readback evidence is required before acceptance",
+        ):
+            reconcile_execution_result(
+                missing_readback,
+                obligation,
+                current_freshness_material=obligation["freshness"]["material"],
+                observed_canonical_state={"board": {"revision": 9}},
+            )
+
+        failed_readback = copy.deepcopy(result)
+        failed_readback["readback"][0]["status"] = "failed"
+        with self.assertRaisesRegex(
+            ExecutionEnvelopeError,
+            "verified readback evidence is required before acceptance",
+        ):
+            reconcile_execution_result(
+                failed_readback,
+                obligation,
+                current_freshness_material=obligation["freshness"]["material"],
+                observed_canonical_state={"board": {"revision": 9}},
+            )
+
+        with self.assertRaisesRegex(ExecutionEnvelopeError, "condition failed"):
+            reconcile_execution_result(
+                result,
+                obligation,
+                current_freshness_material=obligation["freshness"]["material"],
+                observed_canonical_state={"board": {"revision": 8}},
+            )
+
+        with self.assertRaisesRegex(
+            ExecutionEnvelopeError,
+            "governed mutation readback state is required before acceptance",
+        ):
+            reconcile_execution_result(
+                result,
+                obligation,
+                current_freshness_material=obligation["freshness"]["material"],
+                observed_canonical_state={"board": {"revision": 9}},
+            )
 
     def test_unknown_external_effect_never_authorizes_blind_retry(self) -> None:
         self.assertEqual(
@@ -628,33 +741,104 @@ class TypedExecutionContractTests(unittest.TestCase):
 
     def test_policy_kernel_m02_seams_bind_registered_rule_to_typed_contract(self) -> None:
         kernel = PolicyKernel.from_path(REGISTRY)
+        canonical_state = {
+            "board": {
+                "revision": 8,
+                "cards": [
+                    {"id": "M02-T01", "status": "ready"},
+                    {"id": "M01-T01", "status": "done"},
+                ],
+            },
+            "runtime": {"provider": "must-not-be-read"},
+        }
+        compile_args = {
+            "subject": self.subject,
+            "authority_refs": self.authority_refs,
+            "authority_reader": self.reader,
+            "prerequisites": ["M01-T01 DONE"],
+            "constraints": ["canonical writes are coordinator-owned"],
+            "acceptance": ["typed contract accepted"],
+            "tests": ["contract suite GREEN"],
+            "evidence_requirements": ["durable evidence"],
+            "mutation_preconditions": [{"path": "board.revision", "equals": 8}],
+            "mutation_postconditions": [{"path": "board.revision", "equals": 9}],
+        }
         obligation = kernel.compile_obligations(
             "PWV21-K011",
-            role="execution_prep",
-            subject=self.subject,
-            authority_refs=self.authority_refs,
-            authority_reader=self.reader,
-            prerequisites=["M01-T01 DONE"],
-            constraints=["canonical writes are coordinator-owned"],
-            acceptance=["typed contract accepted"],
-            tests=["contract suite GREEN"],
-            evidence_requirements=["durable evidence"],
-            determining_inputs={"board_revision": 8, "card_id": "M02-T01"},
-            mutation_preconditions=[{"path": "board.revision", "equals": 8}],
-            mutation_postconditions=[{"path": "board.revision", "equals": 9}],
+            canonical_state=canonical_state,
+            **compile_args,
         )
+        self.assertEqual(obligation["role"], "execution_prep")
+        self.assertEqual(
+            obligation["freshness"]["material"]["inputs"],
+            {"board.cards": canonical_state["board"]["cards"]},
+        )
+
+        unrelated_runtime_change = copy.deepcopy(canonical_state)
+        unrelated_runtime_change["runtime"]["provider"] = "different-but-still-noncanonical"
+        same = kernel.compile_obligations(
+            "PWV21-K011",
+            canonical_state=unrelated_runtime_change,
+            **compile_args,
+        )
+        self.assertEqual(
+            obligation["freshness"]["fingerprint"],
+            same["freshness"]["fingerprint"],
+        )
+
+        with self.assertRaisesRegex(Exception, "role .* does not match registered obligation"):
+            kernel.compile_obligations(
+                "PWV21-K011",
+                canonical_state=canonical_state,
+                role="review",
+                **compile_args,
+            )
+        with self.assertRaisesRegex(Exception, "determining_inputs are kernel-derived"):
+            kernel.compile_obligations(
+                "PWV21-K011",
+                canonical_state=canonical_state,
+                determining_inputs={"board_revision": 8},
+                **compile_args,
+            )
+        with self.assertRaisesRegex(Exception, "does not match current canonical state"):
+            kernel.compile_obligations(
+                "PWV21-K011",
+                canonical_state={"board": {"cards": [{"status": "done"}]}},
+                **compile_args,
+            )
+
         result = self.result(obligation)
         kernel.validate_results(result)
         self.assertEqual(
             kernel.reconcile(
                 result,
                 obligation,
+                canonical_state=canonical_state,
                 current_freshness_material=obligation["freshness"]["material"],
+                observed_canonical_state={"board": {"revision": 9}},
             ),
             "accept",
         )
+
+        stale_state = copy.deepcopy(canonical_state)
+        stale_state["board"]["cards"][0]["status"] = "in_progress"
+        self.assertEqual(
+            kernel.reconcile(
+                result,
+                obligation,
+                canonical_state=stale_state,
+                current_freshness_material=obligation["freshness"]["material"],
+                observed_canonical_state={"board": {"revision": 9}},
+            ),
+            "reexecute",
+        )
+
         with self.assertRaisesRegex(Exception, "unknown mechanical rule"):
-            kernel.compile_obligations("PWV21-K999", role="execution_prep")
+            kernel.compile_obligations(
+                "PWV21-K999",
+                canonical_state=canonical_state,
+                **compile_args,
+            )
 
 
 if __name__ == "__main__":
