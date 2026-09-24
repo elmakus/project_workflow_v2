@@ -1128,7 +1128,7 @@ class RouterTests(unittest.TestCase):
         verdict: str,
         attempt: str = "R01",
         *,
-        review_kind: str | None = None,
+        review_kind: str | None = "discovery",
         source_discovery_attempt: str = "",
         discovery_complete: bool = False,
         finding_ids: tuple[str, ...] = (),
@@ -1163,6 +1163,10 @@ class RouterTests(unittest.TestCase):
             evidence_path.write_text("# Review evidence\n")
         blob = subject_blob or ("b" * 40)
         extra = ""
+        if review_kind == "discovery" and verdict in {"green", "red"}:
+            discovery_complete = True
+            if verdict == "red" and not finding_ids:
+                finding_ids = ("F-default",)
         if review_kind is not None:
             ids = ", ".join(f'"{item}"' for item in finding_ids)
             extra = (
@@ -1211,7 +1215,21 @@ class RouterTests(unittest.TestCase):
             finally:
                 temp.cleanup()
 
-    def test_green_closure_requires_fresh_discovery_before_finalization(self) -> None:
+    def test_active_legacy_shaped_review_attempt_fails_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            self.add_review_attempt(project, "pending", review_kind=None)
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("explicit review_kind", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_green_closure_requires_all_known_findings_before_fresh_discovery(self) -> None:
         temp, project = self.copy_fixture()
         try:
             self.install_reviewable_result(project, "required")
@@ -1221,7 +1239,7 @@ class RouterTests(unittest.TestCase):
                 "R01",
                 review_kind="discovery",
                 discovery_complete=True,
-                finding_ids=("F1",),
+                finding_ids=("F1", "F2"),
             )
 
             board = project / BOARD
@@ -1242,12 +1260,25 @@ class RouterTests(unittest.TestCase):
             )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("route", "review_freeze"))
-            self.assertIn("fresh full-scope discovery", routed.reason)
+            self.assertIn("another closure-verification", routed.reason)
 
             self.add_review_attempt(
                 project,
                 "green",
                 "R03",
+                review_kind="closure_verification",
+                source_discovery_attempt="R01",
+                finding_ids=("F2",),
+                subject_blob="c" * 40,
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "review_freeze"))
+            self.assertIn("fresh full-scope discovery", routed.reason)
+
+            self.add_review_attempt(
+                project,
+                "green",
+                "R04",
                 review_kind="discovery",
                 discovery_complete=True,
                 finding_ids=(),
