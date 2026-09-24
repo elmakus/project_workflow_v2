@@ -590,6 +590,7 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     attempts,
                     expected_card_id=card["id"],
                     workstream_id=workstream["workstream_id"],
+                    accepted_authority_paths=set(contract["authority_refs"]),
                 )
                 current_subject = exact_result_subject(project["repository"], card["result"])
                 verdict = attempts[-1]["verdict"]
