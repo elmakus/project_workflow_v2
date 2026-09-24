@@ -14,8 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping, Protocol
 
-from tools.state_contract import ValidationError
-
+from tools.obligation_contract import (\n    compile_execution_obligation,\n    reconcile_execution_result,\n    validate_execution_result,\n)\nfrom tools.state_contract import ValidationError\n
 SUPPORTED_REGISTRY_VERSION = 1
 SUPPORTED_SCHEMA_VERSION = 1
 REGISTRY_KIND = "pwv2_mechanical_policy"
@@ -310,11 +309,25 @@ class PolicyKernel:
         if actual != expected:
             raise KernelContractError("registry/contract projection drift")
 
-    def compile_obligations(self, *args: Any, **kwargs: Any) -> Any:
-        raise DeferredKernelCapabilityError("typed Obligation compilation belongs to PWv2.1 M02")
+    def compile_obligations(self, rule_id: str, **kwargs: Any) -> dict[str, Any]:
+        if rule_id not in self._rules_by_id:
+            raise KernelContractError(f"unknown mechanical rule {rule_id!r}")
+        return compile_execution_obligation(rule_id=rule_id, **kwargs)
 
-    def validate_results(self, *args: Any, **kwargs: Any) -> Any:
-        raise DeferredKernelCapabilityError("typed Result validation belongs to PWv2.1 M02")
+    def validate_results(self, payload: Mapping[str, Any]) -> None:
+        validate_execution_result(payload)
 
-    def reconcile(self, *args: Any, **kwargs: Any) -> Any:
-        raise DeferredKernelCapabilityError("typed Result reconciliation belongs to PWv2.1 M02")
+    def reconcile(
+        self,
+        result: Mapping[str, Any],
+        obligation: Mapping[str, Any],
+        *,
+        current_freshness_material: Mapping[str, Any],
+        safe_reuse_proof: Mapping[str, Any] | None = None,
+    ) -> str:
+        return reconcile_execution_result(
+            result,
+            obligation,
+            current_freshness_material=current_freshness_material,
+            safe_reuse_proof=safe_reuse_proof,
+        )
