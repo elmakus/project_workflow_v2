@@ -607,7 +607,18 @@ class StateEnvelopeTests(unittest.TestCase):
             "verdict": "pending",
             "evidence_path": "",
         })
-        validate_review_history(attempts + [new_epoch])
+        new_epoch["subject"]["commit"] = "8" * 40
+        reset_path = new_epoch["epoch_reset_subject"]["path"]
+        reset_blobs = {
+            ("owner/fixture-project", "8" * 40, reset_path): "9" * 40,
+            ("owner/fixture-project", post_red["subject"]["commit"], reset_path): "7" * 40,
+        }
+        validate_review_history(
+            attempts + [new_epoch],
+            exact_blob_reader=lambda repository, commit, path: reset_blobs.get(
+                (repository, commit, path)
+            ),
+        )
 
     def test_review_epoch_identity_cannot_be_reused_after_reset(self) -> None:
         first = read_toml(VALID / "REVIEW_ATTEMPT.toml")
@@ -637,6 +648,13 @@ class StateEnvelopeTests(unittest.TestCase):
                 "blob": "7" * 40,
             },
         })
+        second["subject"]["commit"] = "6" * 40
+        reset_path = second["epoch_reset_subject"]["path"]
+        reset_blobs = {
+            ("owner/fixture-project", "6" * 40, reset_path): "7" * 40,
+            ("owner/fixture-project", "2" * 40, reset_path): "5" * 40,
+        }
+
         third = copy.deepcopy(first)
         third.update({
             "attempt": "R03",
@@ -650,7 +668,12 @@ class StateEnvelopeTests(unittest.TestCase):
             },
         })
         with self.assertRaisesRegex(ValidationError, "cannot be reused"):
-            validate_review_history([first, second, third])
+            validate_review_history(
+                [first, second, third],
+                exact_blob_reader=lambda repository, commit, path: reset_blobs.get(
+                    (repository, commit, path)
+                ),
+            )
 
     def test_task_card_review_acceptance_is_exact_and_semantic(self) -> None:
         review = {
