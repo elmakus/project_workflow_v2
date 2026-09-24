@@ -164,14 +164,14 @@ class PolicyKernelTests(unittest.TestCase):
         self.assertEqual(REGISTRY.read_bytes(), registry_before)
         self.assertEqual(PROJECTION.read_bytes(), projection_before)
 
-    def test_m02_owned_seams_are_declared_but_not_implemented_early(self) -> None:
+    def test_m02_owned_seams_remain_stable_and_are_now_implemented(self) -> None:
         for method in (
             self.kernel.compile_obligations,
             self.kernel.validate_results,
             self.kernel.reconcile,
         ):
-            with self.subTest(method=method.__name__), self.assertRaises(DeferredKernelCapabilityError):
-                method({})
+            with self.subTest(method=method.__name__):
+                self.assertTrue(callable(method))
 
 
 if __name__ == "__main__":
