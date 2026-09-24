@@ -32,7 +32,7 @@
     "canonical writes are coordinator-owned"
   ],
   "freshness": {
-    "fingerprint": "sha256:8a81abcdac6103099eabc87c51050edff21560a1708e675530cff38a214dadb1",
+    "fingerprint": "sha256:d48d536bbd1a031ef7d2005c927517dc16fdc74f14a83e09515b936316cf0c0a",
     "material": {
       "authority": [
         {
@@ -67,11 +67,17 @@
         "card_id": "M02-T01"
       },
       "mutation": {
-        "postconditions": [
-          "result read back exactly"
-        ],
         "preconditions": [
-          "board revision is 8"
+          {
+            "path": "board.revision",
+            "equals": 8
+          }
+        ],
+        "postconditions": [
+          {
+            "path": "board.revision",
+            "equals": 9
+          }
         ]
       },
       "prerequisites": [
@@ -87,14 +93,20 @@
   },
   "kind": "pwv2_execution_obligation",
   "mutation": {
-    "postconditions": [
-      "result read back exactly"
-    ],
     "preconditions": [
-      "board revision is 8"
+      {
+        "path": "board.revision",
+        "equals": 8
+      }
+    ],
+    "postconditions": [
+      {
+        "path": "board.revision",
+        "equals": 9
+      }
     ]
   },
-  "obligation_id": "sha256:b6d3a55981d76a1138b5dc28b8399ebc0c2538e7011aee6902b8a47065d9dd3a",
+  "obligation_id": "sha256:edae6ea1b0db0723b03b6842e62153f7687ab3f927cfab20a60b69844b5088c1",
   "prerequisites": [
     "M01-T01 DONE"
   ],
