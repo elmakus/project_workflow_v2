@@ -20,6 +20,8 @@ RULE_ID = re.compile(r"^PWV21-K[0-9]{3}$")
 RESULT_STATUSES = {"success", "blocked", "failed"}
 TEST_STATUSES = {"green", "red", "not_run"}
 READBACK_STATUSES = {"verified", "failed", "not_applicable"}
+INPUT_PATH = re.compile(r"^[a-z_][a-z0-9_]*(?:\\.[a-z_][a-z0-9_]*)*$")
+STALE_ACTIONS = {"reuse", "rebase", "reconcile"}
 TELEMETRY_KEYS = {
     "provider", "model", "model_id", "worker", "worker_id", "session", "session_id",
     "retry", "retries", "worktree", "paseo", "runtime", "invocation", "scheduler",
@@ -142,13 +144,32 @@ def _completion(
     }
 
 
+def _condition_list(value: Any, label: str) -> list[dict[str, Any]]:
+    _require(isinstance(value, Sequence) and not isinstance(value, (str, bytes)),
+             f"{label}: expected an array")
+    result: list[dict[str, Any]] = []
+    for index, item in enumerate(value):
+        _require(isinstance(item, Mapping) and set(item) == {"path", "equals"},
+                 f"{label}[{index}]: expected path/equals object")
+        path = item["path"]
+        _require(isinstance(path, str) and INPUT_PATH.fullmatch(path) is not None,
+                 f"{label}[{index}]: invalid canonical path")
+        _reject_telemetry_keys(item["equals"], f"{label}[{index}].equals")
+        try:
+            exact_value = json.loads(canonical_json(item["equals"]).decode("utf-8"))
+        except (TypeError, ValueError) as exc:
+            raise ExecutionEnvelopeError(f"{label}[{index}]: equals must be JSON-serializable") from exc
+        result.append({"path": path, "equals": exact_value})
+    return result
+
+
 def _mutation(
-    preconditions: Sequence[str],
-    postconditions: Sequence[str],
-) -> dict[str, list[str]]:
+    preconditions: Sequence[Mapping[str, Any]],
+    postconditions: Sequence[Mapping[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
     return {
-        "preconditions": _string_list(preconditions, "mutation.preconditions"),
-        "postconditions": _string_list(postconditions, "mutation.postconditions"),
+        "preconditions": _condition_list(preconditions, "mutation.preconditions"),
+        "postconditions": _condition_list(postconditions, "mutation.postconditions"),
     }
 
 
@@ -202,8 +223,8 @@ def _validate_freshness_material(material: Any) -> None:
     mutation = material["mutation"]
     _require(isinstance(mutation, Mapping) and set(mutation) == {"preconditions", "postconditions"},
              "freshness.mutation: invalid keys")
-    _string_list(mutation["preconditions"], "freshness.mutation.preconditions")
-    _string_list(mutation["postconditions"], "freshness.mutation.postconditions")
+    _condition_list(mutation["preconditions"], "freshness.mutation.preconditions")
+    _condition_list(mutation["postconditions"], "freshness.mutation.postconditions")
     _require(isinstance(material["inputs"], Mapping), "freshness.inputs must be an object")
     _reject_telemetry_keys(material["inputs"], "freshness.inputs")
 
@@ -227,8 +248,8 @@ def compile_execution_obligation(
     tests: Sequence[str],
     evidence_requirements: Sequence[str],
     determining_inputs: Mapping[str, Any],
-    mutation_preconditions: Sequence[str],
-    mutation_postconditions: Sequence[str],
+    mutation_preconditions: Sequence[Mapping[str, Any]],
+    mutation_postconditions: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     _require(isinstance(rule_id, str) and RULE_ID.fullmatch(rule_id) is not None,
              "obligation.rule_id must be a registered-rule identifier")
@@ -324,8 +345,8 @@ def validate_execution_obligation(payload: Any) -> None:
     mutation = payload["mutation"]
     _require(isinstance(mutation, Mapping) and set(mutation) == {"preconditions", "postconditions"},
              "obligation.mutation: invalid keys")
-    _string_list(mutation["preconditions"], "obligation.mutation.preconditions")
-    _string_list(mutation["postconditions"], "obligation.mutation.postconditions")
+    _condition_list(mutation["preconditions"], "obligation.mutation.preconditions")
+    _condition_list(mutation["postconditions"], "obligation.mutation.postconditions")
     freshness = payload["freshness"]
     _require(isinstance(freshness, Mapping) and set(freshness) == {"fingerprint", "material"},
              "obligation.freshness: invalid keys")
@@ -414,7 +435,7 @@ def reconcile_execution_result(
     obligation: Mapping[str, Any],
     *,
     current_freshness_material: Mapping[str, Any],
-    safe_reuse_proof: Mapping[str, Any] | None = None,
+    stale_resolution: Mapping[str, Any] | None = None,
 ) -> str:
     validate_execution_obligation(obligation)
     validate_execution_result(result)
@@ -426,31 +447,57 @@ def reconcile_execution_result(
     prior = obligation["freshness"]["fingerprint"]
     if current == prior:
         return "accept"
-    if safe_reuse_proof is None:
+    if stale_resolution is None:
         return "reexecute"
-    expected = {"prior_fingerprint", "current_fingerprint", "materially_unchanged", "basis"}
-    _require(isinstance(safe_reuse_proof, Mapping) and set(safe_reuse_proof) == expected,
-             "stale result: invalid safe-reuse proof")
-    _require(safe_reuse_proof["prior_fingerprint"] == prior
-             and safe_reuse_proof["current_fingerprint"] == current,
+    expected = {
+        "prior_fingerprint", "current_fingerprint", "action", "safety_proven", "basis",
+    }
+    _require(isinstance(stale_resolution, Mapping) and set(stale_resolution) == expected,
+             "stale result: invalid resolution proof")
+    _require(stale_resolution["prior_fingerprint"] == prior
+             and stale_resolution["current_fingerprint"] == current,
              "stale result: proof fingerprint mismatch")
-    _require(safe_reuse_proof["materially_unchanged"] is True,
-             "stale result: reuse proof does not establish safety")
-    _require(isinstance(safe_reuse_proof["basis"], str) and safe_reuse_proof["basis"].strip(),
-             "stale result: reuse proof basis is required")
-    return "reuse"
+    _require(stale_resolution["action"] in STALE_ACTIONS,
+             "stale result: invalid safe resolution action")
+    _require(stale_resolution["safety_proven"] is True,
+             "stale result: resolution proof does not establish safety")
+    _require(isinstance(stale_resolution["basis"], str) and stale_resolution["basis"].strip(),
+             "stale result: resolution proof basis is required")
+    return stale_resolution["action"]
+
+
+def _extract_canonical_path(root: Mapping[str, Any], path: str) -> Any:
+    value: Any = root
+    for part in path.split("."):
+        _require(isinstance(value, Mapping) and part in value,
+                 f"mutation readback missing canonical path {path!r}")
+        value = value[part]
+    return value
+
+
+def _verify_conditions(conditions: Sequence[Mapping[str, Any]], state: Mapping[str, Any], label: str) -> str:
+    _require(isinstance(state, Mapping), f"{label}: state must be an object")
+    for condition in conditions:
+        actual = _extract_canonical_path(state, condition["path"])
+        _require(actual == condition["equals"],
+                 f"{label}: condition failed for {condition['path']!r}")
+    return "verified"
+
+
+def verify_mutation_preconditions(
+    obligation: Mapping[str, Any],
+    current_state: Mapping[str, Any],
+) -> str:
+    validate_execution_obligation(obligation)
+    return _verify_conditions(obligation["mutation"]["preconditions"], current_state, "mutation precondition")
 
 
 def verify_mutation_readback(
     obligation: Mapping[str, Any],
-    observed_postconditions: Sequence[str],
+    observed_state: Mapping[str, Any],
 ) -> str:
     validate_execution_obligation(obligation)
-    observed = set(_string_list(observed_postconditions, "observed_postconditions"))
-    expected = set(obligation["mutation"]["postconditions"])
-    missing = sorted(expected - observed)
-    _require(not missing, f"mutation readback missing expected postconditions: {missing}")
-    return "verified"
+    return _verify_conditions(obligation["mutation"]["postconditions"], observed_state, "mutation readback")
 
 
 def external_effect_retry_decision(*, readback_state: str, observation: str) -> str:
