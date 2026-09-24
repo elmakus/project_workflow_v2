@@ -1,0 +1,12 @@
+audit_kind = "pwv2_adversarial_swarm"
+audit_suffix = "6ugr6l0d6zsn8fgvpdj1cjsd"
+repository = "elmakus/project_workflow_v2"
+subject_commit = "4fb4bfb7d7b1481d6f347c182fc96a5a1135e045"
+branch = "audit/pwv2-swarm-6ugr6l0d6zsn8fgvpdj1cjsd"
+blind_discovery = true
+selected_attack_lenses = [
+  "router precedence / unreachable branches / conflicting obligations",
+  "Planning / Premium gates / Execution precedence",
+  "malformed or contradictory state / fail-closed behavior",
+  "plugin / install / update / SessionStart / bootstrap drift",
+]
