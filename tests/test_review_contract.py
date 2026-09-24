@@ -5,8 +5,10 @@ import unittest
 from tools.review_contract import (
     ReviewContractError,
     can_finalize_review_obligation,
+    REVIEW_SCOPE_DISCOVERY_CEILINGS,
     required_closure_scope,
     remaining_closure_findings,
+    review_convergence_state,
     select_review_realization,
     validate_closure_surface,
     validate_discovery_surface,
@@ -140,6 +142,152 @@ class ReviewContractTests(unittest.TestCase):
             remaining_closure_findings(attempts, "R01"),
             frozenset(),
         )
+
+    def test_discovery_epoch_ceiling_matrix_counts_only_new_classes(self) -> None:
+        for scope, ceiling in REVIEW_SCOPE_DISCOVERY_CEILINGS.items():
+            attempts = []
+            for index in range(ceiling - 1):
+                attempts.append({
+                    "attempt": f"R{index + 1:02d}",
+                    "verdict": "red",
+                    "review_kind": "discovery",
+                    "review_scope": scope,
+                    "review_epoch": "E01",
+                    "material_defect_class_ids": [f"class-{index}"],
+                    "post_convergence_validation": False,
+                })
+            state = review_convergence_state(attempts)
+            self.assertEqual(state.discovery_epochs, ceiling - 1)
+            self.assertFalse(state.convergence_required, scope)
+
+            attempts.append({
+                "attempt": f"R{ceiling:02d}",
+                "verdict": "red",
+                "review_kind": "discovery",
+                "review_scope": scope,
+                "review_epoch": "E01",
+                "material_defect_class_ids": [f"class-{ceiling - 1}"],
+                "post_convergence_validation": False,
+            })
+            state = review_convergence_state(attempts)
+            self.assertEqual(state.discovery_epochs, ceiling)
+            self.assertTrue(state.convergence_required, scope)
+
+    def test_known_class_recurrence_green_and_closure_do_not_consume_discovery_epoch(self) -> None:
+        attempts = [
+            {
+                "attempt": "R01",
+                "verdict": "red",
+                "review_kind": "discovery",
+                "review_scope": "card",
+                "review_epoch": "E01",
+                "material_defect_class_ids": ["class-a"],
+                "post_convergence_validation": False,
+            },
+            {
+                "attempt": "R02",
+                "verdict": "green",
+                "review_kind": "closure_verification",
+                "review_scope": "card",
+                "review_epoch": "E01",
+                "material_defect_class_ids": ["class-a"],
+                "post_convergence_validation": False,
+            },
+            {
+                "attempt": "R03",
+                "verdict": "red",
+                "review_kind": "discovery",
+                "review_scope": "card",
+                "review_epoch": "E01",
+                "material_defect_class_ids": ["class-a"],
+                "post_convergence_validation": False,
+            },
+            {
+                "attempt": "R04",
+                "verdict": "green",
+                "review_kind": "discovery",
+                "review_scope": "card",
+                "review_epoch": "E01",
+                "material_defect_class_ids": [],
+                "post_convergence_validation": False,
+            },
+        ]
+        state = review_convergence_state(attempts)
+        self.assertEqual(state.discovery_epochs, 1)
+        self.assertFalse(state.convergence_required)
+
+    def test_third_failed_closure_round_for_one_class_requires_convergence(self) -> None:
+        attempts = [{
+            "attempt": "R01",
+            "verdict": "red",
+            "review_kind": "discovery",
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "material_defect_class_ids": ["class-a"],
+            "post_convergence_validation": False,
+        }]
+        for number in range(2, 5):
+            attempts.append({
+                "attempt": f"R{number:02d}",
+                "verdict": "red",
+                "review_kind": "closure_verification",
+                "review_scope": "card",
+                "review_epoch": "E01",
+                "material_defect_class_ids": ["class-a"],
+                "post_convergence_validation": False,
+            })
+            state = review_convergence_state(attempts)
+            self.assertEqual(state.failed_closure_rounds["class-a"], number - 1)
+            self.assertEqual(state.convergence_required, number == 4)
+
+    def test_epoch_change_resets_derived_counts_and_post_convergence_is_single(self) -> None:
+        attempts = [
+            {
+                "attempt": "R01",
+                "verdict": "red",
+                "review_kind": "discovery",
+                "review_scope": "final",
+                "review_epoch": "E01",
+                "material_defect_class_ids": ["a"],
+                "post_convergence_validation": False,
+            },
+            {
+                "attempt": "R02",
+                "verdict": "red",
+                "review_kind": "discovery",
+                "review_scope": "final",
+                "review_epoch": "E02",
+                "material_defect_class_ids": ["b"],
+                "post_convergence_validation": False,
+            },
+        ]
+        state = review_convergence_state(attempts)
+        self.assertEqual(state.review_epoch, "E02")
+        self.assertEqual(state.discovery_epochs, 1)
+        self.assertEqual(state.seen_defect_classes, frozenset({"b"}))
+
+        attempts.extend([
+            {
+                "attempt": "R03",
+                "verdict": "green",
+                "review_kind": "discovery",
+                "review_scope": "final",
+                "review_epoch": "E02",
+                "material_defect_class_ids": [],
+                "post_convergence_validation": True,
+            },
+            {
+                "attempt": "R04",
+                "verdict": "green",
+                "review_kind": "discovery",
+                "review_scope": "final",
+                "review_epoch": "E02",
+                "material_defect_class_ids": [],
+                "post_convergence_validation": True,
+            },
+        ])
+        with self.assertRaisesRegex(ReviewContractError, "only one post-convergence"):
+            review_convergence_state(attempts)
 
     def test_closure_cannot_finalize_review_obligation(self) -> None:
         self.assertTrue(can_finalize_review_obligation({
