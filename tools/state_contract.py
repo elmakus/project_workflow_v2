@@ -10,9 +10,27 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 try:
-    from tools.review_contract import REVIEW_KINDS, review_kind
+    from tools.review_contract import (
+        CONVERGENCE_FIELDS,
+        REVIEW_KINDS,
+        REVIEW_SCOPE_DISCOVERY_CEILINGS,
+        ReviewContractError,
+        convergence_fields_present,
+        material_defect_classes,
+        review_convergence_state,
+        review_kind,
+    )
 except ModuleNotFoundError:  # direct script execution from tools/
-    from review_contract import REVIEW_KINDS, review_kind
+    from review_contract import (
+        CONVERGENCE_FIELDS,
+        REVIEW_KINDS,
+        REVIEW_SCOPE_DISCOVERY_CEILINGS,
+        ReviewContractError,
+        convergence_fields_present,
+        material_defect_classes,
+        review_convergence_state,
+        review_kind,
+    )
 
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 CARD_STATUSES = {"planned", "ready", "in_progress", "blocked", "done"}
@@ -869,6 +887,53 @@ def validate_review(data: dict[str, Any]) -> None:
             _require(bool(finding_ids),
                      "review: closure_verification must name the known material findings it verifies")
 
+    convergence_aware = convergence_fields_present(data)
+    _require(
+        convergence_aware or not any(key in data for key in CONVERGENCE_FIELDS - {"review_epoch"}),
+        "review: convergence fields require explicit review_epoch",
+    )
+    if convergence_aware:
+        _require(explicit_v21, "review: convergence-aware attempt requires explicit review_kind")
+        scope = data.get("review_scope")
+        _require(scope in REVIEW_SCOPE_DISCOVERY_CEILINGS,
+                 f"review: invalid review_scope {scope!r}")
+        epoch = data.get("review_epoch")
+        _require(isinstance(epoch, str) and epoch.strip(),
+                 "review: review_epoch must be a non-empty string")
+        reset_basis = data.get("epoch_reset_basis")
+        _require(isinstance(reset_basis, str),
+                 "review: epoch_reset_basis must be a string")
+        try:
+            defect_classes = material_defect_classes(data)
+        except ReviewContractError as exc:
+            raise ValidationError(f"review: {exc}") from exc
+        is_post = data.get("post_convergence_validation")
+        _require(isinstance(is_post, bool),
+                 "review: post_convergence_validation must be boolean")
+        convergence_basis = data.get("convergence_basis")
+        _require(isinstance(convergence_basis, str),
+                 "review: convergence_basis must be a string")
+
+        if is_post:
+            _require(kind == "discovery",
+                     "review: post-convergence validation must be a fresh discovery")
+            _require(bool(convergence_basis.strip()),
+                     "review: post-convergence validation requires durable convergence_basis")
+        else:
+            _require(convergence_basis == "",
+                     "review: ordinary attempt must not claim convergence_basis")
+
+        if kind == "discovery":
+            if verdict == "red":
+                _require(bool(defect_classes),
+                         "review: RED discovery must record material_defect_class_ids")
+            else:
+                _require(not defect_classes,
+                         "review: non-RED discovery must not claim material defect classes")
+        else:
+            _require(bool(defect_classes),
+                     "review: closure verification must record material_defect_class_ids")
+
 
 def validate_review_history(
     attempts: list[dict[str, Any]],
@@ -882,11 +947,16 @@ def validate_review_history(
     attempts_by_id: dict[str, dict[str, Any]] = {}
     open_findings: dict[str, set[str]] = {}
     legacy_prefix = True
+    pre_convergence_prefix = True
+    current_epoch: str | None = None
+    current_scope: str | None = None
     nonterminal = 0
     for index, attempt in enumerate(attempts):
         validate_review(attempt)
         attempt_id = attempt["attempt"]
         explicit_v21 = "review_kind" in attempt
+        convergence_aware = convergence_fields_present(attempt)
+
         if explicit_v21:
             legacy_prefix = False
         else:
@@ -894,6 +964,35 @@ def validate_review_history(
                      "review_history: legacy review attempts must form the initial historical prefix")
             _require(attempt["verdict"] in {"green", "red"},
                      "review_history: new/active review attempts require explicit review_kind")
+
+        if convergence_aware:
+            pre_convergence_prefix = False
+            epoch = attempt["review_epoch"]
+            scope = attempt["review_scope"]
+            reset_basis = attempt["epoch_reset_basis"]
+            if current_epoch is None:
+                _require(reset_basis == "",
+                         "review_history: initial convergence-aware epoch must not claim reset basis")
+                current_epoch = epoch
+                current_scope = scope
+            elif epoch != current_epoch:
+                _require(bool(reset_basis.strip()),
+                         "review_history: changed review_epoch requires durable accepted-redesign reset basis")
+                _require(scope == current_scope,
+                         "review_history: review_scope cannot change across epoch reset in one review history")
+                current_epoch = epoch
+                open_findings.clear()
+            else:
+                _require(reset_basis == "",
+                         "review_history: unchanged review_epoch must not claim reset basis")
+                _require(scope == current_scope,
+                         "review_history: review_scope cannot change inside one review history")
+        else:
+            _require(pre_convergence_prefix,
+                     "review_history: pre-convergence attempts must form the initial historical prefix")
+            _require(attempt["verdict"] in {"green", "red"},
+                     "review_history: active attempts require convergence-aware epoch fields")
+
         _require(attempt_id not in seen_ids, f"review_history: duplicate attempt {attempt_id!r}")
         seen_ids.add(attempt_id)
         if expected_card_id is not None:
@@ -909,6 +1008,20 @@ def validate_review_history(
                 not still_open,
                 "review_history: fresh discovery cannot start before all known material findings are closure-verified",
             )
+            if convergence_aware:
+                try:
+                    prior = review_convergence_state(attempts[:index])
+                except ReviewContractError as exc:
+                    raise ValidationError(f"review_history: {exc}") from exc
+                is_post = attempt["post_convergence_validation"]
+                if is_post:
+                    _require(prior.convergence_required,
+                             "review_history: post-convergence validation requires a reached convergence threshold")
+                    _require(prior.post_convergence_attempt is None,
+                             "review_history: only one post-convergence validation is allowed per epoch")
+                elif prior.review_epoch == attempt["review_epoch"]:
+                    _require(not prior.convergence_required,
+                             "review_history: convergence threshold requires post-convergence validation, not another ordinary discovery")
             if attempt["verdict"] == "red":
                 open_findings[attempt_id] = set(attempt["material_finding_ids"])
 
@@ -926,6 +1039,15 @@ def validate_review_history(
                      "review_history: PWv2.1 closure source must record material_finding_ids")
             _require(set(attempt["material_finding_ids"]).issubset(set(source_findings)),
                      "review_history: closure may verify only findings frozen by its source discovery")
+            if convergence_aware:
+                _require(convergence_fields_present(source),
+                         "review_history: convergence-aware closure requires convergence-aware source discovery")
+                _require(source["review_epoch"] == attempt["review_epoch"],
+                         "review_history: closure cannot cross review epochs")
+                source_classes = material_defect_classes(source)
+                closure_classes = material_defect_classes(attempt)
+                _require(closure_classes.issubset(source_classes),
+                         "review_history: closure may verify only defect classes frozen by its source discovery")
             if attempt["verdict"] == "green":
                 open_findings[source_id].difference_update(attempt["material_finding_ids"])
 
@@ -935,6 +1057,10 @@ def validate_review_history(
             _require(index == len(attempts) - 1,
                      "review_history: only the latest attempt may be non-terminal")
     _require(nonterminal <= 1, "review_history: multiple active attempts are forbidden")
+    try:
+        review_convergence_state(attempts)
+    except ReviewContractError as exc:
+        raise ValidationError(f"review_history: {exc}") from exc
 
 
 def validate_external_effect(data: dict[str, Any], workstream_id: str) -> None:
