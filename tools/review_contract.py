@@ -31,6 +31,7 @@ CONVERGENCE_FIELDS = frozenset({
     "review_scope",
     "review_epoch",
     "epoch_reset_basis",
+    "epoch_reset_subject",
     "material_defect_class_ids",
     "post_convergence_validation",
     "convergence_basis",
@@ -96,6 +97,17 @@ def material_defect_classes(attempt: Mapping[str, object]) -> frozenset[str]:
     return frozenset(raw)
 
 
+def _review_subject_identity(attempt: Mapping[str, object]) -> tuple[str, str, str, str]:
+    """Return exact immutable reviewed-subject identity for repair-round accounting."""
+    subject = attempt.get("subject")
+    if not isinstance(subject, Mapping):
+        raise ReviewContractError("RED closure verification requires exact reviewed subject")
+    values = tuple(subject.get(key) for key in ("repository", "commit", "path", "blob"))
+    if not all(isinstance(value, str) and value for value in values):
+        raise ReviewContractError("RED closure verification requires exact reviewed subject")
+    return values  # type: ignore[return-value]
+
+
 def review_convergence_state(
     attempts: Iterable[Mapping[str, object]],
 ) -> ReviewConvergenceState:
@@ -110,6 +122,7 @@ def review_convergence_state(
     discovery_epochs = 0
     seen_classes: set[str] = set()
     failed_rounds: dict[str, int] = {}
+    failed_round_subjects: dict[str, set[tuple[str, str, str, str]]] = {}
     post_attempt: str | None = None
     post_verdict: str | None = None
 
@@ -130,6 +143,7 @@ def review_convergence_state(
             discovery_epochs = 0
             seen_classes = set()
             failed_rounds = {}
+            failed_round_subjects = {}
             post_attempt = None
             post_verdict = None
         elif raw_scope != scope:
@@ -155,9 +169,17 @@ def review_convergence_state(
             if classes - seen_classes:
                 discovery_epochs += 1
             seen_classes.update(classes)
-        elif kind == "closure_verification" and verdict == "red":
-            for defect_class in classes:
-                failed_rounds[defect_class] = failed_rounds.get(defect_class, 0) + 1
+        elif kind == "closure_verification":
+            # Closure may introduce durable class identity when adapting an open
+            # explicit T01 discovery. That class is already known and therefore
+            # must not count as a new discovery epoch if it later recurs.
+            seen_classes.update(classes)
+            if verdict == "red":
+                subject_identity = _review_subject_identity(attempt)
+                for defect_class in classes:
+                    subjects = failed_round_subjects.setdefault(defect_class, set())
+                    subjects.add(subject_identity)
+                    failed_rounds[defect_class] = len(subjects)
 
     if scope is None or epoch is None:
         return ReviewConvergenceState(
