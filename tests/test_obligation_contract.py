@@ -61,7 +61,13 @@ class TypedExecutionContractTests(unittest.TestCase):
     def reader(self, ref: dict[str, str]) -> bytes:
         return AUTHORITY_CONTENT[ref["path"]]
 
-    def obligation(self, *, inputs: dict | None = None) -> dict:
+    def obligation(
+        self,
+        *,
+        inputs: dict | None = None,
+        mutation_preconditions: list[dict] | None = None,
+        mutation_postconditions: list[dict] | None = None,
+    ) -> dict:
         return compile_execution_obligation(
             rule_id="PWV21-K011",
             role="execution_prep",
@@ -74,8 +80,16 @@ class TypedExecutionContractTests(unittest.TestCase):
             tests=["contract suite GREEN"],
             evidence_requirements=["durable evidence"],
             determining_inputs=inputs or {"board_revision": 8, "card_id": "M02-T01"},
-            mutation_preconditions=[{"path": "board.revision", "equals": 8}],
-            mutation_postconditions=[{"path": "board.revision", "equals": 9}],
+            mutation_preconditions=(
+                mutation_preconditions
+                if mutation_preconditions is not None
+                else [{"path": "board.revision", "equals": 8}]
+            ),
+            mutation_postconditions=(
+                mutation_postconditions
+                if mutation_postconditions is not None
+                else [{"path": "board.revision", "equals": 9}]
+            ),
         )
 
     def result(self, obligation: dict) -> dict:
@@ -463,6 +477,15 @@ class TypedExecutionContractTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ExecutionEnvelopeError, "condition failed"):
             verify_mutation_readback(obligation, {"board": {"revision": 8}})
+
+        typed_obligation = self.obligation(
+            mutation_preconditions=[{"path": "board.revision", "equals": 1}],
+            mutation_postconditions=[{"path": "board.revision", "equals": 0}],
+        )
+        with self.assertRaisesRegex(ExecutionEnvelopeError, "condition failed"):
+            verify_mutation_preconditions(typed_obligation, {"board": {"revision": True}})
+        with self.assertRaisesRegex(ExecutionEnvelopeError, "condition failed"):
+            verify_mutation_readback(typed_obligation, {"board": {"revision": False}})
 
     def test_unknown_external_effect_never_authorizes_blind_retry(self) -> None:
         self.assertEqual(

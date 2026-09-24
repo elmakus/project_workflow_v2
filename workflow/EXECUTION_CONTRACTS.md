@@ -52,7 +52,7 @@ A stale result is never silently accepted. Reuse, rebase, or reconcile is allowe
 
 ## Governed mutation and readback
 
-The kernel emits mutation preconditions/postconditions in the obligation. The coordinator/owning workflow role performs any canonical write and then verifies the required postconditions through readback. OR/Paseo does not finalize canonical PW state directly.
+The kernel emits mutation preconditions/postconditions in the obligation. Equality is checked over canonical JSON bytes, so JSON types cannot coerce across the boundary (for example, boolean `true` never satisfies integer `1`). The coordinator/owning workflow role performs any canonical write and then verifies the required postconditions through readback. OR/Paseo does not finalize canonical PW state directly.
 
 For external effects whose occurrence is unknown, existing exact-target readback semantics remain authoritative:
 - pending occurrence -> read back the exact target before deciding;

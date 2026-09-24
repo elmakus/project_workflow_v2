@@ -498,8 +498,10 @@ def _verify_conditions(conditions: Sequence[Mapping[str, Any]], state: Mapping[s
     _require(isinstance(state, Mapping), f"{label}: state must be an object")
     for condition in conditions:
         actual = _extract_canonical_path(state, condition["path"])
-        _require(actual == condition["equals"],
-                 f"{label}: condition failed for {condition['path']!r}")
+        _require(
+            canonical_json(actual) == canonical_json(condition["equals"]),
+            f"{label}: condition failed for {condition['path']!r}",
+        )
     return "verified"
 
 
