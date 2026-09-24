@@ -20,7 +20,7 @@ RULE_ID = re.compile(r"^PWV21-K[0-9]{3}$")
 RESULT_STATUSES = {"success", "blocked", "failed"}
 TEST_STATUSES = {"green", "red", "not_run"}
 READBACK_STATUSES = {"verified", "failed", "not_applicable"}
-INPUT_PATH = re.compile(r"^[a-z_][a-z0-9_]*(?:\\.[a-z_][a-z0-9_]*)*$")
+INPUT_PATH = re.compile(r"^[a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)*$")
 STALE_ACTIONS = {"reuse", "rebase", "reconcile"}
 TELEMETRY_KEYS = {
     "provider", "model", "model_id", "worker", "worker_id", "session", "session_id",
