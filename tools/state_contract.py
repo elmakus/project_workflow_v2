@@ -918,6 +918,10 @@ def validate_review(data: dict[str, Any]) -> None:
                     and SHA40.fullmatch(reset_subject[key]) is not None,
                     f"review.epoch_reset_subject: {key} must be exact 40-hex",
                 )
+            _require(
+                reset_subject["repository"] == subject["repository"],
+                "review: epoch_reset_subject must belong to the reviewed project repository",
+            )
             reset_path = _safe_relative_path(
                 reset_subject["path"], "review.epoch_reset_subject"
             )
@@ -971,9 +975,14 @@ def validate_review_history(
     *,
     expected_card_id: str | None = None,
     workstream_id: str | None = None,
+    accepted_authority_paths: set[str] | None = None,
 ) -> None:
     _require(isinstance(attempts, list) and attempts,
              "review_history: at least one attempt is required")
+    accepted_authorities = {
+        _safe_relative_path(path, "review_history.accepted_authority_paths")
+        for path in (accepted_authority_paths or set())
+    }
     seen_ids: set[str] = set()
     attempts_by_id: dict[str, dict[str, Any]] = {}
     open_findings: dict[str, set[str]] = {}
@@ -1017,6 +1026,12 @@ def validate_review_history(
                          "review_history: changed review_epoch requires durable accepted-redesign reset basis")
                 _require(isinstance(reset_subject, dict),
                          "review_history: changed review_epoch requires exact accepted-redesign reset subject")
+                reset_path = reset_subject["path"]
+                _require(
+                    reset_path == attempt["acceptance"].get("path")
+                    or reset_path in accepted_authorities,
+                    "review_history: epoch reset subject must bind exact accepted authority or acceptance redesign",
+                )
                 _require(scope == current_scope,
                          "review_history: review_scope cannot change across epoch reset in one review history")
                 _require(epoch not in seen_epoch_ids,
