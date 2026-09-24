@@ -1169,11 +1169,18 @@ def validate_review_history(
                              "review_history: closure may verify only defect classes frozen by its source discovery")
                 else:
                     # A terminal explicit T01 discovery may still have open findings when
-                    # convergence accounting is introduced. Its frozen finding IDs remain
-                    # authoritative; the first T02 closure durably introduces class identity
-                    # without retroactively inventing discovery-epoch accounting.
+                    # convergence accounting is first introduced. Its frozen finding IDs
+                    # remain authoritative; the first convergence-aware epoch may durably
+                    # introduce class identity without retroactively inventing discovery
+                    # accounting. After any accepted epoch reset, the redesigned authority/
+                    # acceptance surface requires fresh discovery and may not import a
+                    # pre-convergence source from the prior surface.
                     _require("review_kind" in source,
                              "review_history: convergence-aware closure cannot adapt legacy source without frozen finding IDs")
+                    _require(
+                        len(seen_epoch_ids) == 1,
+                        "review_history: pre-convergence closure adaptation is allowed only in the initial convergence-aware epoch",
+                    )
             if attempt["verdict"] == "green":
                 open_findings[source_id].difference_update(attempt["material_finding_ids"])
 
