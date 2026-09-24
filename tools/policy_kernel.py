@@ -99,6 +99,52 @@ DEFAULT_PREDICATES: dict[str, Predicate] = {
 }
 
 
+def _board_card_identity_status(inputs: Mapping[str, Any]) -> list[dict[str, str]]:
+    cards = inputs["board.cards"]
+    if not isinstance(cards, list):
+        raise KernelContractError("board.cards must be a list")
+    rows: list[dict[str, str]] = []
+    ids: set[str] = set()
+    for index, card in enumerate(cards):
+        if not isinstance(card, Mapping):
+            raise KernelContractError(f"board.cards[{index}] must be an object")
+        card_id = card.get("id")
+        status = card.get("status")
+        if not isinstance(card_id, str) or not card_id:
+            raise KernelContractError(f"board.cards[{index}] must carry non-empty string id")
+        if card_id in ids:
+            raise KernelContractError(f"board.cards contains duplicate id {card_id!r}")
+        ids.add(card_id)
+        if not isinstance(status, str):
+            raise KernelContractError(f"board.cards[{index}] must carry string status")
+        rows.append({"id": card_id, "status": status})
+    return rows
+
+
+def _board_one_ready_freshness(inputs: Mapping[str, Any]) -> dict[str, Any]:
+    rows = _board_card_identity_status(inputs)
+    return {
+        "board.cards": {
+            "ready": sorted(row["id"] for row in rows if row["status"] == "ready"),
+            "in_progress": sorted(row["id"] for row in rows if row["status"] == "in_progress"),
+            "blocked": sorted(row["id"] for row in rows if row["status"] == "blocked"),
+        }
+    }
+
+
+def _board_all_done_freshness(inputs: Mapping[str, Any]) -> dict[str, Any]:
+    rows = _board_card_identity_status(inputs)
+    return {
+        "board.cards": sorted(rows, key=lambda row: (row["id"], row["status"]))
+    }
+
+
+FRESHNESS_PROJECTORS: dict[str, Callable[[Mapping[str, Any]], dict[str, Any]]] = {
+    "board_one_ready_card": _board_one_ready_freshness,
+    "board_all_cards_done": _board_all_done_freshness,
+}
+
+
 class PolicyKernelSeams(Protocol):
     """Stable M01 seam names; full Obligation/Result behavior is M02-owned."""
 
@@ -332,6 +378,20 @@ class PolicyKernel:
             for path in rule["inputs"]
         }
 
+    def _freshness_rule_inputs(
+        self,
+        rule_id: str,
+        canonical_state: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        rule = self._rules_by_id.get(rule_id)
+        if rule is None:
+            raise KernelContractError(f"unknown mechanical rule {rule_id!r}")
+        raw_inputs = self._rule_inputs(rule_id, canonical_state)
+        projector = FRESHNESS_PROJECTORS.get(rule["predicate"])
+        if projector is None:
+            return raw_inputs
+        return projector(raw_inputs)
+
     def _rule_role(self, rule_id: str) -> str:
         rule = self._rules_by_id.get(rule_id)
         if rule is None:
@@ -385,7 +445,7 @@ class PolicyKernel:
             rule_id=rule_id,
             rule_fingerprint=self._rule_fingerprint(rule_id),
             role=expected_role,
-            determining_inputs=self._rule_inputs(rule_id, canonical_state),
+            determining_inputs=self._freshness_rule_inputs(rule_id, canonical_state),
             **kwargs,
         )
 
@@ -417,7 +477,7 @@ class PolicyKernel:
             raise KernelContractError("current_freshness_material must be a mapping")
         current_material = json.loads(json.dumps(current_freshness_material))
         current_material["rule_fingerprint"] = self._rule_fingerprint(rule_id)
-        current_material["inputs"] = self._rule_inputs(rule_id, canonical_state)
+        current_material["inputs"] = self._freshness_rule_inputs(rule_id, canonical_state)
         return reconcile_execution_result(
             result,
             obligation,
