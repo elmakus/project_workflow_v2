@@ -16,6 +16,32 @@ Each review attempt binds:
 
 A changed reviewed subject or a new verdict attempt is a new attempt. Existing terminal attempts remain immutable history.
 
+## Discovery and finding closure
+
+PWv2.1 distinguishes two review-pass kinds:
+
+- `discovery` is a fresh full-scope review. It evaluates the complete applicable acceptance surface, does not stop at the first blocker, and freezes the complete independently discovered material finding set before repair begins.
+- `closure_verification` is intentionally anchored to one earlier RED discovery attempt and the known finding IDs frozen by that discovery. It verifies the repair, required regression evidence, and the materially implicated causal blast radius. It is not a substitute for the next fresh full-scope discovery review.
+
+A closure-verification evidence package must explicitly account for:
+- the known findings being closed;
+- the repair diff;
+- required regression evidence;
+- materially implicated reachable callers;
+- consumers;
+- providers;
+- contracts;
+- sibling representations;
+- negative-space cases.
+
+A causal category may be empty only when no materially implicated member exists; omission of the category is not equivalent to an empty checked set. Closure evidence must cover every concrete materially implicated item.
+
+Repair targets the defect class/root cause and materially adjacent sibling/negative-space cases rather than only the literal reported example.
+
+After all known material findings from a RED discovery are closure-verified, one new fresh `discovery` attempt over the exact current subject is mandatory. A GREEN closure attempt therefore routes to a new discovery attempt and cannot finalize the Card. Only a GREEN discovery attempt can satisfy the review obligation.
+
+Historical review attempts that predate the explicit `review_kind` fields are interpreted as discovery attempts so existing terminal history remains valid. New PWv2.1 attempts use the explicit fields.
+
 ## Semantic independence
 
 Independence is about material production/repair of the exact subject, not runtime identity.
