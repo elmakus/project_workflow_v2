@@ -40,6 +40,12 @@ The execution-resolution classifier has these semantic outcomes:
 
 A RED verdict alone is not a user stop.
 
+## Review convergence and structural resolution
+
+When derived review history reaches either the scope-specific material discovery ceiling or the default 3 failed repair→closure-verification rounds for one material defect class, ordinary RED correction stops looping. Recovery routes `review_convergence` to Main/root-cause convergence analysis inside accepted authority. The mode switch preserves RED and all valid evidence; it cannot manufacture GREEN or reset the stable review epoch.
+
+After convergence analysis, the lifecycle may freeze exactly one fresh post-convergence full-scope discovery with durable convergence basis. If that validation is RED, `review_structural_resolution` classifies the smallest broader correction owner: bounded Execution Prep restructuring when accepted milestone strategy remains intact, Strategic Planning for strategy/order/outcome change, Project Definition for accepted product/global authority change, Research for missing facts, or a real user/blocker stop only when the existing recovery classifier reaches one. It must not automatically create ordinary review N+1.
+
 ## Implementation Research handoff
 
 Implementation/recovery Research is owned by the selected Task Board through one exact `research_obligation` locator. The Research record owns origin, return target, state and once-only reconciliation.
