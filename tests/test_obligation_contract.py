@@ -337,6 +337,21 @@ class TypedExecutionContractTests(unittest.TestCase):
             self.assertFalse(schema["additionalProperties"])
             self.assertTrue(property_names(schema).isdisjoint(forbidden))
 
+        def object_keys(value: object) -> set[str]:
+            found: set[str] = set()
+            if isinstance(value, dict):
+                found.update(str(key).lower() for key in value)
+                for child in value.values():
+                    found.update(object_keys(child))
+            elif isinstance(value, list):
+                for child in value:
+                    found.update(object_keys(child))
+            return found
+
+        for path in (OBLIGATION_GOLDEN, RESULT_GOLDEN):
+            fixture = json.loads(path.read_text(encoding="utf-8"))
+            self.assertTrue(object_keys(fixture).isdisjoint(forbidden))
+
     def test_policy_kernel_m02_seams_bind_registered_rule_to_typed_contract(self) -> None:
         kernel = PolicyKernel.from_path(REGISTRY)
         obligation = kernel.compile_obligations(
