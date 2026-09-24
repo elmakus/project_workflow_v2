@@ -573,6 +573,16 @@ def _normalized_review_attempts(
                 "basis": basis,
             },
         }
+        if verdict in {"pending", "in_progress"}:
+            # A migrated active attempt is newly materialized V2 state, not historical
+            # terminal review history, so bind it to the explicit PWv2.1 discovery
+            # contract rather than relying on the legacy compatibility projection.
+            attempt.update({
+                "review_kind": "discovery",
+                "source_discovery_attempt": "",
+                "discovery_complete": False,
+                "material_finding_ids": [],
+            })
         attempts.append(attempt)
         refs.append({
             "class": "review_attempt",
