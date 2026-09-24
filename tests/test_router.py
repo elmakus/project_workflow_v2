@@ -1386,6 +1386,13 @@ class RouterTests(unittest.TestCase):
                     defect_class_ids=("class-a",),
                     subject_blob=subject_blob,
                 )
+            board = project / BOARD
+            board.write_text(
+                board.read_text().replace(
+                    'blob = "' + ("b" * 40) + '"',
+                    'blob = "' + ("6" * 40) + '"',
+                )
+            )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("route", "review_convergence"))
         finally:
