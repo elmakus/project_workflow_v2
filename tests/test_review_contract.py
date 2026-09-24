@@ -3,15 +3,29 @@ from __future__ import annotations
 import unittest
 
 from tools.review_contract import (
+    ADVISORY_CATEGORIES,
+    FORBIDDEN_DOWNGRADE_BASES,
+    LOAD_BEARING_SURFACES,
+    OBSERVATION_DISPOSITIONS,
+    OPEN_OBSERVATION_DISPOSITION,
     ReviewContractError,
+    attempt_is_observation_aware,
     can_finalize_review_obligation,
     REVIEW_SCOPE_DISCOVERY_CEILINGS,
+    derive_observation_state,
+    finding_severity_records,
+    observation_records,
+    observation_update_records,
     required_closure_scope,
     remaining_closure_findings,
     review_convergence_state,
     select_review_realization,
+    unreconciled_observations,
     validate_closure_surface,
     validate_discovery_surface,
+    validate_finding_severity,
+    validate_observation_provenance,
+    validate_verdict_severity,
 )
 
 
@@ -579,6 +593,409 @@ class ReviewContractTests(unittest.TestCase):
                     review_convergence_state(attempts, expected_review_scope=other)
         with self.assertRaisesRegex(ReviewContractError, "unsupported expected review scope"):
             review_convergence_state([], expected_review_scope="program")
+
+
+class ObservationSeverityTests(unittest.TestCase):
+    def test_load_bearing_surfaces_and_advisory_categories_are_exact(self) -> None:
+        self.assertEqual(
+            LOAD_BEARING_SURFACES,
+            frozenset({
+                "acceptance",
+                "correctness",
+                "safety",
+                "security",
+                "data_integrity",
+                "dependency",
+                "compatibility",
+                "invariant",
+                "contract",
+                "required_evidence",
+            }),
+        )
+        self.assertEqual(
+            ADVISORY_CATEGORIES,
+            frozenset({
+                "advisory",
+                "stylistic",
+                "optional_cleanup",
+                "preference",
+                "speculative_hardening",
+            }),
+        )
+        self.assertEqual(
+            OBSERVATION_DISPOSITIONS,
+            frozenset({"resolved", "cleanup_candidate", "deferred", "promoted", "tracked"}),
+        )
+        self.assertEqual(OPEN_OBSERVATION_DISPOSITION, "open")
+        self.assertEqual(
+            FORBIDDEN_DOWNGRADE_BASES,
+            frozenset({"convenience", "repair_cost", "reviewer_fatigue", "desire_to_finish"}),
+        )
+
+    def test_red_discovery_requires_load_bearing_evidence_for_every_blocking_finding(self) -> None:
+        for surface in sorted(LOAD_BEARING_SURFACES):
+            with self.subTest(surface=surface):
+                covered = validate_finding_severity(
+                    material_finding_ids=["F1"],
+                    severity={"F1": {"id": "F1", "surface": surface, "evidence": "evidence/review-R01.md#F1"}},
+                    require_complete=True,
+                )
+                self.assertEqual(covered, frozenset({"F1"}))
+
+        with self.assertRaisesRegex(ReviewContractError, "load-bearing evidence"):
+            validate_finding_severity(
+                material_finding_ids=["F1", "F2"],
+                severity={"F1": {"id": "F1", "surface": "correctness", "evidence": "evidence/review-R01.md#F1"}},
+                require_complete=True,
+            )
+        with self.assertRaisesRegex(ReviewContractError, "unknown load-bearing surface"):
+            validate_finding_severity(
+                material_finding_ids=["F1"],
+                severity={"F1": {"id": "F1", "surface": "taste", "evidence": "evidence/review-R01.md#F1"}},
+                require_complete=True,
+            )
+        with self.assertRaisesRegex(ReviewContractError, "concrete load-bearing evidence"):
+            validate_finding_severity(
+                material_finding_ids=["F1"],
+                severity={"F1": {"id": "F1", "surface": "correctness", "evidence": "  "}},
+                require_complete=True,
+            )
+        with self.assertRaisesRegex(ReviewContractError, "unknown blocking finding"):
+            validate_finding_severity(
+                material_finding_ids=["F1"],
+                severity={
+                    "F1": {"id": "F1", "surface": "correctness", "evidence": "evidence/review-R01.md#F1"},
+                    "F9": {"id": "F9", "surface": "safety", "evidence": "evidence/review-R01.md#F9"},
+                },
+                require_complete=True,
+            )
+
+    def test_closure_inherits_source_severity_without_repeating_evidence(self) -> None:
+        self.assertEqual(
+            validate_finding_severity(
+                material_finding_ids=["F1"],
+                severity={},
+                require_complete=False,
+            ),
+            frozenset({"F1"}),
+        )
+
+    def test_advisory_observations_alone_cannot_keep_subject_red(self) -> None:
+        self.assertEqual(
+            validate_verdict_severity(
+                verdict="green", load_bearing_ids=[], advisory_ids=["O1", "O2"]
+            ),
+            frozenset(),
+        )
+        with self.assertRaisesRegex(ReviewContractError, "advisory.*cannot.*RED"):
+            validate_verdict_severity(
+                verdict="red", load_bearing_ids=[], advisory_ids=["O1", "O2"]
+            )
+        self.assertEqual(
+            validate_verdict_severity(
+                verdict="red", load_bearing_ids=["F1"], advisory_ids=["O1"]
+            ),
+            frozenset({"F1"}),
+        )
+
+    def test_observation_awareness_is_explicit_per_attempt(self) -> None:
+        self.assertFalse(attempt_is_observation_aware({}))
+        self.assertFalse(
+            attempt_is_observation_aware({
+                "finding_severity": [],
+                "observations": [],
+                "observation_updates": [],
+            })
+        )
+        self.assertTrue(attempt_is_observation_aware({"observations": [{"id": "O1"}]}))
+        self.assertTrue(attempt_is_observation_aware({"finding_severity": [{"id": "F1"}]}))
+        self.assertTrue(attempt_is_observation_aware({"observation_updates": [{"id": "O1"}]}))
+
+    def test_observation_introduction_requires_canonical_provenance_and_disposition(self) -> None:
+        attempt = {
+            "verdict": "green",
+            "observations": [
+                {
+                    "id": "O1",
+                    "category": "stylistic",
+                    "evidence": "evidence/review-R01.md#O1",
+                    "disposition": "open",
+                    "disposition_basis": "",
+                }
+            ]
+        }
+        records = observation_records(attempt)
+        self.assertEqual([record["id"] for record in records], ["O1"])
+
+        for category in sorted(ADVISORY_CATEGORIES):
+            with self.subTest(category=category):
+                attempt["observations"][0]["category"] = category
+                self.assertEqual(observation_records(attempt)[0]["category"], category)
+
+        bad_category = {"verdict": "green", "observations": [{
+            "id": "O1", "category": "load_bearing", "evidence": "evidence/review-R01.md#O1",
+            "disposition": "open", "disposition_basis": "",
+        }]}
+        with self.assertRaisesRegex(ReviewContractError, "unknown advisory category"):
+            observation_records(bad_category)
+
+        for tracker_evidence in (
+            "TRACKER.toml#7",
+            "see issue #7 for details",
+            "https://github.com/owner/repo/issues/7",
+        ):
+            with self.subTest(evidence=tracker_evidence):
+                with self.assertRaisesRegex(ReviewContractError, "tracker"):
+                    observation_records({"verdict": "green", "observations": [{
+                        "id": "O1", "category": "advisory", "evidence": tracker_evidence,
+                        "disposition": "open", "disposition_basis": "",
+                    }]})
+
+        terminal_without_basis = {"verdict": "green", "observations": [{
+            "id": "O1", "category": "advisory", "evidence": "evidence/review-R01.md#O1",
+            "disposition": "resolved", "disposition_basis": "",
+        }]}
+        with self.assertRaisesRegex(ReviewContractError, "disposition_basis"):
+            observation_records(terminal_without_basis)
+
+        open_with_basis = {"verdict": "green", "observations": [{
+            "id": "O1", "category": "advisory", "evidence": "evidence/review-R01.md#O1",
+            "disposition": "open", "disposition_basis": "not yet triaged",
+        }]}
+        with self.assertRaisesRegex(ReviewContractError, "disposition_basis"):
+            observation_records(open_with_basis)
+
+        self.assertEqual(
+            validate_observation_provenance(
+                evidence="evidence/review-R01.md#O1",
+                origin_evidence_path="evidence/review-R01.md",
+            ),
+            "evidence/review-R01.md#O1",
+        )
+        with self.assertRaisesRegex(ReviewContractError, "tracker"):
+            validate_observation_provenance(
+                evidence="evidence/review-R01.md#O1",
+                origin_evidence_path="TRACKER.toml",
+            )
+
+    def test_derived_observations_stay_open_until_terminal_reconciliation(self) -> None:
+        attempts = [
+            {
+                "attempt": "R01",
+                "verdict": "red",
+                "review_kind": "discovery",
+                "review_epoch": "E01",
+                "material_finding_ids": ["F1"],
+                "evidence_path": "evidence/review-R01.md",
+                "observations": [
+                    {
+                        "id": "O1", "category": "stylistic",
+                        "evidence": "evidence/review-R01.md#O1",
+                        "disposition": "open", "disposition_basis": "",
+                    },
+                    {
+                        "id": "O2", "category": "optional_cleanup",
+                        "evidence": "evidence/review-R01.md#O2",
+                        "disposition": "open", "disposition_basis": "",
+                    },
+                ],
+            },
+            {
+                "attempt": "R02",
+                "verdict": "green",
+                "review_kind": "closure_verification",
+                "review_epoch": "E01",
+                "material_finding_ids": ["F1"],
+                "evidence_path": "evidence/review-R02.md",
+            },
+            {
+                "attempt": "R03",
+                "verdict": "green",
+                "review_kind": "discovery",
+                "review_epoch": "E01",
+                "material_finding_ids": [],
+                "evidence_path": "evidence/review-R03.md",
+                "observation_updates": [
+                    {"id": "O1", "disposition": "resolved", "basis": "Fixed alongside F1 repair."},
+                ],
+            },
+        ]
+        state = derive_observation_state(attempts)
+        self.assertEqual(state["O1"]["disposition"], "resolved")
+        self.assertEqual(state["O1"]["origin_attempt"], "R01")
+        self.assertEqual(state["O1"]["origin_evidence_path"], "evidence/review-R01.md")
+        self.assertEqual(state["O2"]["disposition"], "open")
+        self.assertEqual(unreconciled_observations(state), frozenset({"O2"}))
+
+        attempts.append({
+            "attempt": "R04",
+            "verdict": "green",
+            "review_kind": "discovery",
+            "review_epoch": "E01",
+            "material_finding_ids": [],
+            "evidence_path": "evidence/review-R04.md",
+            "observation_updates": [
+                {"id": "O2", "disposition": "tracked", "basis": "Exported as follow-up work item."},
+            ],
+        })
+        self.assertEqual(unreconciled_observations(derive_observation_state(attempts)), frozenset())
+
+    def test_observation_reconciliation_rejects_loss_and_rewrite_vectors(self) -> None:
+        base = {
+            "attempt": "R01",
+            "verdict": "red",
+            "review_kind": "discovery",
+            "review_epoch": "E01",
+            "material_finding_ids": ["F1"],
+            "evidence_path": "evidence/review-R01.md",
+            "observations": [{
+                "id": "O1", "category": "advisory",
+                "evidence": "evidence/review-R01.md#O1",
+                "disposition": "open", "disposition_basis": "",
+            }],
+        }
+
+        def updated(update: dict) -> list:
+            followup = {
+                "attempt": "R02",
+                "verdict": "green",
+                "review_kind": "discovery",
+                "review_epoch": "E01",
+                "material_finding_ids": [],
+                "evidence_path": "evidence/review-R02.md",
+                "observation_updates": [update],
+            }
+            return [base, followup]
+
+        with self.assertRaisesRegex(ReviewContractError, "unknown observation"):
+            derive_observation_state(updated({"id": "O9", "disposition": "resolved", "basis": "No such id."}))
+        with self.assertRaisesRegex(ReviewContractError, "terminal disposition"):
+            derive_observation_state(updated({"id": "O1", "disposition": "open", "basis": ""}))
+        with self.assertRaisesRegex(ReviewContractError, "disposition basis"):
+            derive_observation_state(updated({"id": "O1", "disposition": "resolved", "basis": "  "}))
+
+        duplicate = {
+            "attempt": "R02",
+            "verdict": "green",
+            "review_kind": "discovery",
+            "review_epoch": "E01",
+            "material_finding_ids": [],
+            "evidence_path": "evidence/review-R02.md",
+            "observations": [{
+                "id": "O1", "category": "preference",
+                "evidence": "evidence/review-R02.md#O1",
+                "disposition": "open", "disposition_basis": "",
+            }],
+        }
+        with self.assertRaisesRegex(ReviewContractError, "already recorded"):
+            derive_observation_state([base, duplicate])
+
+        reconciled = updated({"id": "O1", "disposition": "resolved", "basis": "Fixed."})
+        reconciled.append({
+            "attempt": "R03",
+            "verdict": "green",
+            "review_kind": "discovery",
+            "review_epoch": "E01",
+            "material_finding_ids": [],
+            "evidence_path": "evidence/review-R03.md",
+            "observation_updates": [
+                {"id": "O1", "disposition": "deferred", "basis": "Second reconciliation."},
+            ],
+        })
+        with self.assertRaisesRegex(ReviewContractError, "already reconciled"):
+            derive_observation_state(reconciled)
+
+    def test_observation_records_require_terminal_originating_attempt(self) -> None:
+        pending = {
+            "attempt": "R01",
+            "verdict": "pending",
+            "review_kind": "discovery",
+            "review_epoch": "E01",
+            "material_finding_ids": [],
+            "evidence_path": "",
+            "observations": [{
+                "id": "O1", "category": "advisory",
+                "evidence": "draft note",
+                "disposition": "open", "disposition_basis": "",
+            }],
+        }
+        with self.assertRaisesRegex(ReviewContractError, "terminal"):
+            derive_observation_state([pending])
+        with self.assertRaisesRegex(ReviewContractError, "terminal"):
+            finding_severity_records({
+                "verdict": "pending",
+                "finding_severity": [{"id": "F1", "surface": "correctness", "evidence": "draft"}],
+            })
+        with self.assertRaisesRegex(ReviewContractError, "terminal"):
+            observation_update_records({
+                "verdict": "pending",
+                "observation_updates": [{"id": "O1", "disposition": "resolved", "basis": "draft"}],
+            })
+
+    def test_material_finding_cannot_be_downgraded_to_advisory_within_epoch(self) -> None:
+        discovery = {
+            "attempt": "R01",
+            "verdict": "red",
+            "review_kind": "discovery",
+            "review_epoch": "E01",
+            "material_finding_ids": ["F1"],
+            "evidence_path": "evidence/review-R01.md",
+        }
+        downgrade = {
+            "attempt": "R02",
+            "verdict": "green",
+            "review_kind": "closure_verification",
+            "review_epoch": "E01",
+            "material_finding_ids": ["F1"],
+            "evidence_path": "evidence/review-R02.md",
+            "observations": [{
+                "id": "F1", "category": "preference",
+                "evidence": "evidence/review-R02.md#F1",
+                "disposition": "open", "disposition_basis": "",
+            }],
+        }
+        with self.assertRaisesRegex(ReviewContractError, "downgrade"):
+            derive_observation_state([discovery, downgrade])
+
+        redesigned = {
+            "attempt": "R02",
+            "verdict": "green",
+            "review_kind": "discovery",
+            "review_epoch": "E02",
+            "material_finding_ids": [],
+            "evidence_path": "evidence/review-R02.md",
+            "observations": [{
+                "id": "F1", "category": "preference",
+                "evidence": "evidence/review-R02.md#F1",
+                "disposition": "open", "disposition_basis": "",
+            }],
+        }
+        state = derive_observation_state([discovery, redesigned])
+        self.assertIn("F1", state)
+
+        observation_first = {
+            "attempt": "R01",
+            "verdict": "green",
+            "review_kind": "discovery",
+            "review_epoch": "E01",
+            "material_finding_ids": [],
+            "evidence_path": "evidence/review-R01.md",
+            "observations": [{
+                "id": "O1", "category": "advisory",
+                "evidence": "evidence/review-R01.md#O1",
+                "disposition": "open", "disposition_basis": "",
+            }],
+        }
+        promoted_reuse = {
+            "attempt": "R02",
+            "verdict": "red",
+            "review_kind": "discovery",
+            "review_epoch": "E01",
+            "material_finding_ids": ["O1"],
+            "evidence_path": "evidence/review-R02.md",
+        }
+        with self.assertRaisesRegex(ReviewContractError, "downgrade|promoted"):
+            derive_observation_state([observation_first, promoted_reuse])
 
 
 if __name__ == "__main__":

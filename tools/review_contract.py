@@ -37,6 +37,50 @@ CONVERGENCE_FIELDS = frozenset({
     "post_convergence_validation",
     "convergence_basis",
 })
+LOAD_BEARING_SURFACES = frozenset({
+    "acceptance",
+    "correctness",
+    "safety",
+    "security",
+    "data_integrity",
+    "dependency",
+    "compatibility",
+    "invariant",
+    "contract",
+    "required_evidence",
+})
+ADVISORY_CATEGORIES = frozenset({
+    "advisory",
+    "stylistic",
+    "optional_cleanup",
+    "preference",
+    "speculative_hardening",
+})
+OPEN_OBSERVATION_DISPOSITION = "open"
+OBSERVATION_DISPOSITIONS = frozenset({
+    "resolved",
+    "cleanup_candidate",
+    "deferred",
+    "promoted",
+    "tracked",
+})
+FORBIDDEN_DOWNGRADE_BASES = frozenset({
+    "convenience",
+    "repair_cost",
+    "reviewer_fatigue",
+    "desire_to_finish",
+})
+TRACKER_PROVENANCE_MARKERS = (
+    "tracker.toml",
+    "issue#",
+    "issue #",
+    "github.com",
+)
+OBSERVATION_AWARENESS_KEYS = (
+    "finding_severity",
+    "observations",
+    "observation_updates",
+)
 
 
 class ReviewContractError(ValueError):
@@ -399,3 +443,331 @@ def can_finalize_review_obligation(attempt: Mapping[str, object]) -> bool:
     a subsequent fresh full-scope discovery pass.
     """
     return attempt.get("verdict") == "green" and review_kind(attempt) == "discovery"
+
+
+def attempt_is_observation_aware(attempt: Mapping[str, object]) -> bool:
+    """Return whether an attempt carries explicit severity/observation records."""
+    return any(bool(attempt.get(key)) for key in OBSERVATION_AWARENESS_KEYS)
+
+
+def _require_terminal_observation_carrier(attempt: Mapping[str, object]) -> None:
+    if attempt.get("verdict") not in {"green", "red"}:
+        raise ReviewContractError(
+            "severity/observation records require a terminal attempt with durable verdict evidence"
+        )
+
+
+def finding_severity_records(attempt: Mapping[str, object]) -> dict[str, dict[str, str]]:
+    """Parse load-bearing evidence records keyed by blocking finding id."""
+    raw = attempt.get("finding_severity", [])
+    if not raw:
+        return {}
+    _require_terminal_observation_carrier(attempt)
+    if not isinstance(raw, list):
+        raise ReviewContractError("finding_severity must be an array of evidence records")
+    records: dict[str, dict[str, str]] = {}
+    for entry in raw:
+        if not isinstance(entry, Mapping):
+            raise ReviewContractError("finding_severity entries must be tables")
+        finding_id = entry.get("id")
+        surface = entry.get("surface")
+        evidence = entry.get("evidence")
+        if not isinstance(finding_id, str) or not finding_id.strip():
+            raise ReviewContractError("finding_severity entries require a non-empty id")
+        if finding_id in records:
+            raise ReviewContractError(
+                f"duplicate finding_severity record for {finding_id!r}"
+            )
+        if surface not in LOAD_BEARING_SURFACES:
+            raise ReviewContractError(
+                f"unknown load-bearing surface {surface!r} for finding {finding_id!r}"
+            )
+        if not isinstance(evidence, str) or not evidence.strip():
+            raise ReviewContractError(
+                f"finding {finding_id!r} lacks concrete load-bearing evidence"
+            )
+        records[finding_id] = {
+            "id": finding_id,
+            "surface": str(surface),
+            "evidence": evidence,
+        }
+    return records
+
+
+def validate_finding_severity(
+    *,
+    material_finding_ids: Iterable[str],
+    severity: Mapping[str, Mapping[str, object]],
+    require_complete: bool,
+) -> frozenset[str]:
+    """Bind every blocking finding to a load-bearing surface plus concrete evidence.
+
+    RED discovery requires complete coverage. Closure verification inherits its
+    source discovery classification and is validated for well-formedness only.
+    """
+    material = frozenset(material_finding_ids)
+    for finding_id, record in severity.items():
+        if finding_id not in material:
+            raise ReviewContractError(
+                f"finding_severity record {finding_id!r} names an unknown blocking finding"
+            )
+        surface = record.get("surface")
+        evidence = record.get("evidence")
+        if surface not in LOAD_BEARING_SURFACES:
+            raise ReviewContractError(
+                f"unknown load-bearing surface {surface!r} for finding {finding_id!r}"
+            )
+        if not isinstance(evidence, str) or not evidence.strip():
+            raise ReviewContractError(
+                f"finding {finding_id!r} lacks concrete load-bearing evidence"
+            )
+    if require_complete:
+        missing = material - frozenset(severity)
+        if missing:
+            raise ReviewContractError(
+                "RED discovery lacks load-bearing evidence for blocking findings: "
+                + ", ".join(sorted(missing))
+            )
+    return material
+
+
+def validate_verdict_severity(
+    *,
+    verdict: object,
+    load_bearing_ids: Iterable[str],
+    advisory_ids: Iterable[str],
+) -> frozenset[str]:
+    """Require RED to rest on load-bearing evidence; advisory-only attempts stay GREEN."""
+    load_bearing = frozenset(item for item in load_bearing_ids if item)
+    advisory = frozenset(item for item in advisory_ids if item)
+    if verdict == "red" and not load_bearing:
+        if advisory:
+            raise ReviewContractError(
+                "advisory observations alone cannot keep the subject RED"
+            )
+        raise ReviewContractError("RED requires at least one load-bearing finding")
+    return load_bearing
+
+
+def validate_observation_provenance(
+    *,
+    evidence: object,
+    origin_evidence_path: object,
+) -> str:
+    """Require canonical review evidence; tracker pointers are never provenance."""
+    if not isinstance(evidence, str) or not evidence.strip():
+        raise ReviewContractError("observation requires concrete originating evidence")
+    if not isinstance(origin_evidence_path, str) or not origin_evidence_path.strip():
+        raise ReviewContractError("observation requires an originating review evidence path")
+    for candidate in (evidence, origin_evidence_path):
+        lowered = candidate.lower()
+        if any(marker in lowered for marker in TRACKER_PROVENANCE_MARKERS):
+            raise ReviewContractError(
+                "tracker/Issue pointers cannot serve as observation provenance or evidence"
+            )
+    return evidence
+
+
+def observation_records(attempt: Mapping[str, object]) -> list[dict[str, str]]:
+    """Parse advisory observations introduced by one terminal attempt."""
+    raw = attempt.get("observations", [])
+    if not raw:
+        return []
+    _require_terminal_observation_carrier(attempt)
+    if not isinstance(raw, list):
+        raise ReviewContractError("observations must be an array of observation records")
+    records: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for entry in raw:
+        if not isinstance(entry, Mapping):
+            raise ReviewContractError("observation entries must be tables")
+        observation_id = entry.get("id")
+        category = entry.get("category")
+        evidence = entry.get("evidence")
+        disposition = entry.get("disposition")
+        basis = entry.get("disposition_basis", "")
+        if not isinstance(observation_id, str) or not observation_id.strip():
+            raise ReviewContractError("observation entries require a non-empty id")
+        if observation_id in seen:
+            raise ReviewContractError(
+                f"duplicate observation {observation_id!r} in one attempt"
+            )
+        seen.add(observation_id)
+        if category not in ADVISORY_CATEGORIES:
+            raise ReviewContractError(
+                f"unknown advisory category {category!r} for observation {observation_id!r}"
+            )
+        if not isinstance(evidence, str) or not evidence.strip():
+            raise ReviewContractError(
+                f"observation {observation_id!r} lacks concrete originating evidence"
+            )
+        validate_observation_provenance(
+            evidence=evidence, origin_evidence_path=evidence
+        )
+        if disposition != OPEN_OBSERVATION_DISPOSITION and disposition not in OBSERVATION_DISPOSITIONS:
+            raise ReviewContractError(
+                f"observation {observation_id!r} has unknown disposition {disposition!r}"
+            )
+        if not isinstance(basis, str):
+            raise ReviewContractError(
+                f"observation {observation_id!r} has a non-string disposition_basis"
+            )
+        if disposition == OPEN_OBSERVATION_DISPOSITION and basis.strip():
+            raise ReviewContractError(
+                f"open observation {observation_id!r} must not claim disposition_basis"
+            )
+        if disposition != OPEN_OBSERVATION_DISPOSITION and not basis.strip():
+            raise ReviewContractError(
+                f"observation {observation_id!r} reconciled as {disposition!r} requires disposition_basis"
+            )
+        records.append({
+            "id": observation_id,
+            "category": str(category),
+            "evidence": evidence,
+            "disposition": str(disposition),
+            "disposition_basis": basis,
+        })
+    return records
+
+
+def observation_update_records(attempt: Mapping[str, object]) -> list[dict[str, str]]:
+    """Parse open-to-terminal observation reconciliation records from one attempt."""
+    raw = attempt.get("observation_updates", [])
+    if not raw:
+        return []
+    _require_terminal_observation_carrier(attempt)
+    if not isinstance(raw, list):
+        raise ReviewContractError("observation_updates must be an array of update records")
+    records: list[dict[str, str]] = []
+    for entry in raw:
+        if not isinstance(entry, Mapping):
+            raise ReviewContractError("observation update entries must be tables")
+        observation_id = entry.get("id")
+        disposition = entry.get("disposition")
+        basis = entry.get("basis")
+        if not isinstance(observation_id, str) or not observation_id.strip():
+            raise ReviewContractError("observation updates require a non-empty id")
+        if disposition not in OBSERVATION_DISPOSITIONS:
+            raise ReviewContractError(
+                f"observation {observation_id!r} must reconcile to a terminal disposition, "
+                f"got {disposition!r}"
+            )
+        if not isinstance(basis, str) or not basis.strip():
+            raise ReviewContractError(
+                f"observation {observation_id!r} reconciliation requires a disposition basis"
+            )
+        records.append({
+            "id": observation_id,
+            "disposition": str(disposition),
+            "basis": basis,
+        })
+    return records
+
+
+def _attempt_epoch_bucket(attempt: Mapping[str, object]) -> str:
+    epoch = attempt.get("review_epoch")
+    return epoch if isinstance(epoch, str) else ""
+
+
+def derive_observation_state(
+    attempts: Iterable[Mapping[str, object]],
+) -> dict[str, dict[str, str]]:
+    """Derive durable observation dispositions from append-only attempt history.
+
+    Introductions stay open until exactly one terminal reconciliation. Material
+    finding ids and observation ids must remain disjoint inside one review
+    epoch: relabeling a load-bearing finding as advisory is a downgrade, and a
+    promoted observation keeps its advisory identity while follow-up blocking
+    work uses a new finding id. Convenience, repair cost, reviewer fatigue and
+    desire to finish never justify such relabeling.
+    """
+    ordered = list(attempts)
+    material_by_epoch: dict[str, set[str]] = {}
+    for attempt in ordered:
+        raw = attempt.get("material_finding_ids", [])
+        if not raw:
+            continue
+        if not isinstance(raw, list) or not all(
+            isinstance(item, str) and item for item in raw
+        ):
+            raise ReviewContractError("material_finding_ids must contain non-empty strings")
+        material_by_epoch.setdefault(_attempt_epoch_bucket(attempt), set()).update(raw)
+
+    state: dict[str, dict[str, str]] = {}
+    for attempt in ordered:
+        attempt_id = attempt.get("attempt")
+        evidence_path = attempt.get("evidence_path", "")
+        for record in observation_records(attempt):
+            observation_id = record["id"]
+            if observation_id in state:
+                raise ReviewContractError(
+                    f"observation {observation_id!r} is already recorded with durable provenance"
+                )
+            if observation_id in material_by_epoch.get(_attempt_epoch_bucket(attempt), set()):
+                raise ReviewContractError(
+                    f"observation {observation_id!r} downgrades a load-bearing finding; "
+                    "convenience, repair cost, reviewer fatigue and desire to finish "
+                    "never justify a downgrade"
+                )
+            if not isinstance(attempt_id, str) or not attempt_id:
+                raise ReviewContractError("observation introduction requires attempt identity")
+            validate_observation_provenance(
+                evidence=record["evidence"], origin_evidence_path=evidence_path
+            )
+            state[observation_id] = {
+                "id": observation_id,
+                "category": record["category"],
+                "evidence": record["evidence"],
+                "origin_attempt": attempt_id,
+                "origin_evidence_path": str(evidence_path),
+                "disposition": record["disposition"],
+                "basis": record["disposition_basis"],
+            }
+        for update in observation_update_records(attempt):
+            observation_id = update["id"]
+            current = state.get(observation_id)
+            if current is None:
+                raise ReviewContractError(
+                    f"observation update targets unknown observation {observation_id!r}"
+                )
+            if current["disposition"] != OPEN_OBSERVATION_DISPOSITION:
+                raise ReviewContractError(
+                    f"observation {observation_id!r} is already reconciled as "
+                    f"{current['disposition']!r}"
+                )
+            current["disposition"] = update["disposition"]
+            current["basis"] = update["basis"]
+
+    for attempt in ordered:
+        raw = attempt.get("material_finding_ids", [])
+        if not raw:
+            continue
+        for finding_id in raw:
+            entry = state.get(finding_id)
+            if entry is not None and _attempt_epoch_bucket(attempt) == _epoch_of_origin(
+                ordered, entry["origin_attempt"]
+            ):
+                raise ReviewContractError(
+                    f"blocking finding {finding_id!r} reuses advisory observation identity; "
+                    "mark the observation promoted and record follow-up blocking work "
+                    "under a new finding id"
+                )
+    return state
+
+
+def _epoch_of_origin(
+    attempts: list[Mapping[str, object]], origin_attempt: str
+) -> str:
+    for attempt in attempts:
+        if attempt.get("attempt") == origin_attempt:
+            return _attempt_epoch_bucket(attempt)
+    return ""
+
+
+def unreconciled_observations(state: Mapping[str, Mapping[str, object]]) -> frozenset[str]:
+    """Return observation ids that are still open."""
+    return frozenset(
+        observation_id
+        for observation_id, entry in state.items()
+        if entry.get("disposition") == OPEN_OBSERVATION_DISPOSITION
+    )

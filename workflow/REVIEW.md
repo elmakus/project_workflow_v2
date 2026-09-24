@@ -54,6 +54,18 @@ Each material defect class also has a default ceiling of 3 failed repair→closu
 
 After convergence analysis, exactly one fresh full-scope post-convergence discovery may be run, bound to durable `convergence_basis`. A GREEN post-convergence discovery satisfies the normal fresh-discovery rule. A RED post-convergence discovery routes to broader structural classification through Recovery/Planning/Definition as appropriate rather than opening another ordinary repair/review cycle.
 
+## Load-bearing findings versus advisory observations
+
+A finding blocks GREEN only when concrete evidence shows it is materially load-bearing for the applicable acceptance, correctness, safety, security, data-integrity, dependency, compatibility, invariant, contract or required-evidence surface. Material blocking findings are load-bearing by construction. Advisory, stylistic, optional-cleanup, preference or speculative-hardening observations alone cannot keep the subject RED; a GREEN discovery may carry advisory-only observations.
+
+An observation-aware attempt explicitly records `finding_severity` for its blocking findings and `observations`/`observation_updates` for its advisory trace. An aware RED discovery must bind every material finding to its load-bearing surface plus concrete evidence; closure verification inherits its source discovery classification. Severity and observation records require a terminal attempt with durable verdict evidence.
+
+Every non-load-bearing observation remains durable and traceable to its originating terminal review attempt and review evidence path. Observation evidence must be canonical review evidence; tracker/Issue pointers are never provenance. Each observation carries an explicit disposition: `open` until reconciled, then exactly one terminal disposition: `resolved`, `cleanup_candidate`, `deferred`, `promoted` or `tracked`. Reconciliation is a single open-to-terminal update with a concrete basis; unknown targets, duplicate introductions and second reconciliations are rejected.
+
+Material finding ids and observation ids must stay disjoint inside one review epoch. Relabeling a load-bearing finding as advisory is a downgrade: convenience, repair cost, reviewer fatigue and desire to finish never justify it. A promoted observation keeps its advisory identity while follow-up blocking work uses a new finding id; genuine misclassification is corrected only through a governed accepted-redesign epoch, never by convenience relabeling.
+
+Production deterministic helpers: `tools/review_contract.py` (`validate_finding_severity`, `validate_verdict_severity`, `derive_observation_state`, `unreconciled_observations`).
+
 ## Semantic independence
 
 Independence is about material production/repair of the exact subject, not runtime identity.

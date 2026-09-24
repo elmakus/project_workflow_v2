@@ -3,7 +3,14 @@
 
 from __future__ import annotations
 
+import re
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+
+try:
+    from tools.review_contract import OBSERVATION_DISPOSITIONS
+except ModuleNotFoundError:  # direct script execution from tools/
+    from review_contract import OBSERVATION_DISPOSITIONS
 
 
 class CloseContractError(ValueError):
@@ -219,6 +226,156 @@ def verify_terminal_unmerged_closure(
     if implementation_content_in_target:
         raise CloseContractError("terminal-unmerged closure must not import rejected implementation")
     return "unmerged_history_preserved"
+
+
+def validate_cleanup_work(
+    *,
+    work_id: str,
+    subject: Mapping[str, object],
+    tests_evidence: Iterable[str],
+    independent_review_green: bool,
+    covers_observation_ids: Iterable[str],
+    speculative_redesign: bool = False,
+    new_product_scope: bool = False,
+) -> str:
+    """Validate one completed bounded cleanup work before Final Integration evaluates it.
+
+    Cleanup groups concrete cleanup-candidate observations into the smallest
+    meaningful work with its own exact subject, tests/evidence and independent
+    review. It is never a loophole for speculative redesign or new product scope.
+    """
+    if not isinstance(work_id, str) or not work_id.strip():
+        raise CloseContractError("cleanup work requires a non-empty work_id")
+    if not isinstance(subject, Mapping):
+        raise CloseContractError(f"cleanup work {work_id!r} requires an exact subject table")
+    repository = subject.get("repository")
+    path = subject.get("path")
+    commit = subject.get("commit")
+    blob = subject.get("blob")
+    if not isinstance(repository, str) or not repository.strip():
+        raise CloseContractError(f"cleanup work {work_id!r} requires an exact subject repository")
+    if not isinstance(path, str) or not path.strip():
+        raise CloseContractError(f"cleanup work {work_id!r} requires an exact subject path")
+    for label, value in (("commit", commit), ("blob", blob)):
+        if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{40}", value) is None:
+            raise CloseContractError(
+                f"cleanup work {work_id!r} requires an exact subject {label} (40-hex)"
+            )
+    evidence = [item for item in tests_evidence if isinstance(item, str) and item.strip()]
+    if not evidence:
+        raise CloseContractError(
+            f"cleanup work {work_id!r} requires non-empty tests/evidence"
+        )
+    covers = list(covers_observation_ids)
+    if (
+        not covers
+        or not all(isinstance(item, str) and item.strip() for item in covers)
+        or len(set(covers)) != len(covers)
+    ):
+        raise CloseContractError(
+            f"cleanup work {work_id!r} must be grounded in non-empty unique cleanup-candidate observation ids"
+        )
+    if speculative_redesign:
+        raise CloseContractError(
+            f"cleanup work {work_id!r} must not become speculative redesign"
+        )
+    if new_product_scope:
+        raise CloseContractError(
+            f"cleanup work {work_id!r} must not introduce new product scope"
+        )
+    if independent_review_green is not True:
+        raise CloseContractError(
+            f"cleanup work {work_id!r} requires GREEN independent review before Final Integration"
+        )
+    return "cleanup_work_complete"
+
+
+def verify_final_observation_reconciliation(
+    *,
+    observations: Iterable[Mapping[str, object]],
+    cleanup_works: Iterable[Mapping[str, object]] = (),
+    further_advisory_improvement_conceivable: bool = False,
+) -> str:
+    """Gate Final Integration on reconciled observations and completed cleanup.
+
+    Every still-open observation must reconcile to exactly one of the five
+    terminal dispositions, and every cleanup candidate must be covered by a
+    completed independently reviewed cleanup work.
+    """
+
+    # Deliberately do not branch on further_advisory_improvement_conceivable.
+    # Conceivable future improvement alone never keeps cleanup recursively open.
+    _ = further_advisory_improvement_conceivable
+
+    dispositions: dict[str, str] = {}
+    for entry in observations:
+        if not isinstance(entry, Mapping):
+            raise CloseContractError("observation entries must be tables")
+        observation_id = entry.get("id")
+        disposition = entry.get("disposition")
+        if not isinstance(observation_id, str) or not observation_id.strip():
+            raise CloseContractError("observation entries require a non-empty id")
+        if observation_id in dispositions:
+            raise CloseContractError(
+                f"duplicate observation {observation_id!r} in Final reconciliation"
+            )
+        if disposition is None or (isinstance(disposition, str) and not disposition.strip()):
+            raise CloseContractError(
+                f"observation {observation_id!r} lacks an explicit disposition"
+            )
+        if disposition == "open":
+            raise CloseContractError(
+                f"Final Integration cannot complete with unreconciled open observation {observation_id!r}"
+            )
+        if disposition not in OBSERVATION_DISPOSITIONS:
+            raise CloseContractError(
+                f"observation {observation_id!r} has no terminal disposition, "
+                f"got {disposition!r}"
+            )
+        dispositions[observation_id] = str(disposition)
+
+    covered: set[str] = set()
+    for work in cleanup_works:
+        if not isinstance(work, Mapping):
+            raise CloseContractError("cleanup work entries must be tables")
+        work_id = work.get("work_id", "cleanup")
+        covers = work.get("covers_observation_ids", [])
+        if not isinstance(covers, list) or not all(
+            isinstance(item, str) and item.strip() for item in covers
+        ):
+            raise CloseContractError(
+                f"cleanup work {work_id!r} must cover non-empty observation ids"
+            )
+        for observation_id in covers:
+            if observation_id not in dispositions:
+                raise CloseContractError(
+                    f"cleanup work {work_id!r} covers unknown observation {observation_id!r}"
+                )
+            if dispositions[observation_id] != "cleanup_candidate":
+                raise CloseContractError(
+                    f"cleanup work {work_id!r} covers observation {observation_id!r} "
+                    f"which is reconciled as {dispositions[observation_id]!r}, "
+                    "not cleanup_candidate"
+                )
+        if work.get("complete") is True:
+            if work.get("independent_review_green") is not True:
+                raise CloseContractError(
+                    f"cleanup work {work_id!r} requires GREEN independent review before Final Integration"
+                )
+            covered.update(covers)
+
+    pending_cleanup = {
+        observation_id
+        for observation_id, disposition in dispositions.items()
+        if disposition == "cleanup_candidate" and observation_id not in covered
+    }
+    if pending_cleanup:
+        raise CloseContractError(
+            "Final Integration cannot complete with cleanup candidates lacking "
+            "completed independently reviewed cleanup work: "
+            + ", ".join(sorted(pending_cleanup))
+        )
+    return "final_observation_reconciliation_complete"
 
 
 def close_continuation(

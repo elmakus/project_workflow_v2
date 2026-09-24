@@ -1291,5 +1291,238 @@ class StateEnvelopeTests(unittest.TestCase):
         reject_prohibited_keys(project)
 
 
+class ReviewObservationStateTests(unittest.TestCase):
+    def _aware_red_discovery(self) -> dict:
+        base = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        base.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": ["F1"],
+            "verdict": "red",
+            "finding_severity": [
+                {"id": "F1", "surface": "correctness", "evidence": "evidence/review-R01.md#F1"},
+            ],
+        })
+        return base
+
+    def test_aware_red_discovery_requires_load_bearing_surface_and_evidence(self) -> None:
+        validate_review(self._aware_red_discovery())
+
+        missing = self._aware_red_discovery()
+        missing["finding_severity"] = []
+        missing["observations"] = [{
+            "id": "O1",
+            "category": "stylistic",
+            "evidence": "evidence/review-R01.md#O1",
+            "disposition": "open",
+            "disposition_basis": "",
+        }]
+        with self.assertRaisesRegex(ValidationError, "load-bearing evidence"):
+            validate_review(missing)
+
+        bad_surface = self._aware_red_discovery()
+        bad_surface["finding_severity"][0]["surface"] = "taste"
+        with self.assertRaisesRegex(ValidationError, "unknown load-bearing surface"):
+            validate_review(bad_surface)
+
+        empty_evidence = self._aware_red_discovery()
+        empty_evidence["finding_severity"][0]["evidence"] = ""
+        with self.assertRaisesRegex(ValidationError, "concrete load-bearing evidence"):
+            validate_review(empty_evidence)
+
+        foreign_id = self._aware_red_discovery()
+        foreign_id["finding_severity"].append(
+            {"id": "F9", "surface": "safety", "evidence": "evidence/review-R01.md#F9"}
+        )
+        with self.assertRaisesRegex(ValidationError, "unknown blocking finding"):
+            validate_review(foreign_id)
+
+    def test_green_discovery_may_carry_advisory_only_observations(self) -> None:
+        base = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        base.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": [],
+            "verdict": "green",
+            "observations": [
+                {
+                    "id": "O1",
+                    "category": "speculative_hardening",
+                    "evidence": "evidence/review-R01.md#O1",
+                    "disposition": "open",
+                    "disposition_basis": "",
+                },
+            ],
+        })
+        validate_review(base)
+
+    def test_review_attempt_rejects_material_advisory_overlap_and_malformed_observations(self) -> None:
+        overlap = self._aware_red_discovery()
+        overlap["observations"] = [{
+            "id": "F1",
+            "category": "preference",
+            "evidence": "evidence/review-R01.md#F1",
+            "disposition": "open",
+            "disposition_basis": "",
+        }]
+        with self.assertRaisesRegex(ValidationError, "downgrade"):
+            validate_review(overlap)
+
+        bad_category = self._aware_red_discovery()
+        bad_category["observations"] = [{
+            "id": "O1", "category": "cosmetic",
+            "evidence": "evidence/review-R01.md#O1",
+            "disposition": "open", "disposition_basis": "",
+        }]
+        with self.assertRaisesRegex(ValidationError, "unknown advisory category"):
+            validate_review(bad_category)
+
+        tracker_evidence = self._aware_red_discovery()
+        tracker_evidence["observations"] = [{
+            "id": "O1", "category": "advisory",
+            "evidence": "see issue #7",
+            "disposition": "open", "disposition_basis": "",
+        }]
+        with self.assertRaisesRegex(ValidationError, "tracker"):
+            validate_review(tracker_evidence)
+
+        pending_with_observations = self._aware_red_discovery()
+        pending_with_observations.update({
+            "attempt": "R02",
+            "verdict": "pending",
+            "evidence_path": "",
+            "discovery_complete": False,
+            "material_finding_ids": [],
+            "finding_severity": [],
+            "observations": [{
+                "id": "O1", "category": "advisory",
+                "evidence": "evidence/review-R02.md#O1",
+                "disposition": "open", "disposition_basis": "",
+            }],
+        })
+        with self.assertRaisesRegex(ValidationError, "terminal"):
+            validate_review(pending_with_observations)
+
+        legacy_with_observations = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        legacy_with_observations["observations"] = [{
+            "id": "O1", "category": "advisory",
+            "evidence": "evidence/review-R01.md#O1",
+            "disposition": "open", "disposition_basis": "",
+        }]
+        with self.assertRaisesRegex(ValidationError, "explicit review_kind"):
+            validate_review(legacy_with_observations)
+
+    def test_review_history_reconciles_observations_and_rejects_rewrite_vectors(self) -> None:
+        discovery = self._aware_red_discovery()
+        discovery["observations"] = [{
+            "id": "O1", "category": "optional_cleanup",
+            "evidence": "evidence/review-R01.md#O1",
+            "disposition": "open", "disposition_basis": "",
+        }]
+        closure = copy.deepcopy(discovery)
+        closure.update({
+            "attempt": "R02",
+            "review_kind": "closure_verification",
+            "source_discovery_attempt": "R01",
+            "discovery_complete": False,
+            "material_finding_ids": ["F1"],
+            "verdict": "green",
+        })
+        closure.pop("finding_severity", None)
+        closure.pop("observations", None)
+        closure["subject"]["blob"] = "4" * 40
+        rediscovery = copy.deepcopy(closure)
+        rediscovery.update({
+            "attempt": "R03",
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": [],
+            "observation_updates": [
+                {"id": "O1", "disposition": "cleanup_candidate", "basis": "Safe bounded cleanup."},
+            ],
+        })
+        validate_review_history([discovery, closure, rediscovery])
+
+        unknown_update = copy.deepcopy(rediscovery)
+        unknown_update["observation_updates"] = [
+            {"id": "O9", "disposition": "resolved", "basis": "No such observation."},
+        ]
+        with self.assertRaisesRegex(ValidationError, "unknown observation"):
+            validate_review_history([discovery, closure, unknown_update])
+
+        duplicate_intro = copy.deepcopy(rediscovery)
+        duplicate_intro.pop("observation_updates", None)
+        duplicate_intro["observations"] = [{
+            "id": "O1", "category": "preference",
+            "evidence": "evidence/review-R03.md#O1",
+            "disposition": "open", "disposition_basis": "",
+        }]
+        with self.assertRaisesRegex(ValidationError, "already recorded"):
+            validate_review_history([discovery, closure, duplicate_intro])
+
+    def test_review_history_rejects_load_bearing_downgrade_within_epoch(self) -> None:
+        discovery = self._aware_red_discovery()
+        closure = copy.deepcopy(discovery)
+        closure.update({
+            "attempt": "R02",
+            "review_kind": "closure_verification",
+            "source_discovery_attempt": "R01",
+            "discovery_complete": False,
+            "verdict": "green",
+        })
+        closure.pop("finding_severity", None)
+        closure["subject"]["blob"] = "4" * 40
+        downgrade = copy.deepcopy(closure)
+        downgrade.update({
+            "attempt": "R03",
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": [],
+            "observations": [{
+                "id": "F1", "category": "preference",
+                "evidence": "evidence/review-R03.md#F1",
+                "disposition": "open", "disposition_basis": "",
+            }],
+        })
+        validate_review(downgrade)
+        with self.assertRaisesRegex(ValidationError, "downgrade"):
+            validate_review_history([discovery, closure, downgrade])
+
+    def test_tracker_rejects_observation_disposition_epoch_and_primary_store_authority(self) -> None:
+        base = {
+            "workstream_id": "sample-workstream",
+            "provider": "github",
+            "repository": "owner/repo",
+            "dedup_key": "project-workflow:sample-workstream",
+            "state": "linked",
+            "issue_number": 7,
+            "candidate_issue_numbers": [],
+            "readback_state": "verified",
+            "final_pr": 0,
+        }
+        validate_tracker(base, "sample-workstream")
+        for forbidden_key in (
+            "scope_authorized",
+            "repair_scope",
+            "observation_disposition",
+            "review_disposition",
+            "disposition",
+            "epoch_reset",
+            "epoch_reset_basis",
+            "primary_observation_store",
+            "observation_store",
+            "observations",
+        ):
+            with self.subTest(key=forbidden_key):
+                candidate = copy.deepcopy(base)
+                candidate[forbidden_key] = "tracker-claimed"
+                with self.assertRaisesRegex(ValidationError, "must not carry workflow authorization"):
+                    validate_tracker(candidate, "sample-workstream")
+
+
 if __name__ == "__main__":
     unittest.main()

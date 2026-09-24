@@ -64,6 +64,14 @@ A terminal unmerged/superseded workstream must preserve its recovery/history pac
 
 Production deterministic helpers in `tools/close_contract.py` verify target-package completeness and exact merge identity, safe-delete head freshness/absence readback, and terminal-unmerged history separation.
 
+## Pre-Final observation reconciliation and bounded cleanup
+
+Before Final Integration may complete, every still-open non-load-bearing observation must be reconciled to exactly one terminal disposition: `resolved`, `cleanup_candidate`, `deferred`, `promoted` or `tracked`. The reconciled set is derived from durable review-attempt history; GitHub Issues/trackers may receive intentionally exported follow-up work but remain optional bookkeeping and never become the primary canonical observation store or workflow authority.
+
+Concrete bounded safe in-scope cleanup candidates are grouped into the smallest meaningful cleanup work with its own exact subject, tests/evidence and independent review. Each cleanup candidate must be covered by a completed independently GREEN-reviewed cleanup work before Final Integration evaluates the final codebase. Cleanup admits no speculative redesign or new product scope, and it does not recursively stay open merely because further advisory improvement is conceivable: once the bounded work is complete and reviewed, reconciliation terminates.
+
+Production deterministic helpers: `tools/close_contract.py` (`verify_final_observation_reconciliation`, `validate_cleanup_work`).
+
 ## Trigger-only downstream fork publication
 
 Ordinary Close MUST NOT load fork-release lineage policy. Load `workflow/FORK_RELEASE_VERSIONING.md` only when the exact durable current operation explicitly declares a downstream fork release and supplies the accepted upstream repository/tag/SHA lineage tuple.

@@ -16,11 +16,17 @@ try:
         REVIEW_KINDS,
         REVIEW_SCOPE_DISCOVERY_CEILINGS,
         ReviewContractError,
+        attempt_is_observation_aware,
         convergence_fields_present,
+        derive_observation_state,
         failed_material_defect_classes,
+        finding_severity_records,
         material_defect_classes,
+        observation_records,
+        observation_update_records,
         review_convergence_state,
         review_kind,
+        validate_finding_severity,
     )
 except ModuleNotFoundError:  # direct script execution from tools/
     from review_contract import (
@@ -28,11 +34,17 @@ except ModuleNotFoundError:  # direct script execution from tools/
         REVIEW_KINDS,
         REVIEW_SCOPE_DISCOVERY_CEILINGS,
         ReviewContractError,
+        attempt_is_observation_aware,
         convergence_fields_present,
+        derive_observation_state,
         failed_material_defect_classes,
+        finding_severity_records,
         material_defect_classes,
+        observation_records,
+        observation_update_records,
         review_convergence_state,
         review_kind,
+        validate_finding_severity,
     )
 
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
@@ -587,10 +599,21 @@ def validate_tracker(data: dict[str, Any], workstream_id: str) -> None:
         "implementation_authorized",
         "requirements_approved",
         "plan_approved",
+        "scope_authorized",
+        "repair_scope",
+        "observation_disposition",
+        "review_disposition",
+        "disposition",
+        "epoch_reset",
+        "epoch_reset_basis",
+        "primary_observation_store",
+        "observation_store",
+        "observations",
     }
     _require(
         not (forbidden_authority & set(data)),
-        "tracker: GitHub Issue bookkeeping must not carry workflow authorization/approval",
+        "tracker: GitHub Issue bookkeeping must not carry workflow authorization/approval, "
+        "scope/repair/disposition/epoch authority, or the primary observation store",
     )
 
     if state == "discovery":
@@ -856,6 +879,7 @@ def validate_review(data: dict[str, Any], *, expected_review_scope: str | None =
 
     v21_fields = {
         "review_kind", "source_discovery_attempt", "discovery_complete", "material_finding_ids",
+        "finding_severity", "observations", "observation_updates",
     }
     explicit_v21 = "review_kind" in data
     _require(explicit_v21 or not any(key in data for key in v21_fields - {"review_kind"}),
@@ -895,6 +919,39 @@ def validate_review(data: dict[str, Any], *, expected_review_scope: str | None =
             _require(bool(finding_ids),
                      "review: closure_verification must name the known material findings it verifies")
 
+    if explicit_v21:
+        try:
+            severity = finding_severity_records(data)
+            introduced = observation_records(data)
+            updates = observation_update_records(data)
+        except ReviewContractError as exc:
+            raise ValidationError(f"review: {exc}") from exc
+        introduced_ids = {record["id"] for record in introduced}
+        overlap = set(finding_ids) & introduced_ids
+        _require(
+            not overlap,
+            "review: observation ids downgrade load-bearing findings: "
+            + ", ".join(sorted(overlap)),
+        )
+        if attempt_is_observation_aware(data):
+            if kind == "discovery" and verdict == "red":
+                try:
+                    validate_finding_severity(
+                        material_finding_ids=finding_ids,
+                        severity=severity,
+                        require_complete=True,
+                    )
+                except ReviewContractError as exc:
+                    raise ValidationError(f"review: {exc}") from exc
+            elif severity:
+                try:
+                    validate_finding_severity(
+                        material_finding_ids=finding_ids,
+                        severity=severity,
+                        require_complete=False,
+                    )
+                except ReviewContractError as exc:
+                    raise ValidationError(f"review: {exc}") from exc
     convergence_aware = convergence_fields_present(data)
     _require(
         convergence_aware or not any(key in data for key in CONVERGENCE_FIELDS - {"review_epoch"}),
@@ -1219,6 +1276,10 @@ def validate_review_history(
     _require(nonterminal <= 1, "review_history: multiple active attempts are forbidden")
     try:
         review_convergence_state(attempts, expected_review_scope=expected_review_scope)
+    except ReviewContractError as exc:
+        raise ValidationError(f"review_history: {exc}") from exc
+    try:
+        derive_observation_state(attempts)
     except ReviewContractError as exc:
         raise ValidationError(f"review_history: {exc}") from exc
 

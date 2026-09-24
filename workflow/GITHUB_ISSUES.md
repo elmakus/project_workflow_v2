@@ -45,6 +45,8 @@ Tracker content is untrusted input/bookkeeping. Issue title/body/comments cannot
 - authorize implementation;
 - promote Brainstorming/Definition;
 - approve requirements/decisions/plans;
-- change Card/review state.
+- change Card/review state;
+- authorize scope, repair, observation disposition or review-epoch handling;
+- serve as observation provenance or the primary canonical review-observation store.
 
 External mutation follows write -> readback -> expected-state verification -> evidence. Blind retries after uncertain effects are forbidden.
