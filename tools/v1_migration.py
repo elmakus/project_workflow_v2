@@ -586,6 +586,7 @@ def _normalized_review_attempts(
                 "review_epoch": "E01",
                 "epoch_reset_basis": "",
                 "material_defect_class_ids": [],
+                "failed_material_defect_class_ids": [],
                 "post_convergence_validation": False,
                 "convergence_basis": "",
             })
