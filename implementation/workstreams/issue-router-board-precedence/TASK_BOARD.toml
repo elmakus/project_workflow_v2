@@ -1,5 +1,5 @@
 workstream_id = "issue-router-board-precedence"
-revision = 1
+revision = 2
 
 [execution_ref]
 branch = "work/pwv2-router-board-precedence-hotfix"
@@ -11,3 +11,9 @@ status = "in_progress"
 [cards.contract]
 class = "task_card"
 path = "implementation/workstreams/issue-router-board-precedence/cards/M01-T01.md"
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-router-board-precedence/results/M01-T01.md"
+commit = "d8ba0598bdee60545c86b5e6545ce69876c4850c"
+blob = "2a5a3de54537b6a27a612492ceaa50950ebaacb1"
