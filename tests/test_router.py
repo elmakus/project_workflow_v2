@@ -1322,6 +1322,98 @@ class RouterTests(unittest.TestCase):
         finally:
             temp.cleanup()
 
+    def test_preconvergence_closure_after_epoch_reset_fails_closed_in_router(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+
+            source_path = self.add_review_attempt(
+                project,
+                "red",
+                "R01",
+                finding_ids=("F1",),
+                defect_class_ids=("class-a",),
+            )
+            source = project / source_path
+            source_lines = source.read_text().splitlines()
+            convergence_prefixes = (
+                "review_scope = ",
+                "review_epoch = ",
+                "epoch_reset_basis = ",
+                "material_defect_class_ids = ",
+                "failed_material_defect_class_ids = ",
+                "post_convergence_validation = ",
+                "convergence_basis = ",
+            )
+            source.write_text(
+                "\n".join(
+                    line for line in source_lines
+                    if not line.startswith(convergence_prefixes)
+                )
+                + "\n"
+            )
+
+            self.add_review_attempt(
+                project,
+                "green",
+                "R02",
+                review_kind="closure_verification",
+                source_discovery_attempt="R01",
+                finding_ids=("F1",),
+                defect_class_ids=("class-a",),
+            )
+            reset_path = self.add_review_attempt(
+                project,
+                "red",
+                "R03",
+                review_kind="closure_verification",
+                source_discovery_attempt="R01",
+                finding_ids=("F1",),
+                defect_class_ids=("class-a",),
+                failed_defect_class_ids=("class-a",),
+                review_epoch="E02",
+                epoch_reset_basis="Accepted Task Card redesign establishes E02.",
+                subject_blob="e" * 40,
+            )
+            reset = project / reset_path
+            reset_text = reset.read_text().replace(
+                f'commit = "{"a" * 40}"',
+                f'commit = "{"c" * 40}"',
+                1,
+            )
+            reset_text = reset_text.replace(
+                "[subject]\n",
+                '[epoch_reset_subject]\n'
+                'class = "accepted_redesign"\n'
+                'repository = "owner/router-fixture"\n'
+                f'commit = "{"c" * 40}"\n'
+                f'path = "{CARD}"\n'
+                f'blob = "{"d" * 40}"\n'
+                "\n[subject]\n",
+                1,
+            )
+            reset.write_text(reset_text)
+
+            reset_blobs = {
+                ("owner/router-fixture", "c" * 40, CARD): "d" * 40,
+                ("owner/router-fixture", "a" * 40, CARD): "f" * 40,
+            }
+            with patch(
+                "tools.router.project_git_blob_reader",
+                return_value=lambda repository, commit, path: reset_blobs.get(
+                    (repository, commit, path)
+                ),
+            ):
+                routed = select_route(project, [MANIFEST], package_root=ROOT)
+
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("initial convergence-aware epoch", routed.reason)
+        finally:
+            temp.cleanup()
+
     def test_active_legacy_shaped_review_attempt_fails_closed(self) -> None:
         temp, project = self.copy_fixture()
         try:
