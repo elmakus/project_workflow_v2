@@ -61,6 +61,8 @@ class ReviewContractTests(unittest.TestCase):
     def test_closure_scope_requires_complete_causal_blast_radius(self) -> None:
         scope = {
             "known_findings": ["F1"],
+            "defect_classes": ["review-state-bypass"],
+            "root_cause_evidence": ["new attempts were indistinguishable from legacy history"],
             "repair_diff": ["tools/api.py"],
             "regression_evidence": ["test_api_contract"],
             "reachable_callers": ["tools/router.py"],
@@ -85,6 +87,27 @@ class ReviewContractTests(unittest.TestCase):
         incomplete.pop("providers")
         with self.assertRaisesRegex(ReviewContractError, "omitted causal categories"):
             required_closure_scope(incomplete)
+
+    def test_closure_rejects_literal_example_only_repair_evidence(self) -> None:
+        scope = {
+            "known_findings": ["F1"],
+            "defect_classes": [],
+            "root_cause_evidence": [],
+            "repair_diff": ["tools/review_contract.py"],
+            "regression_evidence": ["test_literal_example"],
+            "reachable_callers": [],
+            "consumers": [],
+            "providers": [],
+            "contracts": [],
+            "sibling_representations": ["sibling-state-shape"],
+            "negative_space": ["legacy-shaped-new-attempt"],
+        }
+        with self.assertRaisesRegex(ReviewContractError, "defect_classes.*must not be empty"):
+            required_closure_scope(scope)
+
+        scope["defect_classes"] = ["review-state-bypass"]
+        with self.assertRaisesRegex(ReviewContractError, "root_cause_evidence.*must not be empty"):
+            required_closure_scope(scope)
 
     def test_cumulative_closure_reports_remaining_source_findings(self) -> None:
         attempts = [

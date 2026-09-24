@@ -25,6 +25,8 @@ PWv2.1 distinguishes two review-pass kinds:
 
 A closure-verification evidence package must explicitly account for:
 - the known findings being closed;
+- the demonstrated defect class(es);
+- root-cause evidence showing the repair is not limited to the literal reported example;
 - the repair diff;
 - required regression evidence;
 - materially implicated reachable callers;

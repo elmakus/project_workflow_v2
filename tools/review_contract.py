@@ -9,6 +9,8 @@ from collections.abc import Iterable, Mapping
 REVIEW_KINDS = frozenset({"discovery", "closure_verification"})
 CAUSAL_SCOPE_KEYS = (
     "known_findings",
+    "defect_classes",
+    "root_cause_evidence",
     "repair_diff",
     "regression_evidence",
     "reachable_callers",
@@ -85,7 +87,13 @@ def required_closure_scope(scope: Mapping[str, Iterable[str]]) -> frozenset[str]
         values = frozenset(item for item in raw if isinstance(item, str) and item)
         normalized[key] = values
 
-    for key in ("known_findings", "repair_diff", "regression_evidence"):
+    for key in (
+        "known_findings",
+        "defect_classes",
+        "root_cause_evidence",
+        "repair_diff",
+        "regression_evidence",
+    ):
         if not normalized[key]:
             raise ReviewContractError(f"closure scope {key!r} must not be empty")
 
