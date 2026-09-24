@@ -842,7 +842,11 @@ class RouterTests(unittest.TestCase):
                 self.plan_review_content("green"),
             )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
-            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_prep"))
+            # Co-bound live Board takes precedence over plan JIT: fixture Board
+            # holds M01-T04 in_progress without a result, so Execution owns it.
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution"))
+            self.assertEqual(routed.subject, "M01-T04")
+            self.assertIn(f"project:{BOARD}", routed.read_set)
         finally:
             temp.cleanup()
 
@@ -908,7 +912,9 @@ class RouterTests(unittest.TestCase):
                 )
             )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
-            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_prep"))
+            # Co-bound live Board preempts plan JIT; M01-T04 is in_progress.
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution"))
+            self.assertIn(f"project:{BOARD}", routed.read_set)
 
             base = f"owner/repo@{'a' * 40}:planning/MASTER_PLAN.md@{'b' * 40}"
             planning_path.write_text(
@@ -922,8 +928,10 @@ class RouterTests(unittest.TestCase):
             )
             review_path.write_text(self.plan_review_content("green", cycle=2, revision="P2"))
             routed = select_route(project, [MANIFEST], package_root=ROOT)
-            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_prep"))
-            self.assertIn("Editorial/mechanical-only", routed.reason)
+            # Valid editorial exemption still dispatches the co-bound live Board.
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution"))
+            self.assertEqual(routed.subject, "M01-T04")
+            self.assertIn(f"project:{BOARD}", routed.read_set)
         finally:
             temp.cleanup()
 
@@ -969,6 +977,182 @@ class RouterTests(unittest.TestCase):
             )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+        finally:
+            temp.cleanup()
+
+    def install_approved_plan(self, project: Path) -> None:
+        self.install_green_definition(project)
+        self.install_state_record(
+            project, "planning", "planning", "PLANNING.toml",
+            self.planning_content(state="approved", premium_b="satisfied", premium_c="satisfied"),
+        )
+        self.install_state_record(
+            project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+            self.plan_review_content("green"),
+        )
+
+    def install_editorial_plan(self, project: Path) -> None:
+        self.install_green_definition(project)
+        base = f"owner/repo@{'a' * 40}:planning/MASTER_PLAN.md@{'b' * 40}"
+        self.install_state_record(
+            project, "planning", "planning", "PLANNING.toml",
+            self.planning_content(
+                state="approved", blob="c" * 40,
+                premium_b="satisfied", premium_c="satisfied",
+                gate_subject=base, review_mode="editorial_exempt",
+                exemption_basis="Wording only; strategy, milestones, coverage and gates unchanged.",
+                exemption_base_subject=base,
+            ),
+        )
+        self.install_state_record(
+            project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+            self.plan_review_content("green"),
+        )
+
+    def remove_board_locator(self, project: Path) -> None:
+        workstream = project / MANIFEST
+        text = workstream.read_text()
+        text = text.replace(
+            '\n[task_board]\nclass = "task_board"\npath = "implementation/workstreams/sample-workstream/TASK_BOARD.toml"\n',
+            '\n',
+        )
+        workstream.write_text(text)
+
+    def test_approved_plan_with_live_board_dispatches_board_precedence(self) -> None:
+        cases = (
+            ("no_result", None, "none", ("route", "execution")),
+            ("result_no_review", None, "none_result", ("route", "result_reconciliation")),
+            ("pending", "pending", "required", ("route", "review")),
+            ("green", "green", "required", ("route", "post_review_finalization")),
+            ("red", "red", "required", ("route", "execution_resolution")),
+        )
+        for name, verdict, requirement, expected in cases:
+            temp, project = self.copy_fixture()
+            try:
+                with self.subTest(case=name):
+                    self.install_approved_plan(project)
+                    if name != "no_result":
+                        review_requirement = "none" if requirement == "none_result" else requirement
+                        self.install_reviewable_result(project, review_requirement)
+                        if verdict is not None:
+                            self.add_review_attempt(project, verdict)
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertEqual((routed.disposition, routed.obligation), expected)
+                    self.assertEqual(routed.subject, "M01-T04")
+                    self.assertIn(f"project:{BOARD}", routed.read_set)
+                    if verdict == "red":
+                        self.assertEqual(routed.owner_module, "workflow/RECOVERY.md")
+            finally:
+                temp.cleanup()
+
+    def test_editorial_exempt_with_live_board_dispatches_board_precedence(self) -> None:
+        for verdict, expected, owner in (
+            (None, ("route", "execution"), "workflow/EXECUTION.md"),
+            ("red", ("route", "execution_resolution"), "workflow/RECOVERY.md"),
+        ):
+            temp, project = self.copy_fixture()
+            try:
+                with self.subTest(verdict=verdict):
+                    self.install_editorial_plan(project)
+                    if verdict is not None:
+                        self.install_reviewable_result(project, "required")
+                        self.add_review_attempt(project, verdict)
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertEqual((routed.disposition, routed.obligation), expected)
+                    self.assertEqual(routed.owner_module, owner)
+                    self.assertEqual(routed.subject, "M01-T04")
+                    self.assertIn(f"project:{BOARD}", routed.read_set)
+            finally:
+                temp.cleanup()
+
+    def test_cobound_invalid_board_fails_closed(self) -> None:
+        for plan in ("approved", "editorial"):
+            temp, project = self.copy_fixture()
+            try:
+                with self.subTest(plan=plan):
+                    if plan == "approved":
+                        self.install_approved_plan(project)
+                    else:
+                        self.install_editorial_plan(project)
+                    board = project / BOARD
+                    board.write_text(board.read_text().replace(
+                        'branch = "feat/sample-workstream"', 'branch = "feat/other"',
+                    ))
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            finally:
+                temp.cleanup()
+
+    def test_approved_plan_with_seams_validates_cobound_board_decisions(self) -> None:
+        seams = (
+            '[[seams]]\n'
+            'id = "BOOT-A"\n'
+            'class = "required_seam"\n'
+            'intent = "Review closure stays standalone."\n'
+            '[[seams]]\n'
+            'id = "helper-less-derivation"\n'
+            'class = "preferred_seam"\n'
+            'intent = "Helper-less derivation is its own outcome."\n'
+        )
+        preserved = (
+            '[[seam_decisions]]\n'
+            'seam_id = "BOOT-A"\n'
+            'decision = "preserved"\n'
+            '[[seam_decisions]]\n'
+            'seam_id = "helper-less-derivation"\n'
+            'decision = "preserved"\n'
+        )
+        merged_required = preserved.replace(
+            'seam_id = "BOOT-A"\ndecision = "preserved"',
+            'seam_id = "BOOT-A"\ndecision = "merged"',
+        )
+        cases = (
+            ("valid", preserved, ("route", "execution"), None),
+            ("required_merge", merged_required, ("recovery", "recovery_boundary"),
+             "must not merge a required_seam"),
+            ("missing_decision", "", ("recovery", "recovery_boundary"),
+             "require durable per-seam JIT decisions"),
+        )
+        for name, decisions, expected, reason in cases:
+            temp, project = self.copy_fixture()
+            try:
+                with self.subTest(case=name):
+                    self.install_approved_plan(project)
+                    planning = project / "implementation/workstreams/sample-workstream/PLANNING.toml"
+                    planning.write_text(planning.read_text() + seams)
+                    if decisions:
+                        board = project / BOARD
+                        board.write_text(board.read_text() + decisions)
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertEqual((routed.disposition, routed.obligation), expected)
+                    if reason is None:
+                        self.assertEqual(routed.subject, "M01-T04")
+                    else:
+                        self.assertIn(reason, routed.reason)
+                    self.assertIn(f"project:{BOARD}", routed.read_set)
+            finally:
+                temp.cleanup()
+
+    def test_plan_gate_without_board_owns_plan_jit(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_approved_plan(project)
+            self.remove_board_locator(project)
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_prep"))
+            self.assertEqual(routed.owner_module, "workflow/EXECUTION_PREP.md")
+            self.assertNotIn(f"project:{BOARD}", routed.read_set)
+        finally:
+            temp.cleanup()
+
+        temp, project = self.copy_fixture()
+        try:
+            self.install_editorial_plan(project)
+            self.remove_board_locator(project)
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_prep"))
+            self.assertIn("Editorial/mechanical-only", routed.reason)
+            self.assertNotIn(f"project:{BOARD}", routed.read_set)
         finally:
             temp.cleanup()
 

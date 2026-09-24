@@ -1,0 +1,20 @@
+workstream_id = "issue-router-board-precedence"
+card_id = "M01-T01"
+attempt = "R01"
+verdict = "green"
+evidence_path = "implementation/workstreams/issue-router-board-precedence/evidence/M01-T01_REVIEW_R01_2026-09-24.md"
+
+[subject]
+class = "git_blob"
+repository = "elmakus/project_workflow_v2"
+commit = "d8ba0598bdee60545c86b5e6545ce69876c4850c"
+path = "implementation/workstreams/issue-router-board-precedence/results/M01-T01.md"
+blob = "2a5a3de54537b6a27a612492ceaa50950ebaacb1"
+
+[acceptance]
+class = "task_card"
+path = "implementation/workstreams/issue-router-board-precedence/cards/M01-T01.md"
+
+[independence]
+materially_produced_or_repaired_subject = false
+basis = "Review is reserved for a fresh independent context that did not materially produce or repair this exact result subject."
