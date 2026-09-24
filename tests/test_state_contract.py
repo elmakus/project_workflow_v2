@@ -323,15 +323,28 @@ class StateEnvelopeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "changed review_epoch requires"):
             validate_review_history([base, reset])
 
+        reset["epoch_reset_basis"] = "repair convenience is not a redesign"
+        reset["epoch_reset_subject"] = {
+            "class": "accepted_redesign",
+            "repository": "owner/fixture-project",
+            "commit": "4" * 40,
+            "path": "implementation/workstreams/sample-workstream/results/M03-T03.md",
+            "blob": "5" * 40,
+        }
+        with self.assertRaisesRegex(ValidationError, "accepted authority or acceptance redesign"):
+            validate_review_history([base, reset])
+
         reset["epoch_reset_basis"] = (
             "Accepted authority/acceptance redesign revision R4 replaces the prior epoch."
         )
+        reset["epoch_reset_subject"]["path"] = reset["acceptance"]["path"]
         validate_review_history([base, reset])
 
         same_epoch_claim = copy.deepcopy(base)
         same_epoch_claim.update({
             "attempt": "R02",
             "epoch_reset_basis": "repair convenience is not a redesign",
+            "epoch_reset_subject": copy.deepcopy(reset["epoch_reset_subject"]),
             "material_finding_ids": [],
             "material_defect_class_ids": [],
             "discovery_complete": False,
@@ -492,6 +505,13 @@ class StateEnvelopeTests(unittest.TestCase):
             "material_finding_ids": [],
             "review_epoch": "E02",
             "epoch_reset_basis": "Accepted structural redesign R5 establishes a new acceptance epoch.",
+            "epoch_reset_subject": {
+                "class": "accepted_redesign",
+                "repository": "owner/fixture-project",
+                "commit": "8" * 40,
+                "path": post_red["acceptance"]["path"],
+                "blob": "9" * 40,
+            },
             "material_defect_class_ids": [],
             "post_convergence_validation": False,
             "convergence_basis": "",
@@ -520,11 +540,25 @@ class StateEnvelopeTests(unittest.TestCase):
             "attempt": "R02",
             "review_epoch": "E02",
             "epoch_reset_basis": "Accepted redesign R2",
+            "epoch_reset_subject": {
+                "class": "accepted_redesign",
+                "repository": "owner/fixture-project",
+                "commit": "6" * 40,
+                "path": first["acceptance"]["path"],
+                "blob": "7" * 40,
+            },
         })
         third = copy.deepcopy(first)
         third.update({
             "attempt": "R03",
             "epoch_reset_basis": "Accepted redesign R3",
+            "epoch_reset_subject": {
+                "class": "accepted_redesign",
+                "repository": "owner/fixture-project",
+                "commit": "8" * 40,
+                "path": first["acceptance"]["path"],
+                "blob": "9" * 40,
+            },
         })
         with self.assertRaisesRegex(ValidationError, "cannot be reused"):
             validate_review_history([first, second, third])
