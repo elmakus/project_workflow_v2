@@ -1133,6 +1133,7 @@ class RouterTests(unittest.TestCase):
         discovery_complete: bool = False,
         finding_ids: tuple[str, ...] = (),
         defect_class_ids: tuple[str, ...] = (),
+        failed_defect_class_ids: tuple[str, ...] = (),
         review_scope: str = "card",
         review_epoch: str = "E01",
         epoch_reset_basis: str = "",
@@ -1178,9 +1179,12 @@ class RouterTests(unittest.TestCase):
                     defect_class_ids = ("class-default",)
         if review_kind == "closure_verification" and not defect_class_ids:
             defect_class_ids = ("class-default",)
+        if review_kind == "closure_verification" and verdict == "red" and not failed_defect_class_ids:
+            failed_defect_class_ids = defect_class_ids
         if review_kind is not None:
             ids = ", ".join(f'"{item}"' for item in finding_ids)
             classes = ", ".join(f'"{item}"' for item in defect_class_ids)
+            failed_classes = ", ".join(f'"{item}"' for item in failed_defect_class_ids)
             extra = (
                 f'review_kind = "{review_kind}"\n'
                 f'source_discovery_attempt = "{source_discovery_attempt}"\n'
@@ -1190,6 +1194,7 @@ class RouterTests(unittest.TestCase):
                 f'review_epoch = "{review_epoch}"\n'
                 f'epoch_reset_basis = "{epoch_reset_basis}"\n'
                 f'material_defect_class_ids = [{classes}]\n'
+                f'failed_material_defect_class_ids = [{failed_classes}]\n'
                 f'post_convergence_validation = {"true" if post_convergence_validation else "false"}\n'
                 f'convergence_basis = "{convergence_basis}"\n'
             )
@@ -1272,6 +1277,48 @@ class RouterTests(unittest.TestCase):
                 ("recovery", "recovery_boundary"),
             )
             self.assertIn("exact accepted authority", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_epoch_reset_rejects_fabricated_exact_accepted_subject(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            self.add_review_attempt(
+                project,
+                "red",
+                "R01",
+                finding_ids=("F1",),
+                defect_class_ids=("class-a",),
+            )
+            review_path = self.add_review_attempt(
+                project,
+                "pending",
+                "R02",
+                review_epoch="E02",
+                epoch_reset_basis="Claimed accepted redesign",
+            )
+            path = project / review_path
+            text = path.read_text()
+            text = text.replace(
+                "[subject]\n",
+                '[epoch_reset_subject]\n'
+                'class = "accepted_redesign"\n'
+                'repository = "owner/router-fixture"\n'
+                f'commit = "{"c" * 40}"\n'
+                f'path = "{CARD}"\n'
+                f'blob = "{"d" * 40}"\n'
+                "\n[subject]\n",
+                1,
+            )
+            path.write_text(text)
+
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("exact Git readback", routed.reason)
         finally:
             temp.cleanup()
 
