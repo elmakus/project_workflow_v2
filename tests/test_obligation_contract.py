@@ -785,7 +785,22 @@ class TypedExecutionContractTests(unittest.TestCase):
             same["freshness"]["fingerprint"],
         )
 
-        with self.assertRaisesRegex(Exception, "role .* does not match registered obligation"):
+        material_state_change = copy.deepcopy(canonical_state)
+        material_state_change["board"]["cards"].append(
+            {"id": "M00-T99", "status": "done"}
+        )
+        changed = kernel.compile_obligations(
+            "PWV21-K011",
+            canonical_state=material_state_change,
+            **compile_args,
+        )
+        self.assertNotEqual(
+            obligation["freshness"]["fingerprint"],
+            changed["freshness"]["fingerprint"],
+        )
+        self.assertNotEqual(obligation["obligation_id"], changed["obligation_id"])
+
+        with self.assertRaisesRegex(Exception, "role .* does not match registered owner role"):
             kernel.compile_obligations(
                 "PWV21-K011",
                 canonical_state=canonical_state,
