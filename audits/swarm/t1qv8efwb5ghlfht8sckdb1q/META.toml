@@ -1,0 +1,12 @@
+audit_kind = "pwv2_adversarial_swarm"
+audit_suffix = "t1qv8efwb5ghlfht8sckdb1q"
+repository = "elmakus/project_workflow_v2"
+subject_commit = "4fb4bfb7d7b1481d6f347c182fc96a5a1135e045"
+branch = "audit/pwv2-swarm-t1qv8efwb5ghlfht8sckdb1q"
+blind_discovery = true
+selected_attack_lenses = [
+  "7. Planning / Premium gates / Execution precedence",
+  "4. review independence / review bypass / result mutation",
+  "3. stale commit/blob/path/result/review identity",
+  "5. RED / recovery / blocker / interrupted-runtime continuation",
+]
