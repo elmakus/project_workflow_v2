@@ -880,10 +880,20 @@ def validate_review_history(
              "review_history: at least one attempt is required")
     seen_ids: set[str] = set()
     attempts_by_id: dict[str, dict[str, Any]] = {}
+    open_findings: dict[str, set[str]] = {}
+    legacy_prefix = True
     nonterminal = 0
     for index, attempt in enumerate(attempts):
         validate_review(attempt)
         attempt_id = attempt["attempt"]
+        explicit_v21 = "review_kind" in attempt
+        if explicit_v21:
+            legacy_prefix = False
+        else:
+            _require(legacy_prefix,
+                     "review_history: legacy review attempts must form the initial historical prefix")
+            _require(attempt["verdict"] in {"green", "red"},
+                     "review_history: new/active review attempts require explicit review_kind")
         _require(attempt_id not in seen_ids, f"review_history: duplicate attempt {attempt_id!r}")
         seen_ids.add(attempt_id)
         if expected_card_id is not None:
@@ -892,6 +902,15 @@ def validate_review_history(
         if workstream_id is not None:
             _require(attempt.get("workstream_id") == workstream_id,
                      "review_history: attempt belongs to another workstream")
+
+        if explicit_v21 and review_kind(attempt) == "discovery":
+            still_open = {source_id for source_id, findings in open_findings.items() if findings}
+            _require(
+                not still_open,
+                "review_history: fresh discovery cannot start before all known material findings are closure-verified",
+            )
+            if attempt["verdict"] == "red":
+                open_findings[attempt_id] = set(attempt["material_finding_ids"])
 
         if attempt.get("review_kind") == "closure_verification":
             source_id = attempt["source_discovery_attempt"]
@@ -907,6 +926,8 @@ def validate_review_history(
                      "review_history: PWv2.1 closure source must record material_finding_ids")
             _require(set(attempt["material_finding_ids"]).issubset(set(source_findings)),
                      "review_history: closure may verify only findings frozen by its source discovery")
+            if attempt["verdict"] == "green":
+                open_findings[source_id].difference_update(attempt["material_finding_ids"])
 
         attempts_by_id[attempt_id] = attempt
         if attempt["verdict"] in {"pending", "in_progress"}:
