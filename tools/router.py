@@ -10,6 +10,7 @@ from pathlib import Path, PurePosixPath
 
 from tools.execution_contract import ExecutionContractError, parse_card_result
 from tools.recovery_contract import RecoveryContractError, classify_resolution, exact_result_subject, review_subject
+from tools.review_contract import can_finalize_review_obligation, review_kind
 from tools.policy_kernel import MechanicalDecision, PolicyKernel
 from tools.state_contract import (
     ValidationError,
@@ -603,11 +604,18 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                         subject=card["id"], owner_module="workflow/REVIEW.md",
                     )
                 if verdict == "green":
-                    return result(
-                        reads, "route", "post_review_finalization",
-                        "Exact current review is GREEN; Card finalization is deterministic and is not a verdict-only stop",
-                        subject=card["id"], owner_module="workflow/EXECUTION.md",
-                    )
+                    if can_finalize_review_obligation(attempts[-1]):
+                        return result(
+                            reads, "route", "post_review_finalization",
+                            "Exact current fresh discovery review is GREEN; Card finalization is deterministic and is not a verdict-only stop",
+                            subject=card["id"], owner_module="workflow/EXECUTION.md",
+                        )
+                    if review_kind(attempts[-1]) == "closure_verification":
+                        return result(
+                            reads, "route", "review_freeze",
+                            "Known findings are closure-verified, but closure cannot satisfy the review obligation; freeze a fresh full-scope discovery attempt",
+                            subject=card["id"], owner_module="workflow/REVIEW.md",
+                        )
                 return result(
                     reads, "route", "execution_resolution",
                     "RED review evidence remains durable; execution resolution classifies bounded correction, Planning, Definition, Research or a real stop",
