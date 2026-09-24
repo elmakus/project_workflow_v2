@@ -23,10 +23,10 @@ TEST_STATUSES = {"green", "red", "not_run"}
 READBACK_STATUSES = {"verified", "failed", "not_applicable"}
 INPUT_PATH = re.compile(r"^[a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)*$")
 STALE_ACTIONS = {"reuse", "rebase", "reconcile"}
-TELEMETRY_KEYS = {
-    "provider", "model", "model_id", "worker", "worker_id", "session", "session_id",
-    "retry", "retries", "worktree", "paseo", "runtime", "invocation", "scheduler",
-}
+TELEMETRY_KEY_ROOTS = (
+    "provider", "model", "worker", "session", "retry", "retries",
+    "worktree", "paseo", "runtime", "invocation", "scheduler",
+)
 
 
 class ExecutionEnvelopeError(ValueError):
@@ -75,8 +75,10 @@ def _reject_telemetry_keys(value: Any, where: str = "$") -> None:
     if isinstance(value, Mapping):
         for key, child in value.items():
             normalized = str(key).lower()
-            _require(normalized not in TELEMETRY_KEYS,
-                     f"{where}: telemetry key {key!r} is non-canonical")
+            _require(
+                not normalized.startswith(TELEMETRY_KEY_ROOTS),
+                f"{where}: telemetry key {key!r} is non-canonical",
+            )
             _reject_telemetry_keys(child, f"{where}.{key}")
     elif isinstance(value, list):
         for index, child in enumerate(value):

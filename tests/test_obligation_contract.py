@@ -261,6 +261,24 @@ class TypedExecutionContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ExecutionEnvelopeError, "telemetry key"):
             self.obligation(inputs={"card_id": "M02-T01", "Model": "must-not-be-canonical"})
 
+        for telemetry_key in (
+            "provider_name",
+            "model_name",
+            "worker_uuid",
+            "session_uuid",
+            "retry_count",
+            "worktree_path",
+            "paseo_job_id",
+            "runtime_name",
+            "invocation_id",
+            "scheduler_job_id",
+        ):
+            with self.subTest(telemetry_key=telemetry_key), self.assertRaisesRegex(
+                ExecutionEnvelopeError,
+                "telemetry key",
+            ):
+                self.obligation(inputs={"card_id": "M02-T01", telemetry_key: "must-not-be-canonical"})
+
         for version in (2, True):
             with self.subTest(result_schema_version=version):
                 result = self.result(obligation)
@@ -455,6 +473,24 @@ class TypedExecutionContractTests(unittest.TestCase):
             "card": {"Model": "must-not-be-canonical"}
         }
         invalid_obligations.append(("case-variant nested telemetry input", candidate))
+
+        for telemetry_key in (
+            "provider_name",
+            "model_name",
+            "worker_uuid",
+            "session_uuid",
+            "retry_count",
+            "worktree_path",
+            "paseo_job_id",
+            "runtime_name",
+            "invocation_id",
+            "scheduler_job_id",
+        ):
+            candidate = copy.deepcopy(obligation)
+            candidate["freshness"]["material"]["inputs"] = {
+                "card": {telemetry_key: "must-not-be-canonical"}
+            }
+            invalid_obligations.append((f"telemetry family {telemetry_key}", candidate))
 
         candidate = copy.deepcopy(obligation)
         candidate["freshness"]["material"]["prerequisites"] = ["   "]

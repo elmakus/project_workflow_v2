@@ -38,7 +38,7 @@ A result contains only PW-relevant semantic data:
 - tests, evidence and readback observations;
 - a real blocker when status is blocked.
 
-Provider, model, worker, session, retry, worktree, scheduler, invocation and runtime identity are non-canonical and rejected as fields.
+Provider, model, worker, session, retry, worktree, Paseo, scheduler, invocation and runtime identity are non-canonical and rejected as fields. Those telemetry terms reserve their field-name families as well as their exact spellings (for example, `model_name`, `session_uuid`, and `retry_count` are also forbidden), so runtime identity cannot enter freshness material under an alias.
 
 ## Freshness and stale-result reconciliation
 
