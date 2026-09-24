@@ -387,10 +387,147 @@ class StateEnvelopeTests(unittest.TestCase):
         })
         validate_review_history(attempts + [post])
 
+        terminal_post = copy.deepcopy(post)
+        terminal_post.update({
+            "verdict": "green",
+            "discovery_complete": True,
+            "evidence_path": attempts[0]["evidence_path"],
+        })
         second = copy.deepcopy(post)
         second["attempt"] = "R12"
-        with self.assertRaisesRegex(ValidationError, "only one post-convergence"):
-            validate_review_history(attempts + [post | {"verdict": "green", "discovery_complete": True, "evidence_path": base_evidence if False else attempts[0]["evidence_path"]}, second])
+        with self.assertRaisesRegex(ValidationError, "terminal post-convergence|only one post-convergence"):
+            validate_review_history(attempts + [terminal_post, second])
+
+    def test_convergence_aware_closure_can_adapt_open_t01_discovery(self) -> None:
+        source = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        source.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": ["F1"],
+            "verdict": "red",
+        })
+        closure = copy.deepcopy(source)
+        closure.update({
+            "attempt": "R02",
+            "review_kind": "closure_verification",
+            "source_discovery_attempt": "R01",
+            "discovery_complete": False,
+            "material_finding_ids": ["F1"],
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": ["class-a"],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "verdict": "green",
+        })
+        closure["subject"]["blob"] = "4" * 40
+        validate_review_history([source, closure])
+
+    def test_terminal_post_convergence_red_forbids_same_epoch_review_continuation(self) -> None:
+        attempts = []
+        for index in range(5):
+            discovery = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+            discovery.update({
+                "attempt": f"R{index * 2 + 1:02d}",
+                "review_kind": "discovery",
+                "source_discovery_attempt": "",
+                "discovery_complete": True,
+                "material_finding_ids": [f"F{index}"],
+                "review_scope": "card",
+                "review_epoch": "E01",
+                "epoch_reset_basis": "",
+                "material_defect_class_ids": [f"class-{index}"],
+                "post_convergence_validation": False,
+                "convergence_basis": "",
+                "verdict": "red",
+            })
+            discovery["subject"]["blob"] = chr(ord("4") + index) * 40
+            attempts.append(discovery)
+            closure = copy.deepcopy(discovery)
+            closure.update({
+                "attempt": f"R{index * 2 + 2:02d}",
+                "review_kind": "closure_verification",
+                "source_discovery_attempt": discovery["attempt"],
+                "discovery_complete": False,
+                "verdict": "green",
+            })
+            attempts.append(closure)
+
+        post_red = copy.deepcopy(attempts[-1])
+        post_red.update({
+            "attempt": "R11",
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": ["F-post"],
+            "material_defect_class_ids": ["class-post"],
+            "post_convergence_validation": True,
+            "convergence_basis": "Main convergence/root-cause analysis C01",
+            "verdict": "red",
+        })
+        attempts.append(post_red)
+        validate_review_history(attempts)
+
+        forbidden = copy.deepcopy(post_red)
+        forbidden.update({
+            "attempt": "R12",
+            "review_kind": "closure_verification",
+            "source_discovery_attempt": "R11",
+            "discovery_complete": False,
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "verdict": "green",
+        })
+        with self.assertRaisesRegex(ValidationError, "terminal post-convergence"):
+            validate_review_history(attempts + [forbidden])
+
+        new_epoch = copy.deepcopy(post_red)
+        new_epoch.update({
+            "attempt": "R12",
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": False,
+            "material_finding_ids": [],
+            "review_epoch": "E02",
+            "epoch_reset_basis": "Accepted structural redesign R5 establishes a new acceptance epoch.",
+            "material_defect_class_ids": [],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "verdict": "pending",
+            "evidence_path": "",
+        })
+        validate_review_history(attempts + [new_epoch])
+
+    def test_review_epoch_identity_cannot_be_reused_after_reset(self) -> None:
+        first = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        first.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": [],
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": [],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "verdict": "green",
+        })
+        second = copy.deepcopy(first)
+        second.update({
+            "attempt": "R02",
+            "review_epoch": "E02",
+            "epoch_reset_basis": "Accepted redesign R2",
+        })
+        third = copy.deepcopy(first)
+        third.update({
+            "attempt": "R03",
+            "epoch_reset_basis": "Accepted redesign R3",
+        })
+        with self.assertRaisesRegex(ValidationError, "cannot be reused"):
+            validate_review_history([first, second, third])
 
     def test_task_card_review_acceptance_is_exact_and_semantic(self) -> None:
         review = {
