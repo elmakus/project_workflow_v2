@@ -315,10 +315,48 @@ class PolicyKernel:
         if actual != expected:
             raise KernelContractError("registry/contract projection drift")
 
-    def compile_obligations(self, rule_id: str, **kwargs: Any) -> dict[str, Any]:
-        if rule_id not in self._rules_by_id:
+    def _rule_inputs(
+        self,
+        rule_id: str,
+        canonical_state: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        rule = self._rules_by_id.get(rule_id)
+        if rule is None:
             raise KernelContractError(f"unknown mechanical rule {rule_id!r}")
-        return compile_execution_obligation(rule_id=rule_id, **kwargs)
+        if not isinstance(canonical_state, Mapping):
+            raise KernelContractError("canonical_state must be a mapping")
+        return {
+            path: _extract_path(canonical_state, path)
+            for path in rule["inputs"]
+        }
+
+    def compile_obligations(
+        self,
+        rule_id: str,
+        *,
+        canonical_state: Mapping[str, Any],
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        decision = self.route(rule_id, canonical_state)
+        if decision is None:
+            raise KernelContractError(
+                f"{rule_id}: cannot compile obligation because the registered rule does not match current canonical state"
+            )
+        if "determining_inputs" in kwargs:
+            raise KernelContractError(
+                "determining_inputs are kernel-derived from the registered rule and canonical state"
+            )
+        supplied_role = kwargs.pop("role", decision.obligation)
+        if supplied_role != decision.obligation:
+            raise KernelContractError(
+                f"{rule_id}: role {supplied_role!r} does not match registered obligation {decision.obligation!r}"
+            )
+        return compile_execution_obligation(
+            rule_id=rule_id,
+            role=decision.obligation,
+            determining_inputs=self._rule_inputs(rule_id, canonical_state),
+            **kwargs,
+        )
 
     def validate_results(self, payload: Mapping[str, Any]) -> None:
         validate_execution_result(payload)
@@ -328,12 +366,30 @@ class PolicyKernel:
         result: Mapping[str, Any],
         obligation: Mapping[str, Any],
         *,
+        canonical_state: Mapping[str, Any],
         current_freshness_material: Mapping[str, Any],
         stale_resolution: Mapping[str, Any] | None = None,
+        observed_canonical_state: Mapping[str, Any] | None = None,
     ) -> str:
+        if not isinstance(obligation, Mapping):
+            raise KernelContractError("obligation must be a mapping")
+        rule_id = obligation.get("rule_id")
+        rule = self._rules_by_id.get(rule_id) if isinstance(rule_id, str) else None
+        if rule is None:
+            raise KernelContractError(f"unknown mechanical rule {rule_id!r}")
+        expected_role = rule["outcome"]["obligation"]
+        if obligation.get("role") != expected_role:
+            raise KernelContractError(
+                f"{rule_id}: obligation role does not match registered obligation {expected_role!r}"
+            )
+        if not isinstance(current_freshness_material, Mapping):
+            raise KernelContractError("current_freshness_material must be a mapping")
+        current_material = json.loads(json.dumps(current_freshness_material))
+        current_material["inputs"] = self._rule_inputs(rule_id, canonical_state)
         return reconcile_execution_result(
             result,
             obligation,
-            current_freshness_material=current_freshness_material,
+            current_freshness_material=current_material,
             stale_resolution=stale_resolution,
+            observed_canonical_state=observed_canonical_state,
         )
