@@ -293,6 +293,46 @@ class StateEnvelopeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "initial historical prefix"):
             validate_review_history([historical, explicit_terminal, legacy_after_explicit])
 
+    def test_red_closure_records_only_the_classes_that_remained_blocking(self) -> None:
+        source = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        source.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": ["F1", "F2"],
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": ["class-a", "class-b"],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "verdict": "red",
+        })
+        closure = copy.deepcopy(source)
+        closure.update({
+            "attempt": "R02",
+            "review_kind": "closure_verification",
+            "source_discovery_attempt": "R01",
+            "discovery_complete": False,
+            "material_finding_ids": ["F1", "F2"],
+            "material_defect_class_ids": ["class-a", "class-b"],
+            "failed_material_defect_class_ids": ["class-b"],
+            "verdict": "red",
+        })
+        closure["subject"]["commit"] = "4" * 40
+        closure["subject"]["blob"] = "5" * 40
+        validate_review_history([source, closure])
+
+        missing = copy.deepcopy(closure)
+        missing.pop("failed_material_defect_class_ids")
+        with self.assertRaisesRegex(ValidationError, "failed_material_defect_class_ids"):
+            validate_review_history([source, missing])
+
+        foreign_class = copy.deepcopy(closure)
+        foreign_class["failed_material_defect_class_ids"] = ["class-c"]
+        with self.assertRaisesRegex(ValidationError, "subset"):
+            validate_review_history([source, foreign_class])
+
     def test_review_epoch_reset_requires_material_accepted_redesign_basis(self) -> None:
         base = read_toml(VALID / "REVIEW_ATTEMPT.toml")
         base.update({
@@ -319,6 +359,7 @@ class StateEnvelopeTests(unittest.TestCase):
             "verdict": "pending",
             "evidence_path": "",
         })
+        reset["subject"]["commit"] = "4" * 40
         reset["subject"]["blob"] = "4" * 40
         with self.assertRaisesRegex(ValidationError, "changed review_epoch requires"):
             validate_review_history([base, reset])
@@ -338,23 +379,54 @@ class StateEnvelopeTests(unittest.TestCase):
             "Accepted authority/acceptance redesign revision R4 replaces the prior epoch."
         )
         reset["epoch_reset_subject"]["path"] = reset["acceptance"]["path"]
-        validate_review_history([base, reset])
+
+        with self.assertRaisesRegex(ValidationError, "exact Git readback"):
+            validate_review_history(
+                [base, reset],
+                exact_blob_reader=lambda repository, commit, path: None,
+            )
+
+        acceptance_path = reset["acceptance"]["path"]
+        valid_blobs = {
+            ("owner/fixture-project", "4" * 40, acceptance_path): "5" * 40,
+            ("owner/fixture-project", "2" * 40, acceptance_path): "6" * 40,
+        }
+        reader = lambda repository, commit, path: valid_blobs.get((repository, commit, path))
+        validate_review_history([base, reset], exact_blob_reader=reader)
+
+        unchanged_blobs = dict(valid_blobs)
+        unchanged_blobs[("owner/fixture-project", "2" * 40, acceptance_path)] = "5" * 40
+        with self.assertRaisesRegex(ValidationError, "material accepted redesign"):
+            validate_review_history(
+                [base, reset],
+                exact_blob_reader=lambda repository, commit, path: unchanged_blobs.get(
+                    (repository, commit, path)
+                ),
+            )
 
         foreign_repository = copy.deepcopy(reset)
         foreign_repository["epoch_reset_subject"]["repository"] = "other/repository"
         with self.assertRaisesRegex(ValidationError, "reviewed project repository"):
-            validate_review_history([base, foreign_repository])
+            validate_review_history([base, foreign_repository], exact_blob_reader=reader)
 
         arbitrary_authority_root = copy.deepcopy(reset)
         arbitrary_authority_root["epoch_reset_subject"]["path"] = "requirements/UNACCEPTED_DRAFT.md"
         with self.assertRaisesRegex(ValidationError, "exact accepted authority"):
-            validate_review_history([base, arbitrary_authority_root])
+            validate_review_history([base, arbitrary_authority_root], exact_blob_reader=reader)
 
         accepted_authority = copy.deepcopy(arbitrary_authority_root)
         accepted_authority["epoch_reset_subject"]["path"] = "requirements/ACCEPTED.md"
+        authority_path = accepted_authority["epoch_reset_subject"]["path"]
+        authority_blobs = {
+            ("owner/fixture-project", "4" * 40, authority_path): "5" * 40,
+            ("owner/fixture-project", "2" * 40, authority_path): "6" * 40,
+        }
         validate_review_history(
             [base, accepted_authority],
-            accepted_authority_paths={"requirements/ACCEPTED.md"},
+            accepted_authority_paths={authority_path},
+            exact_blob_reader=lambda repository, commit, path: authority_blobs.get(
+                (repository, commit, path)
+            ),
         )
 
         same_epoch_claim = copy.deepcopy(base)
