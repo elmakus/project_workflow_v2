@@ -1132,6 +1132,12 @@ class RouterTests(unittest.TestCase):
         source_discovery_attempt: str = "",
         discovery_complete: bool = False,
         finding_ids: tuple[str, ...] = (),
+        defect_class_ids: tuple[str, ...] = (),
+        review_scope: str = "card",
+        review_epoch: str = "E01",
+        epoch_reset_basis: str = "",
+        post_convergence_validation: bool = False,
+        convergence_basis: str = "",
         subject_blob: str | None = None,
     ) -> str:
         review_path = f"implementation/workstreams/sample-workstream/reviews/M01-T04-{attempt}.toml"
@@ -1165,15 +1171,27 @@ class RouterTests(unittest.TestCase):
         extra = ""
         if review_kind == "discovery" and verdict in {"green", "red"}:
             discovery_complete = True
-            if verdict == "red" and not finding_ids:
-                finding_ids = ("F-default",)
+            if verdict == "red":
+                if not finding_ids:
+                    finding_ids = ("F-default",)
+                if not defect_class_ids:
+                    defect_class_ids = ("class-default",)
+        if review_kind == "closure_verification" and not defect_class_ids:
+            defect_class_ids = ("class-default",)
         if review_kind is not None:
             ids = ", ".join(f'"{item}"' for item in finding_ids)
+            classes = ", ".join(f'"{item}"' for item in defect_class_ids)
             extra = (
                 f'review_kind = "{review_kind}"\n'
                 f'source_discovery_attempt = "{source_discovery_attempt}"\n'
                 f'discovery_complete = {"true" if discovery_complete else "false"}\n'
                 f'material_finding_ids = [{ids}]\n'
+                f'review_scope = "{review_scope}"\n'
+                f'review_epoch = "{review_epoch}"\n'
+                f'epoch_reset_basis = "{epoch_reset_basis}"\n'
+                f'material_defect_class_ids = [{classes}]\n'
+                f'post_convergence_validation = {"true" if post_convergence_validation else "false"}\n'
+                f'convergence_basis = "{convergence_basis}"\n'
             )
         path.write_text(
             'workstream_id = "sample-workstream"\n'
@@ -1289,6 +1307,123 @@ class RouterTests(unittest.TestCase):
                 (routed.disposition, routed.obligation),
                 ("route", "post_review_finalization"),
             )
+        finally:
+            temp.cleanup()
+
+    def test_fifth_new_card_defect_class_routes_review_convergence(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            for index in range(5):
+                discovery_id = f"R{index * 2 + 1:02d}"
+                self.add_review_attempt(
+                    project,
+                    "red",
+                    discovery_id,
+                    finding_ids=(f"F{index}",),
+                    defect_class_ids=(f"class-{index}",),
+                )
+                if index < 4:
+                    self.add_review_attempt(
+                        project,
+                        "green",
+                        f"R{index * 2 + 2:02d}",
+                        review_kind="closure_verification",
+                        source_discovery_attempt=discovery_id,
+                        finding_ids=(f"F{index}",),
+                        defect_class_ids=(f"class-{index}",),
+                    )
+
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "review_convergence"))
+            self.assertIn("ceiling", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_known_class_recurrence_does_not_consume_new_discovery_epoch(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            self.add_review_attempt(
+                project, "red", "R01",
+                finding_ids=("F1",), defect_class_ids=("class-a",),
+            )
+            self.add_review_attempt(
+                project, "green", "R02",
+                review_kind="closure_verification",
+                source_discovery_attempt="R01",
+                finding_ids=("F1",), defect_class_ids=("class-a",),
+            )
+            self.add_review_attempt(
+                project, "red", "R03",
+                finding_ids=("F2",), defect_class_ids=("class-a",),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_resolution"))
+        finally:
+            temp.cleanup()
+
+    def test_third_failed_closure_round_routes_review_convergence(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            self.add_review_attempt(
+                project, "red", "R01",
+                finding_ids=("F1",), defect_class_ids=("class-a",),
+            )
+            for attempt in ("R02", "R03", "R04"):
+                self.add_review_attempt(
+                    project,
+                    "red",
+                    attempt,
+                    review_kind="closure_verification",
+                    source_discovery_attempt="R01",
+                    finding_ids=("F1",),
+                    defect_class_ids=("class-a",),
+                )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "review_convergence"))
+        finally:
+            temp.cleanup()
+
+    def test_convergence_closure_freezes_one_post_validation_and_red_routes_structural(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            for index in range(5):
+                discovery_id = f"R{index * 2 + 1:02d}"
+                finding = f"F{index}"
+                defect = f"class-{index}"
+                self.add_review_attempt(
+                    project, "red", discovery_id,
+                    finding_ids=(finding,), defect_class_ids=(defect,),
+                )
+                self.add_review_attempt(
+                    project, "green", f"R{index * 2 + 2:02d}",
+                    review_kind="closure_verification",
+                    source_discovery_attempt=discovery_id,
+                    finding_ids=(finding,), defect_class_ids=(defect,),
+                )
+
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "review_freeze"))
+            self.assertIn("post-convergence", routed.reason)
+
+            self.add_review_attempt(
+                project,
+                "red",
+                "R11",
+                finding_ids=("F-post",),
+                defect_class_ids=("class-post",),
+                post_convergence_validation=True,
+                convergence_basis="Main convergence/root-cause analysis C01",
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("route", "review_structural_resolution"),
+            )
+            self.assertIn("post-convergence", routed.reason)
         finally:
             temp.cleanup()
 
