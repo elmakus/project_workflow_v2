@@ -208,6 +208,7 @@ def _mutation(
 
 def build_freshness_material(
     *,
+    rule_fingerprint: str,
     subject: Mapping[str, Any],
     authority_refs: Sequence[Mapping[str, Any]],
     prerequisites: Sequence[str],
@@ -216,11 +217,16 @@ def build_freshness_material(
     mutation: Mapping[str, Any],
     determining_inputs: Mapping[str, Any],
 ) -> dict[str, Any]:
+    _require(
+        isinstance(rule_fingerprint, str) and SHA256.fullmatch(rule_fingerprint) is not None,
+        "freshness rule_fingerprint must be sha256",
+    )
     _require(isinstance(determining_inputs, Mapping), "freshness inputs must be an object")
     _reject_telemetry_keys(determining_inputs, "freshness.inputs")
     authority = [validate_exact_ref(ref, f"authority[{i}]") for i, ref in enumerate(authority_refs)]
     authority.sort(key=lambda item: (item["repository"], item["path"], item["commit"], item["blob"]))
     return {
+        "rule_fingerprint": rule_fingerprint,
         "subject": validate_exact_ref(subject, "subject"),
         "authority": authority,
         "prerequisites": _string_list(prerequisites, "prerequisites"),
@@ -234,10 +240,15 @@ def build_freshness_material(
 def _validate_freshness_material(material: Any) -> None:
     _require(isinstance(material, Mapping), "freshness material must be an object")
     expected = {
-        "subject", "authority", "prerequisites", "constraints",
+        "rule_fingerprint", "subject", "authority", "prerequisites", "constraints",
         "completion", "mutation", "inputs",
     }
     _require(set(material) == expected, "freshness material: invalid keys")
+    _require(
+        isinstance(material["rule_fingerprint"], str)
+        and SHA256.fullmatch(material["rule_fingerprint"]) is not None,
+        "freshness.rule_fingerprint must be sha256",
+    )
     validate_exact_ref(material["subject"], "freshness.subject")
     authority = material["authority"]
     _require(isinstance(authority, list) and authority, "freshness.authority must be non-empty")
@@ -271,6 +282,7 @@ def freshness_fingerprint(material: Mapping[str, Any]) -> str:
 def compile_execution_obligation(
     *,
     rule_id: str,
+    rule_fingerprint: str,
     role: str,
     subject: Mapping[str, Any],
     authority_refs: Sequence[Mapping[str, Any]],
@@ -286,6 +298,10 @@ def compile_execution_obligation(
 ) -> dict[str, Any]:
     _require(isinstance(rule_id, str) and RULE_ID.fullmatch(rule_id) is not None,
              "obligation.rule_id must be a registered-rule identifier")
+    _require(
+        isinstance(rule_fingerprint, str) and SHA256.fullmatch(rule_fingerprint) is not None,
+        "obligation.rule_fingerprint must be sha256",
+    )
     _require(isinstance(role, str) and role.strip(), "obligation.role must be non-empty")
     exact_subject = validate_exact_ref(subject, "subject")
     normalized_authority = [validate_exact_ref(ref, f"authority[{i}]") for i, ref in enumerate(authority_refs)]
@@ -295,6 +311,7 @@ def compile_execution_obligation(
     prereq = _string_list(prerequisites, "prerequisites")
     bounded_constraints = _string_list(constraints, "constraints")
     material = build_freshness_material(
+        rule_fingerprint=rule_fingerprint,
         subject=exact_subject,
         authority_refs=normalized_authority,
         prerequisites=prereq,
@@ -306,6 +323,7 @@ def compile_execution_obligation(
     fingerprint = freshness_fingerprint(material)
     obligation_id = _sha256({
         "rule_id": rule_id,
+        "rule_fingerprint": rule_fingerprint,
         "role": role,
         "subject": exact_subject,
         "freshness_fingerprint": fingerprint,
@@ -407,6 +425,7 @@ def validate_execution_obligation(payload: Any) -> None:
              "obligation: invalid obligation_id")
     expected_id = _sha256({
         "rule_id": payload["rule_id"],
+        "rule_fingerprint": freshness["material"]["rule_fingerprint"],
         "role": payload["role"],
         "subject": subject,
         "freshness_fingerprint": fingerprint,
@@ -483,6 +502,29 @@ def serialize_result(payload: Mapping[str, Any]) -> bytes:
     return canonical_json(payload) + b"\n"
 
 
+def _require_result_acceptance_semantics(
+    result: Mapping[str, Any],
+    obligation: Mapping[str, Any],
+) -> None:
+    _require(
+        result["status"] == "success",
+        f"result: status {result['status']!r} is not eligible for acceptance",
+    )
+    _require(result["blocker"] is None, "result: successful result cannot carry a blocker")
+    if obligation["completion"]["tests"]:
+        _require(result["tests"], "result: required test outcomes are missing")
+    _require(
+        all(item["status"] == "green" for item in result["tests"]),
+        "result: non-green test outcome is not eligible for acceptance",
+    )
+    if obligation["completion"]["evidence"]:
+        _require(result["evidence"], "result: required evidence is missing")
+    _require(
+        not any(item["status"] == "failed" for item in result["readback"]),
+        "result: failed readback is not eligible for acceptance",
+    )
+
+
 def reconcile_execution_result(
     result: Mapping[str, Any],
     obligation: Mapping[str, Any],
@@ -499,6 +541,7 @@ def reconcile_execution_result(
              "result: original freshness binding mismatch")
     _require(result["subject"] == obligation["subject"],
              "result: subject binding mismatch")
+    _require_result_acceptance_semantics(result, obligation)
     current = freshness_fingerprint(current_freshness_material)
     prior = obligation["freshness"]["fingerprint"]
     if current == prior:
