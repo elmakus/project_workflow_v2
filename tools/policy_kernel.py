@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Mapping, Protocol
 
 from tools.obligation_contract import (
@@ -330,6 +330,12 @@ class PolicyKernel:
             for path in rule["inputs"]
         }
 
+    def _rule_role(self, rule_id: str) -> str:
+        rule = self._rules_by_id.get(rule_id)
+        if rule is None:
+            raise KernelContractError(f"unknown mechanical rule {rule_id!r}")
+        return PurePosixPath(rule["outcome"]["owner_module"]).stem.lower()
+
     def compile_obligations(
         self,
         rule_id: str,
@@ -346,14 +352,15 @@ class PolicyKernel:
             raise KernelContractError(
                 "determining_inputs are kernel-derived from the registered rule and canonical state"
             )
-        supplied_role = kwargs.pop("role", decision.obligation)
-        if supplied_role != decision.obligation:
+        expected_role = self._rule_role(rule_id)
+        supplied_role = kwargs.pop("role", expected_role)
+        if supplied_role != expected_role:
             raise KernelContractError(
-                f"{rule_id}: role {supplied_role!r} does not match registered obligation {decision.obligation!r}"
+                f"{rule_id}: role {supplied_role!r} does not match registered owner role {expected_role!r}"
             )
         return compile_execution_obligation(
             rule_id=rule_id,
-            role=decision.obligation,
+            role=expected_role,
             determining_inputs=self._rule_inputs(rule_id, canonical_state),
             **kwargs,
         )
@@ -377,10 +384,10 @@ class PolicyKernel:
         rule = self._rules_by_id.get(rule_id) if isinstance(rule_id, str) else None
         if rule is None:
             raise KernelContractError(f"unknown mechanical rule {rule_id!r}")
-        expected_role = rule["outcome"]["obligation"]
+        expected_role = self._rule_role(rule_id)
         if obligation.get("role") != expected_role:
             raise KernelContractError(
-                f"{rule_id}: obligation role does not match registered obligation {expected_role!r}"
+                f"{rule_id}: obligation role does not match registered owner role {expected_role!r}"
             )
         if not isinstance(current_freshness_material, Mapping):
             raise KernelContractError("current_freshness_material must be a mapping")
