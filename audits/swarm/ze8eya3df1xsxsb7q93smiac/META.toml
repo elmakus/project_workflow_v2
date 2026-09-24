@@ -1,0 +1,12 @@
+audit_kind = "pwv2_adversarial_swarm"
+audit_suffix = "ze8eya3df1xsxsb7q93smiac"
+repository = "elmakus/project_workflow_v2"
+subject_commit = "4fb4bfb7d7b1481d6f347c182fc96a5a1135e045"
+branch = "audit/pwv2-swarm-ze8eya3df1xsxsb7q93smiac"
+blind_discovery = true
+selected_attack_lenses = [
+  "helper vs documented semantics / parity drift / negative space",
+  "Close / finalization / end-of-approved-scope",
+  "stale commit/blob/path/result/review identity",
+  "Task Board / READY / active / DONE / JIT-trigger lifecycle",
+]
