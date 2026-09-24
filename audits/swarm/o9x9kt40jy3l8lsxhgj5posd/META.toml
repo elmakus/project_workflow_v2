@@ -1,0 +1,12 @@
+audit_kind = "pwv2_adversarial_swarm"
+audit_suffix = "o9x9kt40jy3l8lsxhgj5posd"
+repository = "elmakus/project_workflow_v2"
+subject_commit = "4fb4bfb7d7b1481d6f347c182fc96a5a1135e045"
+branch = "audit/pwv2-swarm-o9x9kt40jy3l8lsxhgj5posd"
+blind_discovery = true
+selected_attack_lenses = [
+  "plugin / install / update / SessionStart / bootstrap drift",
+  "Planning / Premium gates / Execution precedence",
+  "RED / recovery / blocker / interrupted-runtime continuation",
+  "helper vs documented semantics / parity drift / negative space",
+]
