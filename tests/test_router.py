@@ -1233,6 +1233,48 @@ class RouterTests(unittest.TestCase):
             finally:
                 temp.cleanup()
 
+    def test_epoch_reset_rejects_unaccepted_authority_root_in_router(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            self.add_review_attempt(
+                project,
+                "red",
+                "R01",
+                finding_ids=("F1",),
+                defect_class_ids=("class-a",),
+            )
+            review_path = self.add_review_attempt(
+                project,
+                "pending",
+                "R02",
+                review_epoch="E02",
+                epoch_reset_basis="Claimed accepted redesign",
+            )
+            path = project / review_path
+            text = path.read_text()
+            text = text.replace(
+                "[subject]\n",
+                '[epoch_reset_subject]\n'
+                'class = "accepted_redesign"\n'
+                'repository = "owner/router-fixture"\n'
+                f'commit = "{"c" * 40}"\n'
+                'path = "requirements/UNACCEPTED_DRAFT.md"\n'
+                f'blob = "{"d" * 40}"\n'
+                "\n[subject]\n",
+                1,
+            )
+            path.write_text(text)
+
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("exact accepted authority", routed.reason)
+        finally:
+            temp.cleanup()
+
     def test_active_legacy_shaped_review_attempt_fails_closed(self) -> None:
         temp, project = self.copy_fixture()
         try:
