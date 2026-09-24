@@ -42,12 +42,16 @@ def _require(condition: bool, message: str) -> None:
 
 
 def canonical_json(value: Any) -> bytes:
-    return json.dumps(
-        value,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-    ).encode("utf-8")
+    try:
+        return json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise ExecutionEnvelopeError("canonical JSON value must be finite and JSON-serializable") from exc
 
 
 def _sha256(value: Any) -> str:
