@@ -865,7 +865,13 @@ class TypedExecutionContractTests(unittest.TestCase):
         )
         self.assertEqual(
             obligation["freshness"]["material"]["inputs"],
-            {"board.cards": canonical_state["board"]["cards"]},
+            {
+                "board.cards": {
+                    "ready": ["M02-T01"],
+                    "in_progress": [],
+                    "blocked": [],
+                }
+            },
         )
 
         registry_payload = json.loads(REGISTRY.read_text(encoding="utf-8"))
@@ -910,20 +916,102 @@ class TypedExecutionContractTests(unittest.TestCase):
             same["freshness"]["fingerprint"],
         )
 
-        material_state_change = copy.deepcopy(canonical_state)
-        material_state_change["board"]["cards"].append(
-            {"id": "M00-T99", "status": "done"}
+        unrelated_done_sibling = copy.deepcopy(canonical_state)
+        unrelated_done_sibling["board"]["cards"].append(
+            {
+                "id": "M00-T99",
+                "status": "done",
+                "review_attempts": [{"path": "reviews/unrelated.toml"}],
+            }
         )
-        changed = kernel.compile_obligations(
+        same_with_done_sibling = kernel.compile_obligations(
             "PWV21-K011",
-            canonical_state=material_state_change,
+            canonical_state=unrelated_done_sibling,
             **compile_args,
         )
-        self.assertNotEqual(
+        self.assertEqual(
             obligation["freshness"]["fingerprint"],
-            changed["freshness"]["fingerprint"],
+            same_with_done_sibling["freshness"]["fingerprint"],
         )
-        self.assertNotEqual(obligation["obligation_id"], changed["obligation_id"])
+        self.assertEqual(obligation["obligation_id"], same_with_done_sibling["obligation_id"])
+
+        reordered_metadata_noise = copy.deepcopy(unrelated_done_sibling)
+        reordered_metadata_noise["board"]["cards"].reverse()
+        done_card = next(
+            card for card in reordered_metadata_noise["board"]["cards"]
+            if card["id"] == "M01-T01"
+        )
+        done_card["result"] = {"path": "results/irrelevant-to-K011.md"}
+        same_reordered = kernel.compile_obligations(
+            "PWV21-K011",
+            canonical_state=reordered_metadata_noise,
+            **compile_args,
+        )
+        self.assertEqual(
+            obligation["freshness"]["fingerprint"],
+            same_reordered["freshness"]["fingerprint"],
+        )
+        self.assertEqual(obligation["obligation_id"], same_reordered["obligation_id"])
+
+        blocked_sibling = copy.deepcopy(canonical_state)
+        blocked_sibling["board"]["cards"].append(
+            {"id": "M00-T98", "status": "blocked"}
+        )
+        self.assertEqual(
+            kernel.reconcile(
+                self.result(obligation),
+                obligation,
+                canonical_state=blocked_sibling,
+                current_freshness_material=obligation["freshness"]["material"],
+                observed_canonical_state={"board": {"revision": 9}},
+            ),
+            "reexecute",
+        )
+
+        close_state = {
+            "board": {
+                "cards": [
+                    {"id": "M02-T01", "status": "done", "review_attempts": ["ignored"]},
+                    {"id": "M01-T01", "status": "done"},
+                ]
+            }
+        }
+        close_obligation = kernel.compile_obligations(
+            "PWV21-K012",
+            canonical_state=close_state,
+            **compile_args,
+        )
+        self.assertEqual(
+            close_obligation["freshness"]["material"]["inputs"],
+            {
+                "board.cards": [
+                    {"id": "M01-T01", "status": "done"},
+                    {"id": "M02-T01", "status": "done"},
+                ]
+            },
+        )
+        close_noise = copy.deepcopy(close_state)
+        close_noise["board"]["cards"].reverse()
+        close_noise["board"]["cards"][0]["result"] = {"path": "results/ignored.md"}
+        same_close = kernel.compile_obligations(
+            "PWV21-K012",
+            canonical_state=close_noise,
+            **compile_args,
+        )
+        self.assertEqual(
+            close_obligation["freshness"]["fingerprint"],
+            same_close["freshness"]["fingerprint"],
+        )
+        self.assertEqual(close_obligation["obligation_id"], same_close["obligation_id"])
+
+        close_material_change = copy.deepcopy(close_state)
+        close_material_change["board"]["cards"][0]["status"] = "ready"
+        with self.assertRaisesRegex(Exception, "does not match current canonical state"):
+            kernel.compile_obligations(
+                "PWV21-K012",
+                canonical_state=close_material_change,
+                **compile_args,
+            )
 
         with self.assertRaisesRegex(Exception, "role .* does not match registered owner role"):
             kernel.compile_obligations(
