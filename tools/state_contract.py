@@ -950,6 +950,8 @@ def validate_review_history(
     pre_convergence_prefix = True
     current_epoch: str | None = None
     current_scope: str | None = None
+    seen_epoch_ids: set[str] = set()
+    post_convergence_terminal_epoch: str | None = None
     nonterminal = 0
     for index, attempt in enumerate(attempts):
         validate_review(attempt)
@@ -975,18 +977,27 @@ def validate_review_history(
                          "review_history: initial convergence-aware epoch must not claim reset basis")
                 current_epoch = epoch
                 current_scope = scope
+                seen_epoch_ids.add(epoch)
             elif epoch != current_epoch:
                 _require(bool(reset_basis.strip()),
                          "review_history: changed review_epoch requires durable accepted-redesign reset basis")
                 _require(scope == current_scope,
                          "review_history: review_scope cannot change across epoch reset in one review history")
+                _require(epoch not in seen_epoch_ids,
+                         "review_history: review_epoch identity cannot be reused after reset")
                 current_epoch = epoch
+                seen_epoch_ids.add(epoch)
+                post_convergence_terminal_epoch = None
                 open_findings.clear()
             else:
                 _require(reset_basis == "",
                          "review_history: unchanged review_epoch must not claim reset basis")
                 _require(scope == current_scope,
                          "review_history: review_scope cannot change inside one review history")
+                _require(
+                    post_convergence_terminal_epoch != epoch,
+                    "review_history: terminal post-convergence validation requires structural resolution or a new accepted-redesign epoch",
+                )
         else:
             _require(pre_convergence_prefix,
                      "review_history: pre-convergence attempts must form the initial historical prefix")
@@ -1040,16 +1051,29 @@ def validate_review_history(
             _require(set(attempt["material_finding_ids"]).issubset(set(source_findings)),
                      "review_history: closure may verify only findings frozen by its source discovery")
             if convergence_aware:
-                _require(convergence_fields_present(source),
-                         "review_history: convergence-aware closure requires convergence-aware source discovery")
-                _require(source["review_epoch"] == attempt["review_epoch"],
-                         "review_history: closure cannot cross review epochs")
-                source_classes = material_defect_classes(source)
                 closure_classes = material_defect_classes(attempt)
-                _require(closure_classes.issubset(source_classes),
-                         "review_history: closure may verify only defect classes frozen by its source discovery")
+                if convergence_fields_present(source):
+                    _require(source["review_epoch"] == attempt["review_epoch"],
+                             "review_history: closure cannot cross review epochs")
+                    source_classes = material_defect_classes(source)
+                    _require(closure_classes.issubset(source_classes),
+                             "review_history: closure may verify only defect classes frozen by its source discovery")
+                else:
+                    # A terminal explicit T01 discovery may still have open findings when
+                    # convergence accounting is introduced. Its frozen finding IDs remain
+                    # authoritative; the first T02 closure durably introduces class identity
+                    # without retroactively inventing discovery-epoch accounting.
+                    _require("review_kind" in source,
+                             "review_history: convergence-aware closure cannot adapt legacy source without frozen finding IDs")
             if attempt["verdict"] == "green":
                 open_findings[source_id].difference_update(attempt["material_finding_ids"])
+
+        if (
+            convergence_aware
+            and attempt.get("post_convergence_validation") is True
+            and attempt["verdict"] in {"green", "red"}
+        ):
+            post_convergence_terminal_epoch = attempt["review_epoch"]
 
         attempts_by_id[attempt_id] = attempt
         if attempt["verdict"] in {"pending", "in_progress"}:
