@@ -19,7 +19,7 @@ An obligation binds:
 
 The obligation is derived and disposable. It is not a second project-state store. Canonical JSON serialization rejects non-finite numeric values and any value that cannot be represented as standard JSON.
 
-`obligation_id` is content-derived from the registered rule, exact role, exact subject and current relevant freshness fingerprint. The production kernel derives the rule-owned determining inputs from the registered rule's declared canonical input paths and the current canonical state; callers cannot substitute an arbitrary determining-input projection or a role that disagrees with the registered outcome. Equivalent determining inputs serialize byte-identically. Unrelated repository state is excluded from the fingerprint rather than hashed for convenience.
+`obligation_id` is content-derived from the registered rule, exact role, exact subject and current relevant freshness fingerprint. The production kernel derives the rule-owned determining inputs from the registered rule's declared canonical input paths and the current canonical state; it also derives the semantic role from the rule's registered owner module. Callers cannot substitute an arbitrary determining-input projection or a role that disagrees with that owner. Equivalent determining inputs serialize byte-identically. Unrelated repository state is excluded from the fingerprint rather than hashed for convenience.
 
 ## Authority resolution
 
@@ -69,4 +69,4 @@ Blind duplicate external effects are forbidden.
 
 ## Kernel seams
 
-`PolicyKernel.compile_obligations()`, `validate_results()`, and `reconcile()` are the M02 entry points. Compilation accepts only an existing registered rule ID that matches current canonical state, binds the registered semantic obligation/role, and derives the rule's declared canonical determining inputs itself; it does not create a second rule vocabulary or general workflow DSL. Reconciliation refreshes those registered rule inputs from current canonical state before recomputing freshness.
+`PolicyKernel.compile_obligations()`, `validate_results()`, and `reconcile()` are the M02 entry points. Compilation accepts only an existing registered rule ID that matches current canonical state, binds the semantic role to the registered owner module, and derives the rule's declared canonical determining inputs itself; it does not create a second rule vocabulary or general workflow DSL. Reconciliation refreshes those registered rule inputs from current canonical state before recomputing freshness.
