@@ -193,48 +193,30 @@ class StateEnvelopeTests(unittest.TestCase):
         closure["subject"]["blob"] = "4" * 40
         validate_review_history([base, closure])
 
-        unknown_source = copy.deepcopy(closure)
-        unknown_source["source_discovery_attempt"] = "R99"
-        with self.assertRaisesRegex(ValidationError, "earlier attempt"):
-            validate_review_history([base, unknown_source])
-
-        foreign_finding = copy.deepcopy(closure)
-        foreign_finding["material_finding_ids"] = ["F3"]
-        with self.assertRaisesRegex(ValidationError, "only findings frozen"):
-            validate_review_history([base, foreign_finding])
-
-        incomplete_discovery = copy.deepcopy(base)
-        incomplete_discovery["discovery_complete"] = False
-        with self.assertRaisesRegex(ValidationError, "complete acceptance-surface"):
-            validate_review(incomplete_discovery)
-
-        green_with_blocker = copy.deepcopy(base)
-        green_with_blocker["verdict"] = "green"
-        with self.assertRaisesRegex(ValidationError, "cannot retain material blocking"):
-            validate_review(green_with_blocker)
-
-    def test_pw21_discovery_and_closure_history_is_explicit_and_bounded(self) -> None:
-        base = read_toml(VALID / "REVIEW_ATTEMPT.toml")
-        base.update({
+        premature_discovery = copy.deepcopy(base)
+        premature_discovery.update({
+            "attempt": "R03",
             "review_kind": "discovery",
             "source_discovery_attempt": "",
-            "discovery_complete": True,
-            "material_finding_ids": ["F1", "F2"],
-            "verdict": "red",
-        })
-        validate_review(base)
-
-        closure = copy.deepcopy(base)
-        closure.update({
-            "attempt": "R02",
-            "review_kind": "closure_verification",
-            "source_discovery_attempt": "R01",
             "discovery_complete": False,
-            "material_finding_ids": ["F1"],
-            "verdict": "green",
+            "material_finding_ids": [],
+            "verdict": "pending",
+            "evidence_path": "",
         })
-        closure["subject"]["blob"] = "4" * 40
-        validate_review_history([base, closure])
+        premature_discovery["subject"]["blob"] = "4" * 40
+        with self.assertRaisesRegex(ValidationError, "before all known material findings"):
+            validate_review_history([base, closure, premature_discovery])
+
+        closure_two = copy.deepcopy(closure)
+        closure_two.update({
+            "attempt": "R03",
+            "material_finding_ids": ["F2"],
+        })
+        validate_review_history([base, closure, closure_two])
+
+        next_discovery = copy.deepcopy(premature_discovery)
+        next_discovery["attempt"] = "R04"
+        validate_review_history([base, closure, closure_two, next_discovery])
 
         unknown_source = copy.deepcopy(closure)
         unknown_source["source_discovery_attempt"] = "R99"
@@ -255,6 +237,36 @@ class StateEnvelopeTests(unittest.TestCase):
         green_with_blocker["verdict"] = "green"
         with self.assertRaisesRegex(ValidationError, "cannot retain material blocking"):
             validate_review(green_with_blocker)
+
+        legacy_active = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        legacy_active["verdict"] = "pending"
+        legacy_active["evidence_path"] = ""
+        with self.assertRaisesRegex(ValidationError, "explicit review_kind"):
+            validate_review_history([legacy_active])
+
+        historical = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        explicit_after_history = copy.deepcopy(historical)
+        explicit_after_history.update({
+            "attempt": "R02",
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": False,
+            "material_finding_ids": [],
+            "verdict": "pending",
+            "evidence_path": "",
+        })
+        validate_review_history([historical, explicit_after_history])
+
+        legacy_after_explicit = copy.deepcopy(historical)
+        legacy_after_explicit["attempt"] = "R03"
+        explicit_terminal = copy.deepcopy(explicit_after_history)
+        explicit_terminal.update({
+            "verdict": "green",
+            "discovery_complete": True,
+            "evidence_path": historical["evidence_path"],
+        })
+        with self.assertRaisesRegex(ValidationError, "initial historical prefix"):
+            validate_review_history([historical, explicit_terminal, legacy_after_explicit])
 
     def test_task_card_review_acceptance_is_exact_and_semantic(self) -> None:
         review = {
