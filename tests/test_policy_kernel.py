@@ -8,7 +8,6 @@ from pathlib import Path
 
 from tools.policy_kernel import (
     DEFAULT_PREDICATES,
-    DeferredKernelCapabilityError,
     KernelContractError,
     MechanicalDecision,
     PolicyKernel,
