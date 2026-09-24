@@ -162,6 +162,25 @@ class TypedExecutionContractTests(unittest.TestCase):
                 mutation_postconditions=[],
             )
 
+        invalid_subject = copy.deepcopy(self.subject)
+        invalid_subject["repository"] = "owner/project/extra"
+        with self.assertRaisesRegex(ExecutionEnvelopeError, "repository must be owner/name"):
+            compile_execution_obligation(
+                rule_id="PWV21-K011",
+                role="execution_prep",
+                subject=invalid_subject,
+                authority_refs=self.authority_refs,
+                authority_reader=self.reader,
+                prerequisites=[],
+                constraints=[],
+                acceptance=[],
+                tests=[],
+                evidence_requirements=[],
+                determining_inputs={"card_id": "M02-T01"},
+                mutation_preconditions=[],
+                mutation_postconditions=[],
+            )
+
         wrong_blob = copy.deepcopy(self.authority_refs)
         wrong_blob[0]["blob"] = "d" * 40
         with self.assertRaisesRegex(ExecutionEnvelopeError, "blob mismatch"):
@@ -200,6 +219,34 @@ class TypedExecutionContractTests(unittest.TestCase):
         result["session_id"] = "session-7"
         with self.assertRaisesRegex(ExecutionEnvelopeError, "telemetry key"):
             validate_execution_result(result)
+
+    def test_obligation_identity_and_freshness_surface_reject_drift(self) -> None:
+        obligation = self.obligation()
+
+        changed = copy.deepcopy(obligation)
+        changed["role"] = "review"
+        with self.assertRaisesRegex(ExecutionEnvelopeError, "deterministic identity drift"):
+            validate_execution_obligation(changed)
+
+        drift_cases = {
+            "prerequisites": ["different dependency"],
+            "constraints": ["different constraint"],
+            "completion": {
+                "acceptance": ["different acceptance"],
+                "tests": ["contract suite GREEN"],
+                "evidence": ["durable evidence"],
+            },
+            "mutation": {
+                "preconditions": [{"path": "board.revision", "equals": 8}],
+                "postconditions": [{"path": "board.revision", "equals": 10}],
+            },
+        }
+        for field, replacement in drift_cases.items():
+            with self.subTest(field=field):
+                changed = copy.deepcopy(obligation)
+                changed[field] = replacement
+                with self.assertRaisesRegex(ExecutionEnvelopeError, f"{field}/freshness drift"):
+                    validate_execution_obligation(changed)
 
     def test_result_binding_staleness_and_safe_reuse_are_explicit(self) -> None:
         obligation = self.obligation()
@@ -256,6 +303,20 @@ class TypedExecutionContractTests(unittest.TestCase):
                 obligation,
                 current_freshness_material=stale_material,
                 stale_resolution=unsafe,
+            )
+
+        mismatched_subject = self.result(obligation)
+        mismatched_subject["subject"] = {
+            "repository": "owner/project",
+            "commit": "d" * 40,
+            "path": "implementation/cards/OTHER.md",
+            "blob": "e" * 40,
+        }
+        with self.assertRaisesRegex(ExecutionEnvelopeError, "subject binding mismatch"):
+            reconcile_execution_result(
+                mismatched_subject,
+                obligation,
+                current_freshness_material=obligation["freshness"]["material"],
             )
 
         mismatched = self.result(obligation)

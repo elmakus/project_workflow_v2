@@ -19,7 +19,7 @@ An obligation binds:
 
 The obligation is derived and disposable. It is not a second project-state store.
 
-`obligation_id` is content-derived from the registered rule, exact subject and current relevant freshness fingerprint. Equivalent determining inputs serialize byte-identically. Unrelated repository state is excluded from the fingerprint rather than hashed for convenience.
+`obligation_id` is content-derived from the registered rule, exact role, exact subject and current relevant freshness fingerprint. Equivalent determining inputs serialize byte-identically. Unrelated repository state is excluded from the fingerprint rather than hashed for convenience.
 
 ## Authority resolution
 
@@ -46,9 +46,9 @@ Before acceptance, PW validates the result against the exact obligation and reco
 
 - unchanged fingerprint -> `accept`;
 - stale without a bounded safety proof -> `reexecute`;
-- stale with exact old/new fingerprint binding, an explicit materially-unchanged proof and durable basis -> `reuse`.
+- stale with exact old/new fingerprint binding, an explicit materially-unchanged proof and durable basis -> explicit `reuse`, `rebase`, or `reconcile`.
 
-A stale result is never silently accepted. Reuse is allowed only when safety is positively proven.
+A stale result is never silently accepted. Reuse, rebase, or reconcile is allowed only when safety is positively proven.
 
 ## Governed mutation and readback
 

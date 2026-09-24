@@ -17,6 +17,7 @@ SUPPORTED_SCHEMA_VERSION = 1
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 RULE_ID = re.compile(r"^PWV21-K[0-9]{3}$")
+REPOSITORY = re.compile(r"^[^/]+/[^/]+$")
 RESULT_STATUSES = {"success", "blocked", "failed"}
 TEST_STATUSES = {"green", "red", "not_run"}
 READBACK_STATUSES = {"verified", "failed", "not_applicable"}
@@ -83,7 +84,7 @@ def validate_exact_ref(ref: Any, label: str = "ref") -> dict[str, str]:
     expected = {"repository", "commit", "path", "blob"}
     _require(set(ref) == expected, f"{label}: exact ref keys must be {sorted(expected)}")
     repository = ref["repository"]
-    _require(isinstance(repository, str) and "/" in repository and not repository.startswith("/"),
+    _require(isinstance(repository, str) and REPOSITORY.fullmatch(repository) is not None,
              f"{label}: repository must be owner/name")
     commit = ref["commit"]
     blob = ref["blob"]
@@ -273,6 +274,7 @@ def compile_execution_obligation(
     fingerprint = freshness_fingerprint(material)
     obligation_id = _sha256({
         "rule_id": rule_id,
+        "role": role,
         "subject": exact_subject,
         "freshness_fingerprint": fingerprint,
     })
@@ -359,11 +361,20 @@ def validate_execution_obligation(payload: Any) -> None:
              "obligation: authority bundle/freshness drift")
     _require(subject == freshness["material"]["subject"],
              "obligation: subject/freshness drift")
+    _require(payload["prerequisites"] == freshness["material"]["prerequisites"],
+             "obligation: prerequisites/freshness drift")
+    _require(payload["constraints"] == freshness["material"]["constraints"],
+             "obligation: constraints/freshness drift")
+    _require(payload["completion"] == freshness["material"]["completion"],
+             "obligation: completion/freshness drift")
+    _require(payload["mutation"] == freshness["material"]["mutation"],
+             "obligation: mutation/freshness drift")
     obligation_id = payload["obligation_id"]
     _require(isinstance(obligation_id, str) and SHA256.fullmatch(obligation_id) is not None,
              "obligation: invalid obligation_id")
     expected_id = _sha256({
         "rule_id": payload["rule_id"],
+        "role": payload["role"],
         "subject": subject,
         "freshness_fingerprint": fingerprint,
     })
@@ -443,6 +454,8 @@ def reconcile_execution_result(
              "result: obligation binding mismatch")
     _require(result["freshness_fingerprint"] == obligation["freshness"]["fingerprint"],
              "result: original freshness binding mismatch")
+    _require(result["subject"] == obligation["subject"],
+             "result: subject binding mismatch")
     current = freshness_fingerprint(current_freshness_material)
     prior = obligation["freshness"]["fingerprint"]
     if current == prior:
