@@ -327,7 +327,8 @@ def validate_execution_obligation(payload: Any) -> None:
     }
     _require(set(payload) == expected, "obligation: invalid top-level keys")
     _require(payload["kind"] == OBLIGATION_KIND, "obligation: wrong kind")
-    _require(payload["schema_version"] == SUPPORTED_SCHEMA_VERSION,
+    _require(not isinstance(payload["schema_version"], bool)
+             and payload["schema_version"] == SUPPORTED_SCHEMA_VERSION,
              f"obligation: unsupported schema_version {payload['schema_version']!r}")
     _require(isinstance(payload["rule_id"], str) and RULE_ID.fullmatch(payload["rule_id"]) is not None,
              "obligation: invalid rule_id")
@@ -400,7 +401,8 @@ def validate_execution_result(payload: Any) -> None:
     }
     _require(set(payload) == expected, "result: invalid top-level keys")
     _require(payload["kind"] == RESULT_KIND, "result: wrong kind")
-    _require(payload["schema_version"] == SUPPORTED_SCHEMA_VERSION,
+    _require(not isinstance(payload["schema_version"], bool)
+             and payload["schema_version"] == SUPPORTED_SCHEMA_VERSION,
              f"result: unsupported schema_version {payload['schema_version']!r}")
     for key in ("obligation_id", "freshness_fingerprint"):
         _require(isinstance(payload[key], str) and SHA256.fullmatch(payload[key]) is not None,
