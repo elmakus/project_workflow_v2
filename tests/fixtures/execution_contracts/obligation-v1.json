@@ -32,7 +32,7 @@
     "canonical writes are coordinator-owned"
   ],
   "freshness": {
-    "fingerprint": "sha256:d48d536bbd1a031ef7d2005c927517dc16fdc74f14a83e09515b936316cf0c0a",
+    "fingerprint": "sha256:8065e976982799ab7fec91036d479e31053ae8811c5ca8a3f40e319ea564ca36",
     "material": {
       "authority": [
         {
@@ -88,7 +88,8 @@
         "commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "path": "implementation/cards/M02-T01.md",
         "repository": "owner/project"
-      }
+      },
+      "rule_fingerprint": "sha256:65c334ebb3b1164b9f2918b3af0447cd976082be77e3b36436a5ea9f31a16539"
     }
   },
   "kind": "pwv2_execution_obligation",
@@ -106,7 +107,7 @@
       }
     ]
   },
-  "obligation_id": "sha256:cd82f63081b606cf66ed00a9af03527034fb83e09885aad7f3aadb4e6bbc9b56",
+  "obligation_id": "sha256:5ba6a5fbe7c5dc2a5740ab698641d800e7f9b3546aeee648fbe59518f4505481",
   "prerequisites": [
     "M01-T01 DONE"
   ],
