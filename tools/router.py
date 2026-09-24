@@ -327,6 +327,7 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             ):
                 raise ValidationError("Definition source does not match exact promoted Brainstorming revision")
 
+        plan_gate_passed_with_board = False
         if definition is not None:
             if definition["state"] == "active":
                 return result(
@@ -408,28 +409,32 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             if planning["review_mode"] == "editorial_exempt":
                 if plan_review is None or plan_review["verdict"] != "green":
                     raise ValidationError("editorial exemption requires prior exact GREEN Plan Review")
-                return result(
-                    reads, "route", "execution_prep",
-                    "Editorial/mechanical-only plan change preserves prior GREEN review and satisfied C; no new Stage-6 review is due",
-                    subject=subject_key, owner_module="workflow/EXECUTION_PREP.md",
-                )
+                if "task_board" not in workstream:
+                    return result(
+                        reads, "route", "execution_prep",
+                        "Editorial/mechanical-only plan change preserves prior GREEN review and satisfied C; no new Stage-6 review is due",
+                        subject=subject_key, owner_module="workflow/EXECUTION_PREP.md",
+                    )
+                plan_gate_passed_with_board = True
+            else:
+                if plan_review is None or plan_review["verdict"] != "green":
+                    raise ValidationError("approved plan requires exact GREEN Plan Review")
+                if planning["premium_c"] == "due":
+                    return result(
+                        reads, "stop", "premium_C",
+                        "GREEN Plan Review is approved; premium stop C is due before Execution Prep; "
+                        "recommend switching to a lighter/cheaper model/context for Execution Prep",
+                        subject=subject_key, owner_module="workflow/PLANNING.md",
+                    )
+                if "task_board" not in workstream:
+                    return result(
+                        reads, "route", "execution_prep",
+                        "Premium stop C is satisfied; common Execution Prep owns Card materialization",
+                        subject=subject_key, owner_module="workflow/EXECUTION_PREP.md",
+                    )
+                plan_gate_passed_with_board = True
 
-            if plan_review is None or plan_review["verdict"] != "green":
-                raise ValidationError("approved plan requires exact GREEN Plan Review")
-            if planning["premium_c"] == "due":
-                return result(
-                    reads, "stop", "premium_C",
-                    "GREEN Plan Review is approved; premium stop C is due before Execution Prep; "
-                    "recommend switching to a lighter/cheaper model/context for Execution Prep",
-                    subject=subject_key, owner_module="workflow/PLANNING.md",
-                )
-            return result(
-                reads, "route", "execution_prep",
-                "Premium stop C is satisfied; common Execution Prep owns Card materialization",
-                subject=subject_key, owner_module="workflow/EXECUTION_PREP.md",
-            )
-
-        if brainstorm is not None:
+        if not plan_gate_passed_with_board and brainstorm is not None:
             exact_scope = f"{brainstorm['scope_id']}@{brainstorm['revision']}"
             if brainstorm["explicit_user_stop"]:
                 return result(
@@ -455,7 +460,7 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                 subject=exact_scope, owner_module="workflow/DEFINITION.md",
             )
 
-        if "task_board" not in workstream:
+        if not plan_gate_passed_with_board and "task_board" not in workstream:
             if intake is None:
                 raise ValidationError("selected workstream has no routable pre-execution state or Task Board")
             if intake["kind"] == "issue" and intake["micro_fix_candidate"]:
