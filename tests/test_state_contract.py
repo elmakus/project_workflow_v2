@@ -158,6 +158,10 @@ class StateEnvelopeTests(unittest.TestCase):
         pending["attempt"] = "R02"
         pending["verdict"] = "pending"
         pending["evidence_path"] = ""
+        pending["review_kind"] = "discovery"
+        pending["source_discovery_attempt"] = ""
+        pending["discovery_complete"] = False
+        pending["material_finding_ids"] = []
         pending["subject"]["blob"] = "4" * 40
         validate_review_history([base, pending])
 
@@ -275,6 +279,10 @@ class StateEnvelopeTests(unittest.TestCase):
             "attempt": "R01",
             "verdict": "pending",
             "evidence_path": "",
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": False,
+            "material_finding_ids": [],
             "subject": {
                 "class": "git_blob",
                 "repository": "owner/repo",
