@@ -268,14 +268,16 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           }
         },
         "constraints": {
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           }
         },
         "completion": {
@@ -297,22 +299,7 @@
       "then": {
         "propertyNames": {
           "not": {
-            "enum": [
-              "provider",
-              "model",
-              "model_id",
-              "worker",
-              "worker_id",
-              "session",
-              "session_id",
-              "retry",
-              "retries",
-              "worktree",
-              "paseo",
-              "runtime",
-              "invocation",
-              "scheduler"
-            ]
+            "pattern": "^(?:[pP][rR][oO][vV][iI][dD][eE][rR]|[mM][oO][dD][eE][lL]|[mM][oO][dD][eE][lL]_[iI][dD]|[wW][oO][rR][kK][eE][rR]|[wW][oO][rR][kK][eE][rR]_[iI][dD]|[sS][eE][sS][sS][iI][oO][nN]|[sS][eE][sS][sS][iI][oO][nN]_[iI][dD]|[rR][eE][tT][rR][yY]|[rR][eE][tT][rR][iI][eE][sS]|[wW][oO][rR][kK][tT][rR][eE][eE]|[pP][aA][sS][eE][oO]|[rR][uU][nN][tT][iI][mM][eE]|[iI][nN][vV][oO][cC][aA][tT][iI][oO][nN]|[sS][cC][hH][eE][dD][uU][lL][eE][rR])$"
           }
         },
         "additionalProperties": {
