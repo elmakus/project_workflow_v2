@@ -9,7 +9,10 @@ import tomllib
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from tools.review_contract import REVIEW_KINDS, review_kind
+try:
+    from tools.review_contract import REVIEW_KINDS, review_kind
+except ModuleNotFoundError:  # direct script execution from tools/
+    from review_contract import REVIEW_KINDS, review_kind
 
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 CARD_STATUSES = {"planned", "ready", "in_progress", "blocked", "done"}
