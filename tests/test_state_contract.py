@@ -340,6 +340,23 @@ class StateEnvelopeTests(unittest.TestCase):
         reset["epoch_reset_subject"]["path"] = reset["acceptance"]["path"]
         validate_review_history([base, reset])
 
+        foreign_repository = copy.deepcopy(reset)
+        foreign_repository["epoch_reset_subject"]["repository"] = "other/repository"
+        with self.assertRaisesRegex(ValidationError, "reviewed project repository"):
+            validate_review_history([base, foreign_repository])
+
+        arbitrary_authority_root = copy.deepcopy(reset)
+        arbitrary_authority_root["epoch_reset_subject"]["path"] = "requirements/UNACCEPTED_DRAFT.md"
+        with self.assertRaisesRegex(ValidationError, "exact accepted authority"):
+            validate_review_history([base, arbitrary_authority_root])
+
+        accepted_authority = copy.deepcopy(arbitrary_authority_root)
+        accepted_authority["epoch_reset_subject"]["path"] = "requirements/ACCEPTED.md"
+        validate_review_history(
+            [base, accepted_authority],
+            accepted_authority_paths={"requirements/ACCEPTED.md"},
+        )
+
         same_epoch_claim = copy.deepcopy(base)
         same_epoch_claim.update({
             "attempt": "R02",
