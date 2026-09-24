@@ -14,7 +14,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping, Protocol
 
-from tools.obligation_contract import (\n    compile_execution_obligation,\n    reconcile_execution_result,\n    validate_execution_result,\n)\nfrom tools.state_contract import ValidationError\n
+from tools.obligation_contract import (
+    compile_execution_obligation,
+    reconcile_execution_result,
+    validate_execution_result,
+)
+from tools.state_contract import ValidationError
+
 SUPPORTED_REGISTRY_VERSION = 1
 SUPPORTED_SCHEMA_VERSION = 1
 REGISTRY_KIND = "pwv2_mechanical_policy"
