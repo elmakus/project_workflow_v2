@@ -681,7 +681,6 @@ class TypedExecutionContractTests(unittest.TestCase):
                 result,
                 obligation,
                 current_freshness_material=obligation["freshness"]["material"],
-                observed_canonical_state={"board": {"revision": 9}},
             )
 
     def test_unknown_external_effect_never_authorizes_blind_retry(self) -> None:
