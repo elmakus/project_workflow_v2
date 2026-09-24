@@ -4,6 +4,10 @@ card_id = "M03-T01"
 attempt = "R01"
 verdict = "pending"
 evidence_path = ""
+review_kind = "discovery"
+source_discovery_attempt = ""
+discovery_complete = false
+material_finding_ids = []
 
 [subject]
 class = "git_blob"
