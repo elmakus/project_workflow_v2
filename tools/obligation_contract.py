@@ -83,6 +83,19 @@ def _reject_telemetry_keys(value: Any, where: str = "$") -> None:
             _reject_telemetry_keys(child, f"{where}[{index}]")
 
 
+def validate_git_subject(subject: Any, label: str = "subject") -> dict[str, str]:
+    _require(isinstance(subject, Mapping), f"{label}: exact Git subject must be an object")
+    expected = {"repository", "commit"}
+    _require(set(subject) == expected, f"{label}: exact Git subject keys must be {sorted(expected)}")
+    repository = subject["repository"]
+    _require(isinstance(repository, str) and REPOSITORY.fullmatch(repository) is not None,
+             f"{label}: repository must be owner/name")
+    commit = subject["commit"]
+    _require(isinstance(commit, str) and SHA40.fullmatch(commit) is not None,
+             f"{label}: commit must be exact 40-hex")
+    return {"repository": repository, "commit": commit}
+
+
 def validate_exact_ref(ref: Any, label: str = "ref") -> dict[str, str]:
     _require(isinstance(ref, Mapping), f"{label}: exact ref must be an object")
     expected = {"repository", "commit", "path", "blob"}
@@ -396,7 +409,7 @@ def validate_execution_result(payload: Any) -> None:
     _reject_telemetry_keys(payload, "result")
     expected = {
         "kind", "schema_version", "obligation_id", "freshness_fingerprint", "status",
-        "subject", "changed_artifacts", "tests", "evidence", "readback",
+        "subject", "result_subject", "changed_artifacts", "tests", "evidence", "readback",
         "blocker", "semantic_outcome",
     }
     _require(set(payload) == expected, "result: invalid top-level keys")
@@ -409,6 +422,7 @@ def validate_execution_result(payload: Any) -> None:
                  f"result: invalid {key}")
     _require(payload["status"] in RESULT_STATUSES, "result: invalid status")
     validate_exact_ref(payload["subject"], "result.subject")
+    validate_git_subject(payload["result_subject"], "result.result_subject")
     changed = payload["changed_artifacts"]
     _require(isinstance(changed, list), "result.changed_artifacts must be array")
     for index, ref in enumerate(changed):

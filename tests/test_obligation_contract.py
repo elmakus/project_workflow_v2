@@ -100,6 +100,10 @@ class TypedExecutionContractTests(unittest.TestCase):
             "freshness_fingerprint": obligation["freshness"]["fingerprint"],
             "status": "success",
             "subject": self.subject,
+            "result_subject": {
+                "repository": "owner/project",
+                "commit": "d" * 40,
+            },
             "changed_artifacts": [],
             "tests": [
                 {"name": "contract suite", "status": "green", "evidence": "evidence/M02.md"}
@@ -205,6 +209,24 @@ class TypedExecutionContractTests(unittest.TestCase):
                 mutation_preconditions=[],
                 mutation_postconditions=[],
             )
+
+        transported = self.obligation()
+        altered_bundle = copy.deepcopy(transported)
+        altered_bundle["authority_bundle"] = altered_bundle["authority_bundle"][1:]
+        with self.assertRaisesRegex(ExecutionEnvelopeError, "authority bundle/freshness drift"):
+            validate_execution_obligation(altered_bundle)
+
+        summary_only = copy.deepcopy(transported)
+        exact = summary_only["authority_bundle"][0]
+        summary_only["authority_bundle"][0] = {
+            "repository": exact["repository"],
+            "commit": exact["commit"],
+            "path": exact["path"],
+            "blob": exact["blob"],
+            "summary": "navigation summary is not authority content",
+        }
+        with self.assertRaisesRegex(ExecutionEnvelopeError, "invalid keys"):
+            validate_execution_obligation(summary_only)
 
         wrong_blob = copy.deepcopy(self.authority_refs)
         wrong_blob[0]["blob"] = "d" * 40
@@ -358,6 +380,32 @@ class TypedExecutionContractTests(unittest.TestCase):
                 obligation,
                 current_freshness_material=obligation["freshness"]["material"],
             )
+
+    def test_result_carries_distinct_immutable_subject_and_rejects_direct_mutation_payload(self) -> None:
+        obligation = self.obligation()
+        result = self.result(obligation)
+        validate_execution_result(result)
+        self.assertEqual(
+            result["result_subject"],
+            {"repository": "owner/project", "commit": "d" * 40},
+        )
+        self.assertNotEqual(result["result_subject"]["commit"], result["subject"]["commit"])
+        self.assertEqual(
+            reconcile_execution_result(
+                result,
+                obligation,
+                current_freshness_material=obligation["freshness"]["material"],
+            ),
+            "accept",
+        )
+
+        direct_mutation = copy.deepcopy(result)
+        direct_mutation["canonical_write"] = {
+            "path": "implementation/workstreams/example/TASK_BOARD.toml",
+            "content": "mutated by runtime",
+        }
+        with self.assertRaisesRegex(ExecutionEnvelopeError, "invalid top-level keys"):
+            validate_execution_result(direct_mutation)
 
     def test_result_matches_golden_and_is_canonical(self) -> None:
         obligation = self.obligation()

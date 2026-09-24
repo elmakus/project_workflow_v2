@@ -32,8 +32,8 @@ The transport/execution runtime receives the resolved bundle. It does not add, d
 The canonical JSON shape is `schemas/EXECUTION_RESULT.schema.json`; executable validation is in `tools/obligation_contract.py`.
 
 A result contains only PW-relevant semantic data:
-- exact obligation and original freshness binding;
-- exact result subject and changed-artifact refs;
+- exact obligation, original obligation-subject, and original freshness binding;
+- a distinct exact immutable result/implementation subject plus changed-artifact refs;
 - semantic status/outcome;
 - tests, evidence and readback observations;
 - a real blocker when status is blocked.
@@ -49,6 +49,8 @@ Before acceptance, PW validates the result against the exact obligation and reco
 - stale with exact old/new fingerprint binding, an explicit materially-unchanged proof and durable basis -> explicit `reuse`, `rebase`, or `reconcile`.
 
 A stale result is never silently accepted. Reuse, rebase, or reconcile is allowed only when safety is positively proven.
+
+The Result's `subject` remains the exact original obligation subject used for binding validation. Its separate `result_subject` is the exact immutable Git implementation subject produced by execution (repository + commit), matching the implementation-subject meaning that Main persists in the durable Card Result.
 
 ## Governed mutation and readback
 

@@ -11,6 +11,7 @@
     "freshness_fingerprint",
     "status",
     "subject",
+    "result_subject",
     "changed_artifacts",
     "tests",
     "evidence",
@@ -42,6 +43,9 @@
     },
     "subject": {
       "$ref": "#/$defs/exact_ref"
+    },
+    "result_subject": {
+      "$ref": "#/$defs/git_subject"
     },
     "changed_artifacts": {
       "type": "array",
@@ -131,6 +135,24 @@
     }
   },
   "$defs": {
+    "git_subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "commit"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[^/]+/[^/]+$"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      }
+    },
     "exact_ref": {
       "type": "object",
       "additionalProperties": false,

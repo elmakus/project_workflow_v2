@@ -10,6 +10,10 @@
     "path": "implementation/cards/M02-T01.md",
     "blob": "cccccccccccccccccccccccccccccccccccccccc"
   },
+  "result_subject": {
+    "repository": "owner/project",
+    "commit": "dddddddddddddddddddddddddddddddddddddddd"
+  },
   "changed_artifacts": [],
   "tests": [
     {
