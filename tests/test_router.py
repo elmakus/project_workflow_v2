@@ -1371,6 +1371,30 @@ class RouterTests(unittest.TestCase):
                 project, "red", "R01",
                 finding_ids=("F1",), defect_class_ids=("class-a",),
             )
+            for index, attempt in enumerate(("R02", "R03", "R04"), start=4):
+                self.add_review_attempt(
+                    project,
+                    "red",
+                    attempt,
+                    review_kind="closure_verification",
+                    source_discovery_attempt="R01",
+                    finding_ids=("F1",),
+                    defect_class_ids=("class-a",),
+                    subject_blob=str(index) * 40,
+                )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "review_convergence"))
+        finally:
+            temp.cleanup()
+
+    def test_repeated_red_closure_same_subject_does_not_consume_repair_rounds(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            self.add_review_attempt(
+                project, "red", "R01",
+                finding_ids=("F1",), defect_class_ids=("class-a",),
+            )
             for attempt in ("R02", "R03", "R04"):
                 self.add_review_attempt(
                     project,
@@ -1380,9 +1404,10 @@ class RouterTests(unittest.TestCase):
                     source_discovery_attempt="R01",
                     finding_ids=("F1",),
                     defect_class_ids=("class-a",),
+                    subject_blob="4" * 40,
                 )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
-            self.assertEqual((routed.disposition, routed.obligation), ("route", "review_convergence"))
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_resolution"))
         finally:
             temp.cleanup()
 
