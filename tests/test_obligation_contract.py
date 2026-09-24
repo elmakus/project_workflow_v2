@@ -213,20 +213,24 @@ class TypedExecutionContractTests(unittest.TestCase):
 
     def test_versions_and_telemetry_vocabulary_fail_closed(self) -> None:
         obligation = self.obligation()
-        changed = copy.deepcopy(obligation)
-        changed["schema_version"] = 2
-        with self.assertRaisesRegex(ExecutionEnvelopeError, "unsupported schema_version"):
-            validate_execution_obligation(changed)
+        for version in (2, True):
+            with self.subTest(obligation_schema_version=version):
+                changed = copy.deepcopy(obligation)
+                changed["schema_version"] = version
+                with self.assertRaisesRegex(ExecutionEnvelopeError, "unsupported schema_version"):
+                    validate_execution_obligation(changed)
 
         with self.assertRaisesRegex(ExecutionEnvelopeError, "telemetry key"):
             self.obligation(inputs={"card_id": "M02-T01", "worker_id": "worker-7"})
         with self.assertRaisesRegex(ExecutionEnvelopeError, "telemetry key"):
             self.obligation(inputs={"card_id": "M02-T01", "Model": "must-not-be-canonical"})
 
-        result = self.result(obligation)
-        result["schema_version"] = 2
-        with self.assertRaisesRegex(ExecutionEnvelopeError, "unsupported schema_version"):
-            validate_execution_result(result)
+        for version in (2, True):
+            with self.subTest(result_schema_version=version):
+                result = self.result(obligation)
+                result["schema_version"] = version
+                with self.assertRaisesRegex(ExecutionEnvelopeError, "unsupported schema_version"):
+                    validate_execution_result(result)
 
         result = self.result(obligation)
         result["session_id"] = "session-7"
@@ -371,6 +375,10 @@ class TypedExecutionContractTests(unittest.TestCase):
         invalid_obligations.append(("breaking version", candidate))
 
         candidate = copy.deepcopy(obligation)
+        candidate["schema_version"] = True
+        invalid_obligations.append(("boolean version", candidate))
+
+        candidate = copy.deepcopy(obligation)
         candidate["subject"]["path"] = "../outside.md"
         invalid_obligations.append(("parent path", candidate))
 
@@ -414,6 +422,10 @@ class TypedExecutionContractTests(unittest.TestCase):
         candidate = copy.deepcopy(result)
         candidate["schema_version"] = 2
         invalid_results.append(("breaking version", candidate))
+
+        candidate = copy.deepcopy(result)
+        candidate["schema_version"] = True
+        invalid_results.append(("boolean version", candidate))
 
         candidate = copy.deepcopy(result)
         candidate["subject"]["path"] = "/absolute/result.md"
