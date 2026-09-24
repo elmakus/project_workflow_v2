@@ -747,7 +747,7 @@ class TypedExecutionContractTests(unittest.TestCase):
         failed_readback["readback"][0]["status"] = "failed"
         with self.assertRaisesRegex(
             ExecutionEnvelopeError,
-            "verified readback evidence is required before acceptance",
+            "failed readback is not eligible for acceptance",
         ):
             reconcile_execution_result(
                 failed_readback,
