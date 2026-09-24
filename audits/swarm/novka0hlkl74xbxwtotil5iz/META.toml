@@ -1,0 +1,13 @@
+audit_kind = "pwv2_adversarial_swarm"
+audit_suffix = "novka0hlkl74xbxwtotil5iz"
+repository = "elmakus/project_workflow_v2"
+subject_commit = "4fb4bfb7d7b1481d6f347c182fc96a5a1135e045"
+branch = "audit/pwv2-swarm-novka0hlkl74xbxwtotil5iz"
+blind_discovery = true
+selected_attack_lenses = [
+  "review independence / review bypass / result mutation",
+  "malformed or contradictory state / fail-closed behavior",
+  "stale commit/blob/path/result/review identity",
+  "Task Board / READY / active / DONE / JIT-trigger lifecycle",
+]
+blindness_limitation = "GitHub commit metadata unexpectedly over-returned historical implementation/review/evidence diff content before findings were frozen; those passages were not used as finding sources and no audit/* branches, swarm reports, Issues, or PR comments were inspected."
