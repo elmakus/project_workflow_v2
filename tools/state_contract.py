@@ -903,6 +903,37 @@ def validate_review(data: dict[str, Any]) -> None:
         reset_basis = data.get("epoch_reset_basis")
         _require(isinstance(reset_basis, str),
                  "review: epoch_reset_basis must be a string")
+        reset_subject = data.get("epoch_reset_subject")
+        if reset_basis.strip():
+            _require(isinstance(reset_subject, dict),
+                     "review: non-empty epoch_reset_basis requires exact epoch_reset_subject")
+            _require(reset_subject.get("class") == "accepted_redesign",
+                     "review: epoch_reset_subject must have class 'accepted_redesign'")
+            for key in ("repository", "path"):
+                _require(isinstance(reset_subject.get(key), str) and reset_subject[key],
+                         f"review.epoch_reset_subject: missing {key}")
+            for key in ("commit", "blob"):
+                _require(
+                    isinstance(reset_subject.get(key), str)
+                    and SHA40.fullmatch(reset_subject[key]) is not None,
+                    f"review.epoch_reset_subject: {key} must be exact 40-hex",
+                )
+            reset_path = _safe_relative_path(
+                reset_subject["path"], "review.epoch_reset_subject"
+            )
+            accepted_authority_roots = (
+                "requirements/", "decisions/", "planning/", "workflow/",
+            )
+            _require(
+                reset_path == acceptance.get("path")
+                or reset_path.startswith(accepted_authority_roots),
+                "review: epoch_reset_subject must bind exact accepted authority or acceptance redesign",
+            )
+        else:
+            _require(
+                reset_subject is None,
+                "review: epoch_reset_subject is allowed only with non-empty epoch_reset_basis",
+            )
         try:
             defect_classes = material_defect_classes(data)
         except ReviewContractError as exc:
@@ -972,15 +1003,20 @@ def validate_review_history(
             epoch = attempt["review_epoch"]
             scope = attempt["review_scope"]
             reset_basis = attempt["epoch_reset_basis"]
+            reset_subject = attempt.get("epoch_reset_subject")
             if current_epoch is None:
                 _require(reset_basis == "",
                          "review_history: initial convergence-aware epoch must not claim reset basis")
+                _require(reset_subject is None,
+                         "review_history: initial convergence-aware epoch must not claim reset subject")
                 current_epoch = epoch
                 current_scope = scope
                 seen_epoch_ids.add(epoch)
             elif epoch != current_epoch:
                 _require(bool(reset_basis.strip()),
                          "review_history: changed review_epoch requires durable accepted-redesign reset basis")
+                _require(isinstance(reset_subject, dict),
+                         "review_history: changed review_epoch requires exact accepted-redesign reset subject")
                 _require(scope == current_scope,
                          "review_history: review_scope cannot change across epoch reset in one review history")
                 _require(epoch not in seen_epoch_ids,
@@ -992,6 +1028,8 @@ def validate_review_history(
             else:
                 _require(reset_basis == "",
                          "review_history: unchanged review_epoch must not claim reset basis")
+                _require(reset_subject is None,
+                         "review_history: unchanged review_epoch must not claim reset subject")
                 _require(scope == current_scope,
                          "review_history: review_scope cannot change inside one review history")
                 _require(
