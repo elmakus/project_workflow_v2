@@ -10,7 +10,12 @@ from pathlib import Path, PurePosixPath
 
 from tools.execution_contract import ExecutionContractError, parse_card_result
 from tools.recovery_contract import RecoveryContractError, classify_resolution, exact_result_subject, review_subject
-from tools.review_contract import can_finalize_review_obligation, remaining_closure_findings, review_kind
+from tools.review_contract import (
+    can_finalize_review_obligation,
+    remaining_closure_findings,
+    review_convergence_state,
+    review_kind,
+)
 from tools.policy_kernel import MechanicalDecision, PolicyKernel
 from tools.state_contract import (
     ValidationError,
@@ -619,11 +624,35 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                                 "Some known findings remain unverified; freeze another closure-verification attempt before fresh discovery",
                                 subject=card["id"], owner_module="workflow/REVIEW.md",
                             )
+                        convergence = review_convergence_state(attempts)
+                        if (
+                            convergence.convergence_required
+                            and convergence.post_convergence_attempt is None
+                        ):
+                            return result(
+                                reads, "route", "review_freeze",
+                                "Known findings are closed after a convergence threshold; freeze the single fresh post-convergence full-scope validation",
+                                subject=card["id"], owner_module="workflow/REVIEW.md",
+                            )
                         return result(
                             reads, "route", "review_freeze",
                             "All known findings are closure-verified, but closure cannot satisfy the review obligation; freeze a fresh full-scope discovery attempt",
                             subject=card["id"], owner_module="workflow/REVIEW.md",
                         )
+
+                convergence = review_convergence_state(attempts)
+                if attempts[-1].get("post_convergence_validation") is True:
+                    return result(
+                        reads, "route", "review_structural_resolution",
+                        "Fresh post-convergence validation is RED; broader structural classification is required instead of another ordinary review loop",
+                        subject=card["id"], owner_module="workflow/RECOVERY.md",
+                    )
+                if convergence.convergence_required:
+                    return result(
+                        reads, "route", "review_convergence",
+                        "Review discovery or per-class repair/closure ceiling is reached; Main convergence/root-cause analysis owns the next correction mode",
+                        subject=card["id"], owner_module="workflow/RECOVERY.md",
+                    )
                 return result(
                     reads, "route", "execution_resolution",
                     "RED review evidence remains durable; execution resolution classifies bounded correction, Planning, Definition, Research or a real stop",
