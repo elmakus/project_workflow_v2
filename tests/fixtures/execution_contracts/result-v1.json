@@ -1,8 +1,8 @@
 {
   "kind": "pwv2_execution_result",
   "schema_version": 1,
-  "obligation_id": "sha256:cd82f63081b606cf66ed00a9af03527034fb83e09885aad7f3aadb4e6bbc9b56",
-  "freshness_fingerprint": "sha256:d48d536bbd1a031ef7d2005c927517dc16fdc74f14a83e09515b936316cf0c0a",
+  "obligation_id": "sha256:5ba6a5fbe7c5dc2a5740ab698641d800e7f9b3546aeee648fbe59518f4505481",
+  "freshness_fingerprint": "sha256:8065e976982799ab7fec91036d479e31053ae8811c5ca8a3f40e319ea564ca36",
   "status": "success",
   "subject": {
     "repository": "owner/project",
