@@ -112,6 +112,49 @@ def validate_closure_surface(
     return evaluated
 
 
+def remaining_closure_findings(
+    attempts: Iterable[Mapping[str, object]],
+    source_discovery_attempt: str,
+) -> frozenset[str]:
+    """Return source-discovery findings not yet covered by GREEN closure attempts."""
+    source_findings: set[str] | None = None
+    closed: set[str] = set()
+
+    for attempt in attempts:
+        if attempt.get("attempt") == source_discovery_attempt:
+            if review_kind(attempt) != "discovery" or attempt.get("verdict") != "red":
+                raise ReviewContractError("closure source must be a RED discovery attempt")
+            raw = attempt.get("material_finding_ids")
+            if not isinstance(raw, list) or not all(
+                isinstance(item, str) and item for item in raw
+            ):
+                raise ReviewContractError(
+                    "closure source discovery must record material_finding_ids"
+                )
+            source_findings = set(raw)
+            continue
+
+        if source_findings is None:
+            continue
+        if (
+            attempt.get("review_kind") == "closure_verification"
+            and attempt.get("source_discovery_attempt") == source_discovery_attempt
+            and attempt.get("verdict") == "green"
+        ):
+            raw = attempt.get("material_finding_ids")
+            if not isinstance(raw, list) or not all(
+                isinstance(item, str) and item for item in raw
+            ):
+                raise ReviewContractError(
+                    "GREEN closure attempt must record material_finding_ids"
+                )
+            closed.update(raw)
+
+    if source_findings is None:
+        raise ReviewContractError("closure source discovery attempt was not found")
+    return frozenset(source_findings - closed)
+
+
 def can_finalize_review_obligation(attempt: Mapping[str, object]) -> bool:
     """Only a GREEN fresh discovery pass may satisfy the review obligation.
 
