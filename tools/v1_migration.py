@@ -582,6 +582,12 @@ def _normalized_review_attempts(
                 "source_discovery_attempt": "",
                 "discovery_complete": False,
                 "material_finding_ids": [],
+                "review_scope": "card",
+                "review_epoch": "E01",
+                "epoch_reset_basis": "",
+                "material_defect_class_ids": [],
+                "post_convergence_validation": False,
+                "convergence_basis": "",
             })
         attempts.append(attempt)
         refs.append({
