@@ -1,0 +1,30 @@
+workstream_id = "issue-router-board-precedence"
+state = "consumed"
+origin_role = "intake"
+origin_subject = "repair:approved-plan-co-bound-board-precedence:v1"
+return_target = "intake"
+return_reconciliation = "applied"
+return_result = "prior-art:router-board-precedence:v1:no-blocker"
+finding = "No prior-art blocker: canonical docs and installed router code confirm the defect class (approved plan with satisfied C, or exact editorial exemption, returns execution_prep at tools/router.py:408-430 before the co-bound Task Board is read at line 473), so a valid active Board/Card state is never reached on that path. Repair must preserve no-board Execution Prep, route valid active Board/Card states (incl. terminal RED to execution_resolution), and fail closed on malformed Board. See evidence/DIAGNOSIS_router-board-precedence-2026-09-24.md."
+limitations = "Proportional micro-fix prior art only: tracker read is a single read-only list (empty repo, zero issues); no community pattern governs canonical state semantics; consumer M02R-T03/R01 state was not edited or relied on as authority."
+conflicts = "none: checked source classes agree the co-bound Board must be read before the approved-plan execution_prep return, and no source contradicts the bounded repair."
+
+[[sources]]
+class = "official_upstream"
+status = "checked"
+weight = "primary"
+
+[[sources]]
+class = "project_runtime"
+status = "checked"
+weight = "direct"
+
+[[sources]]
+class = "tracker_discussion"
+status = "checked"
+weight = "supporting"
+
+[[sources]]
+class = "practitioner_community"
+status = "not_relevant"
+weight = "supporting"
