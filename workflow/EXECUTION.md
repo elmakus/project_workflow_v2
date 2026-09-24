@@ -19,6 +19,12 @@ Main:
 
 A worker/subagent must not finalize Task Board/manifest state or create another Project Workflow Card.
 
+## Typed obligation/result boundary
+
+Before runtime realization, Project Workflow derives the transport-neutral typed package defined by `workflow/EXECUTION_CONTRACTS.md`. PW resolves exact authority content and hashes, binds the relevant freshness fingerprint and mutation pre/postconditions, and supplies only that bounded package.
+
+Before accepting a returned typed result, PW validates its exact obligation/freshness binding and reconciles any stale result according to that contract. Runtime infrastructure may realize the package, but it cannot add/drop authority or directly finalize canonical PW state.
+
 ## Delegated or direct realization
 
 Delegation qualifies only when all are true:
