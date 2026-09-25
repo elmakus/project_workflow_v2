@@ -812,6 +812,24 @@ class SplitTopologyBoardTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "consumed JIT trigger 'after-M01-T01'"):
             validate_board(board, self.workstream)
 
+    def test_done_card_keeps_split_audit_as_history(self) -> None:
+        board = read_toml(VALID / "TASK_BOARD.toml")
+        _add_trigger(board, "after-M01-T01", "M01-T01", "consumed")
+        board["sizing_audits"] = [
+            _audit(card_id="M01-T02"),
+            _audit(
+                card_id="M01-T01",
+                decision="split",
+                outcomes=[
+                    _outcome("first", kind="invariant", family="identity",
+                             allocated_to="card:M01-T01"),
+                    _outcome("second", kind="useful_outcome", family="bundles",
+                             allocated_to="jit:after-M01-T01"),
+                ],
+            ),
+        ]
+        validate_board(board, self.workstream)
+
     def test_split_to_sibling_card_is_valid(self) -> None:
         board = read_toml(VALID / "TASK_BOARD.toml")
         _add_card(board, "M01-T03", "planned")

@@ -50,6 +50,9 @@ The registry is deliberately not an expression language. It names exact canonica
 - one READY Card -> launch refresh against exact Card/authority/DONE dependency results and optional technical contract, then Execution Prep;
 - multiple READY Cards -> Execution Prep selects deterministically from accepted plan/dependency authority;
 - no executable Card -> Execution Prep owns bounded JIT materialization/refinement;
+- active Card with a pending late-oversize return -> Execution Prep to materialize and bind the residual Card (preserved evidence and exact review-attempt read back first);
+- active Card with a bound late-oversize return -> Execution Prep for handoff finalization into the original's `returned` non-GREEN terminal disposition;
+- all Cards `done`/`returned` with at least one `returned` -> Close only when every bound residual outcome terminates in accepted downstream Cards, else back to a concrete Execution Prep obligation (a `returned` Card alone is never accepted completion);
 - one active Card without durable result -> common Execution;
 - active Card with a valid durable semantic result -> result reconciliation without replay;
 - reviewable durable result with no attempt -> freeze exact review attempt;

@@ -20,6 +20,10 @@ A clean textual merge is never sufficient semantic-compatibility proof.
 
 Production deterministic helper: tools/close_contract.py.
 
+## Returned handoff terminals
+
+A `returned` Card is a non-GREEN late-oversize handoff disposition, never accepted completion. When the board is all-terminal with at least one `returned` Card, the router walks every bound residual outcome through anchor sizing-audit allocations, JIT-trigger resolutions, and chained handoffs: Close is reached only when each outcome terminates in an accepted (`done`) downstream Card. Any gap — uncovered or changed outcome, unmaterialized or unbound trigger, dropped chained scope, or circular handoff — routes back to a concrete Execution Prep obligation instead. A `returned` Card alone, or beside one arbitrary `done` Card, never completes approved scope.
+
 ## Stacked workstreams
 
 Stacking exists only for a genuine unmerged parent-only dependency.

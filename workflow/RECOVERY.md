@@ -8,9 +8,10 @@ Recovery reconstructs the next semantic obligation from durable repository state
 
 1. Validate project/workstream/Task Board binding.
 2. If the Task Board points to implementation Research, recover that exact Research obligation and return target before unrelated execution.
-3. If an active Card already has a valid durable semantic result, reconcile from that result before considering implementation replay.
-4. If an exact review attempt exists, recheck that its subject still covers the current result before GREEN finalization or RED correction.
-5. Only then route current execution/correction/blocker state.
+3. If the active Card has a pending or unfinalized bound late-oversize return, route to Execution Prep for residual binding or handoff finalization before replay or finalization; preserved evidence, the return record and history stay durable.
+4. If an active Card already has a valid durable semantic result, reconcile from that result before considering implementation replay.
+5. If an exact review attempt exists, recheck that its subject still covers the current result before GREEN finalization or RED correction.
+6. Only then route current execution/correction/blocker state.
 
 No worker/model/session/invocation identifier is required.
 

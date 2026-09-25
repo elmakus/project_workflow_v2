@@ -19,6 +19,11 @@ from tools.review_contract import (
 )
 from tools.policy_kernel import MechanicalDecision, PolicyKernel
 from tools.topology_contract import compute_card_contract_digest, ready_topology_hold
+from tools.late_oversize_contract import (
+    bound_handoff_hold,
+    pending_late_return,
+    unfinished_residual_scope,
+)
 from tools.state_contract import (
     ValidationError,
     read_project,
@@ -201,6 +206,13 @@ def classify_jit_refinement(change_class: str) -> tuple[str, str]:
             "Materially risky Card topology requires a fresh independent "
             "topology challenge before first launch; Execution Prep owns the "
             "challenge and any bounded re-decomposition",
+        ),
+        "late_oversize_return": (
+            "execution_prep",
+            "Material execution/review evidence that the active Card is "
+            "oversized returns only the residual unaccepted scope to "
+            "Execution Prep for bounded re-decomposition; independently valid "
+            "evidence is preserved and the Worker never self-splits",
         ),
     }
     if change_class not in routes:
@@ -640,6 +652,54 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
     except (OSError, ValidationError, KeyError) as exc:
         return recovery(reads, f"selected workstream identity invalid: {exc}")
 
+    late = pending_late_return(board)
+    handoff = bound_handoff_hold(board) if late is None else None
+    held = late if late is not None else handoff
+    if held is not None:
+        try:
+            record = next(
+                item for item in board.get("late_oversize_returns", [])
+                if isinstance(item, dict) and item.get("card_id") == held
+            )
+        except StopIteration as exc:
+            return recovery(reads, f"late-oversize return record unreadable: {exc}")
+        try:
+            for ref in record.get("preserved_refs", []):
+                reads.project(ref).read_text(encoding="utf-8")
+        except (OSError, ValidationError) as exc:
+            return recovery(reads, f"late-oversize preserved evidence unreadable: {exc}")
+        if record.get("origin") == "review":
+            try:
+                attempt_data = read_toml(reads.project(record.get("origin_attempt_path", "")))
+            except (OSError, ValueError) as exc:
+                return recovery(reads, f"late-oversize review attempt readback failed: {exc}")
+            if attempt_data.get("attempt") != record.get("origin_attempt"):
+                return recovery(
+                    reads,
+                    f"late-oversize review attempt binding mismatch for Card {held}: "
+                    f"locator {record.get('origin_attempt_path')!r} does not carry "
+                    f"attempt {record.get('origin_attempt')!r}",
+                )
+        if late is not None:
+            reason = (
+                f"Card {held} has a pending late-oversize return; independently "
+                "valid evidence is preserved and only the residual unaccepted "
+                "scope returns to Execution Prep, which must materialize the "
+                "residual Card and bind the return before the original "
+                "transitions to returned"
+            )
+        else:
+            reason = (
+                f"Card {held} has a bound late-oversize return; Execution Prep owns "
+                "handoff finalization — transition the original to returned, "
+                "its non-GREEN terminal disposition, so the bound residual "
+                "Card can proceed"
+            )
+        return result(
+            reads, "route", "execution_prep", reason,
+            subject=held, owner_module="workflow/EXECUTION_PREP.md",
+        )
+
     active = [card for card in board["cards"] if card["status"] == "in_progress"]
     ready = [card for card in board["cards"] if card["status"] == "ready"]
 
@@ -828,6 +888,22 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             reads,
             decision,
             "All current Cards are terminal; Close owns finalization and decides whether approved scope is durably complete",
+        )
+
+    statuses = {card["status"] for card in board["cards"]}
+    if statuses and statuses <= {"done", "returned"} and "returned" in statuses:
+        unfinished = unfinished_residual_scope(board)
+        if unfinished is not None:
+            return result(
+                reads, "route", "execution_prep", unfinished,
+                owner_module="workflow/EXECUTION_PREP.md",
+            )
+        return result(
+            reads, "route", "close",
+            "All current Cards are terminal and every bound residual outcome "
+            "lands in accepted downstream Cards; Close owns finalization and "
+            "must not equate a returned Card alone with accepted completion",
+            owner_module="workflow/CLOSE.md",
         )
 
     return result(reads, "route", "execution_prep",

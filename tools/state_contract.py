@@ -40,6 +40,10 @@ try:
         TopologyError,
         validate_topology_audits,
     )
+    from tools.late_oversize_contract import (
+        LateOversizeError,
+        validate_late_returns,
+    )
 except ModuleNotFoundError:  # direct script execution from tools/
     from review_contract import (
         CONVERGENCE_FIELDS,
@@ -70,9 +74,13 @@ except ModuleNotFoundError:  # direct script execution from tools/
         TopologyError,
         validate_topology_audits,
     )
+    from late_oversize_contract import (
+        LateOversizeError,
+        validate_late_returns,
+    )
 
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
-CARD_STATUSES = {"planned", "ready", "in_progress", "blocked", "done"}
+CARD_STATUSES = {"planned", "ready", "in_progress", "blocked", "done", "returned"}
 INTAKE_KINDS = {"issue", "feature", "change"}
 INTAKE_STATES = {"active", "complete"}
 RESPONSE_KINDS = {"none", "question", "concern", "alternative", "authorization"}
@@ -742,6 +750,39 @@ def parse_task_card(text: str, expected_id: str, workstream_id: str) -> dict[str
     }
 
 
+def _bound_handoff_trigger(
+    returns: Any,
+    cards_by_id: dict[str, Any],
+    trigger: dict[str, Any],
+    after_card: str,
+) -> bool:
+    """Check the distinct return-handoff path for trigger advancement.
+
+    A trigger after a ``returned`` Card may advance only when a durable
+    late-oversize return binds that exact trigger id to a materialized
+    residual Card in ``residual_bound`` state. Full record validity is
+    enforced separately by the late-oversize gate; this linkage check only
+    gates the predecessor exception so forged satisfaction fails closed here.
+    """
+    predecessor = cards_by_id.get(after_card)
+    if not isinstance(predecessor, dict) or predecessor.get("status") != "returned":
+        return False
+    if not isinstance(returns, list):
+        return False
+    for record in returns:
+        if not isinstance(record, dict):
+            continue
+        if (
+            record.get("card_id") == after_card
+            and record.get("residual_trigger") == trigger.get("id")
+            and record.get("state") == "residual_bound"
+            and isinstance(record.get("residual_card"), str)
+            and record.get("residual_card") in cards_by_id
+        ):
+            return True
+    return False
+
+
 def validate_board(
     data: dict[str, Any],
     workstream: dict[str, Any],
@@ -831,8 +872,19 @@ def validate_board(
         _require(isinstance(condition, str) and condition.strip(), f"{label}: missing condition")
         if state in {"satisfied", "consumed"}:
             predecessor = cards_by_id[after_card]
-            _require(predecessor["status"] == "done" and "result" in predecessor,
-                     f"{label}: satisfied trigger requires DONE predecessor result")
+            if predecessor["status"] == "done" and "result" in predecessor:
+                pass
+            elif _bound_handoff_trigger(
+                data.get("late_oversize_returns"), cards_by_id,
+                trigger, after_card,
+            ):
+                pass
+            else:
+                raise ValidationError(
+                    f"{label}: satisfied trigger requires DONE predecessor "
+                    "result or a bound late-oversize handoff for the exact "
+                    "residual trigger"
+                )
 
     if planning_seams:
         _require(
@@ -864,6 +916,29 @@ def validate_board(
         )
     except TopologyError as exc:
         raise ValidationError(f"{exc}") from exc
+
+    try:
+        late_records = validate_late_returns(
+            data.get("late_oversize_returns"),
+            cards,
+            triggers,
+            workstream["workstream_id"],
+            data.get("sizing_audits"),
+        )
+    except LateOversizeError as exc:
+        raise ValidationError(f"{exc}") from exc
+
+    for index, card in enumerate(cards):
+        if card["status"] != "returned":
+            continue
+        record = late_records.get(card["id"])
+        if record is None or record.get("state") != "residual_bound":
+            raise ValidationError(
+                f"task_board.cards[{index}]: returned Card {card['id']!r} "
+                "requires a bound late-oversize return naming its "
+                "materialized residual Card; returned is a non-GREEN handoff "
+                "disposition, never an unbound terminal"
+            )
 
 
 def validate_blocker(data: dict[str, Any], workstream_id: str, card_id: str) -> None:

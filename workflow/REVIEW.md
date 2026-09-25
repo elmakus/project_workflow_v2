@@ -79,7 +79,7 @@ A runtime may satisfy review with an internal independent context when one genui
 ## Blocking lifecycle
 
 For REQUIRED/activated RECOMMENDED review:
-- no attempt / pending / in-progress / RED blocks terminal Card completion;
+- no attempt / pending / in-progress / RED blocks accepted (`done`) terminal Card completion; a late-oversize handoff transitions to `returned` (non-acceptance) without claiming GREEN instead of bypassing this gate;
 - GREEN for the exact current subject + acceptance permits deterministic post-review finalization;
 - GREEN is not a verdict-only user stop;
 - RED remains attached to its failed subject and routes to corrective classification; RED itself is not automatically a user stop.
@@ -93,6 +93,8 @@ Card Review owns bounded local correctness for one Card's coherent outcome; Mile
 The selected Card owns ordered review-attempt locators in its Task Board state. Attempt files are workstream-local under `reviews/`.
 
 At most one pending/in-progress attempt may exist and it must be the last attempt. Terminal attempts keep non-empty evidence. A later attempt never overwrites a prior GREEN/RED file.
+
+Review may surface late-oversize evidence, but the return preserves attempt history and routes through Execution Prep (see `workflow/EXECUTION_PREP.md`); it binds the originating attempt id to one exact durable attempt locator on the Card and never deletes attempts, reuses attempt IDs, or manufactures GREEN.
 
 ## Runtime boundary
 

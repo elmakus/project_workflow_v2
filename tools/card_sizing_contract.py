@@ -67,6 +67,8 @@ ALLOCATION_KINDS = frozenset({"card", "jit"})
 
 AUDITED_STATUSES = frozenset({"planned", "ready", "in_progress"})
 
+TERMINAL_HISTORY_STATUSES = frozenset({"done", "returned"})
+
 REBUTTAL_CLASSES = frozenset({
     "atomicity",
     "invalid_intermediate_state",
@@ -509,9 +511,13 @@ def validate_sizing_audits(
     exempt so historical terminal state stays valid, as are ``blocked`` Cards
     while blocked so legacy migrated boards validate; any return to an
     executable status re-triggers the gate. Split allocations resolve against
-    materialized Cards and JIT triggers: unretained, dangling, terminal,
-    consumed or foreign-predecessor destinations fail closed. Returns the Card
-    id to validated-decision mapping.
+    materialized Cards and JIT triggers while the audited Card is executable:
+    unretained, dangling, terminal, consumed or foreign-predecessor
+    destinations fail closed. ``done`` and ``returned`` Cards keep their
+    audits as immutable history with shape/decision/coverage rules still
+    enforced, but destination liveness is not re-checked: fulfilled
+    destinations (completed Cards, consumed triggers) are success, not
+    violation. Returns the Card id to validated-decision mapping.
     """
     if audits is None:
         audits = []
@@ -538,7 +544,10 @@ def validate_sizing_audits(
             record = validate_sizing_audit(audit, label)
         except CardSizingError as exc:
             raise CardSizingError(f"{exc}") from exc
-        if record["decision"] == "split":
+        if (
+            record["decision"] == "split"
+            and cards_by_id[card_id].get("status") not in TERMINAL_HISTORY_STATUSES
+        ):
             try:
                 validate_split_resolution(
                     record["outcomes"], cards_by_id, triggers_by_id, label, card_id

@@ -41,9 +41,10 @@ Runtime-internal work may use zero, one or many workers sequentially or concurre
 Returned implementation is classified before durable reconciliation:
 - acceptance/evidence valid -> reconcile one durable accepted result;
 - contract still valid but return is incomplete/incorrect -> keep Card `in_progress` and correct it;
+- material evidence that the Card is oversized or exposes separable review-worthy outcomes -> preserve independently valid evidence and return only the residual unaccepted scope to Execution Prep for bounded re-decomposition (never reconcile as GREEN; the handoff terminal is `returned`, never `done`);
 - a real unresolved blocker prevents the Card contract -> persist proportional blocker state and mark Card `blocked`.
 
-A bad worker result is not a new Project Card and is not by itself a real stop.
+A bad worker result is not a new Project Card and is not by itself a real stop. A worker must not silently broaden scope, merge Cards, self-split or rewrite the stable Card; Main owns the late-oversize return decision (see `workflow/EXECUTION_PREP.md`).
 
 ## Accepted semantic result
 
