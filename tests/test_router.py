@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -238,6 +239,7 @@ class RouterTests(unittest.TestCase):
         revision: str = "P1", blob: str | None = None, gate_subject: str | None = None,
         review_mode: str = "independent", exemption_basis: str = "",
         exemption_base_subject: str = "",
+        exemption_classification: tuple[str, str, str, str] | None = None,
     ) -> str:
         blob = blob or ("b" * 40)
         premium_a_subject = premium_a_subject or f"definition:R1|planning-cycle:{cycle}"
@@ -266,6 +268,18 @@ class RouterTests(unittest.TestCase):
             f'commit = "{"a" * 40 if frozen else ""}"\n'
             f'path = "{"planning/MASTER_PLAN.md" if frozen else ""}"\n'
             f'blob = "{blob if frozen else ""}"\n'
+            + (
+                (
+                    '[review_exemption_classification]\n'
+                    'class = "git_blob"\n'
+                    f'repository = "{exemption_classification[0]}"\n'
+                    f'commit = "{exemption_classification[1]}"\n'
+                    f'path = "{exemption_classification[2]}"\n'
+                    f'blob = "{exemption_classification[3]}"\n'
+                )
+                if exemption_classification is not None
+                else ""
+            )
         )
 
     def plan_review_content(
@@ -917,6 +931,9 @@ class RouterTests(unittest.TestCase):
             self.assertIn(f"project:{BOARD}", routed.read_set)
 
             base = f"owner/repo@{'a' * 40}:planning/MASTER_PLAN.md@{'b' * 40}"
+            exemption_classification = self.install_editorial_classification(
+                project, cycle=2, revision="P2"
+            )
             planning_path.write_text(
                 self.planning_content(
                     state="approved", cycle=2, revision="P2", blob="c" * 40,
@@ -924,6 +941,7 @@ class RouterTests(unittest.TestCase):
                     gate_subject=base, review_mode="editorial_exempt",
                     exemption_basis="Wording only; strategy, milestones, coverage and gates unchanged.",
                     exemption_base_subject=base,
+                    exemption_classification=exemption_classification,
                 )
             )
             review_path.write_text(self.plan_review_content("green", cycle=2, revision="P2"))
@@ -980,6 +998,66 @@ class RouterTests(unittest.TestCase):
         finally:
             temp.cleanup()
 
+    def install_editorial_classification(
+        self,
+        project: Path,
+        *,
+        cycle: int = 1,
+        revision: str = "P1",
+        base_blob: str = "b" * 40,
+        changed_blob: str = "c" * 40,
+    ) -> tuple[str, str, str, str]:
+        path = (
+            "implementation/workstreams/sample-workstream/"
+            f"planning_classifications/{revision}-E01.toml"
+        )
+        target = project / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            'workstream_id = "sample-workstream"\n'
+            f'planning_cycle = {cycle}\n'
+            f'plan_revision = "{revision}"\n'
+            'verdict = "green"\n'
+            'classification = "editorial_only"\n'
+            'inspected_diff_evidence = "Exact immutable old/new plan blobs were semantically compared; only editorial wording changed."\n'
+            '[base_subject]\n'
+            'class = "git_blob"\n'
+            'repository = "owner/repo"\n'
+            f'commit = "{"a" * 40}"\n'
+            'path = "planning/MASTER_PLAN.md"\n'
+            f'blob = "{base_blob}"\n'
+            '[changed_subject]\n'
+            'class = "git_blob"\n'
+            'repository = "owner/repo"\n'
+            f'commit = "{"a" * 40}"\n'
+            'path = "planning/MASTER_PLAN.md"\n'
+            f'blob = "{changed_blob}"\n'
+            '[unchanged]\n'
+            'strategy = true\n'
+            'milestone_topology = true\n'
+            'requirement_coverage = true\n'
+            'gates = true\n'
+            'acceptance_semantics = true\n'
+            '[independence]\n'
+            'materially_produced_or_repaired_changed_subject = false\n'
+            'basis = "Fresh semantic classifier did not author or repair the changed subject."\n'
+        )
+        if not (project / ".git").exists():
+            subprocess.run(["git", "init", "-q", str(project)], check=True)
+            subprocess.run(["git", "-C", str(project), "config", "user.email", "fixture@example.invalid"], check=True)
+            subprocess.run(["git", "-C", str(project), "config", "user.name", "Fixture"], check=True)
+        subprocess.run(["git", "-C", str(project), "add", path], check=True)
+        subprocess.run(["git", "-C", str(project), "commit", "-q", "-m", f"fixture {revision} editorial proof"], check=True)
+        commit = subprocess.run(
+            ["git", "-C", str(project), "rev-parse", "HEAD"],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        blob = subprocess.run(
+            ["git", "-C", str(project), "rev-parse", f"HEAD:{path}"],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        return ("owner/router-fixture", commit, path, blob)
+
     def install_approved_plan(self, project: Path) -> None:
         self.install_green_definition(project)
         self.install_state_record(
@@ -994,6 +1072,7 @@ class RouterTests(unittest.TestCase):
     def install_editorial_plan(self, project: Path) -> None:
         self.install_green_definition(project)
         base = f"owner/repo@{'a' * 40}:planning/MASTER_PLAN.md@{'b' * 40}"
+        exemption_classification = self.install_editorial_classification(project)
         self.install_state_record(
             project, "planning", "planning", "PLANNING.toml",
             self.planning_content(
@@ -1002,6 +1081,7 @@ class RouterTests(unittest.TestCase):
                 gate_subject=base, review_mode="editorial_exempt",
                 exemption_basis="Wording only; strategy, milestones, coverage and gates unchanged.",
                 exemption_base_subject=base,
+                exemption_classification=exemption_classification,
             ),
         )
         self.install_state_record(
