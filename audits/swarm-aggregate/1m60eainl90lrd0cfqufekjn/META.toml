@@ -1,0 +1,17 @@
+audit_kind = "pwv2_swarm_aggregate"
+aggregate_suffix = "1m60eainl90lrd0cfqufekjn"
+repository = "elmakus/project_workflow_v2"
+subject_commit = "4fb4bfb7d7b1481d6f347c182fc96a5a1135e045"
+source_branch_prefix = "audit/pwv2-swarm-"
+source_set_frozen = true
+aggregation_only = true
+matching_branches_discovered = 36
+completed_valid_source_audits = 34
+incomplete_empty_branches = 2
+excluded_mismatched_branches = 0
+clean_source_audits = 0
+findings_found_source_audits = 34
+total_original_material_findings = 164
+candidate_defect_class_clusters = 27
+clusters_independently_reported_by_2plus = 15
+unique_single_source_candidate_classes = 12
