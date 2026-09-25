@@ -170,21 +170,30 @@ def _require(condition: bool, message: str) -> None:
 
 
 def read_toml(path: Path) -> dict[str, Any]:
-    with path.open("rb") as handle:
-        value = tomllib.load(handle)
+    try:
+        with path.open("rb") as handle:
+            value = tomllib.load(handle)
+    except (tomllib.TOMLDecodeError, ValueError) as exc:
+        raise ValidationError(f"{path}: malformed TOML: {exc}") from exc
     _require(isinstance(value, dict), f"{path}: top-level TOML must be a table")
     return value
 
 
 def read_project(path: Path) -> dict[str, Any]:
-    text = path.read_text(encoding="utf-8")
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValidationError(f"{path}: PROJECT.md is not UTF-8 text: {exc}") from exc
     lines = text.splitlines()
     _require(lines and lines[0] == "+++", f"{path}: missing TOML front matter")
     try:
         end = lines.index("+++", 1)
     except ValueError as exc:
         raise ValidationError(f"{path}: unterminated TOML front matter") from exc
-    return tomllib.loads("\n".join(lines[1:end]))
+    try:
+        return tomllib.loads("\n".join(lines[1:end]))
+    except (tomllib.TOMLDecodeError, ValueError) as exc:
+        raise ValidationError(f"{path}: malformed TOML front matter: {exc}") from exc
 
 
 def reject_prohibited_keys(value: Any, where: str = "$") -> None:

@@ -2249,6 +2249,128 @@ class RouterTests(unittest.TestCase):
         for forbidden in ("chatgpt", "codex", "model_id", "session_id", "worker_id"):
             self.assertNotIn(forbidden, combined)
 
+    def test_malformed_board_and_workstream_route_to_recovery(self) -> None:
+        """RF017/H030: malformed Board/Workstream TOML routes Recovery without a parser leak."""
+        for target in (MANIFEST, BOARD):
+            temp, project = self.copy_fixture()
+            try:
+                path = project / target
+                before = path.read_text()
+                path.write_text(before + "\nrevision = [\n")
+                routed = select_route(project, [MANIFEST], package_root=ROOT)
+                self.assertEqual(
+                    (routed.disposition, routed.obligation),
+                    ("recovery", "recovery_boundary"),
+                    msg=f"malformed {target} must fail closed",
+                )
+                self.assertIn("malformed TOML", routed.reason)
+                self.assertIn(target, routed.reason)
+                self.assertEqual(path.read_text(), before + "\nrevision = [\n")
+            finally:
+                temp.cleanup()
+
+    def test_malformed_project_front_matter_routes_to_recovery(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            path = project / "PROJECT.md"
+            path.write_text(path.read_text().replace(
+                'workstream_root = "implementation/workstreams"\n+++',
+                'workstream_root = "implementation/workstreams"\nrevision = [\n+++',
+                1,
+            ))
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("bootstrap project identity invalid", routed.reason)
+            self.assertIn("malformed TOML front matter", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def install_malformed_planning(self, project: Path) -> None:
+        self.install_green_definition(project)
+        self.install_state_record(
+            project, "planning", "planning", "PLANNING.toml",
+            'workstream_id = "sample-workstream"\ncycle = [\n',
+        )
+
+    def install_malformed_board_research(self, project: Path) -> None:
+        self.install_board_research(project, state="active")
+        research = project / "implementation/workstreams/sample-workstream/RESEARCH.toml"
+        research.write_text(research.read_text() + "\nrevision = [\n")
+
+    def test_malformed_preboard_and_board_records_route_to_recovery(self) -> None:
+        """RF017: representative selector-owned TOML surfaces fail closed the same way."""
+        cases = (
+            ("INTAKE.toml", lambda project: self.install_intake(
+                project, 'workstream_id = "sample-workstream"\nkind = [\n')),
+            ("RESEARCH.toml", lambda project: self.install_state_record(
+                project, "research", "research", "RESEARCH.toml",
+                'workstream_id = "sample-workstream"\nstate = [\n')),
+            ("TRACKER.toml", lambda project: self.install_state_record(
+                project, "tracker", "tracker", "TRACKER.toml",
+                'workstream_id = "sample-workstream"\nstate = [\n')),
+            ("PLANNING.toml", self.install_malformed_planning),
+            ("RESEARCH.toml", self.install_malformed_board_research),
+        )
+        for filename, install in cases:
+            temp, project = self.copy_fixture()
+            try:
+                install(project)
+                routed = select_route(project, [MANIFEST], package_root=ROOT)
+                with self.subTest(surface=filename):
+                    self.assertEqual(
+                        (routed.disposition, routed.obligation),
+                        ("recovery", "recovery_boundary"),
+                    )
+                    self.assertIn("selected workstream identity invalid", routed.reason)
+                    self.assertIn("malformed TOML", routed.reason)
+                    self.assertIn(filename, routed.reason)
+            finally:
+                temp.cleanup()
+
+    def test_malformed_review_attempt_and_blocker_route_to_recovery(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            review_path = self.add_review_attempt(project, "pending")
+            attempt = project / review_path
+            attempt.write_text(attempt.read_text() + "\nrevision = [\n")
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("current Card execution state invalid", routed.reason)
+            self.assertIn("malformed TOML", routed.reason)
+            self.assertIn(review_path, routed.reason)
+        finally:
+            temp.cleanup()
+
+        temp, project = self.copy_fixture()
+        try:
+            self.install_blocker(project, "missing_evidence")
+            blocker = project / "implementation/workstreams/sample-workstream/blockers/M01-T04.toml"
+            blocker.write_text(blocker.read_text() + "\nrevision = [\n")
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("blocked Card recovery invalid", routed.reason)
+            self.assertIn("malformed TOML", routed.reason)
+            self.assertIn("blockers/M01-T04.toml", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_valid_and_semantic_invalid_controls_keep_existing_treatment(self) -> None:
+        routed = select_route(FIXTURE, [MANIFEST], package_root=ROOT)
+        self.assertEqual((routed.disposition, routed.obligation), ("route", "execution"))
+
+        temp, project = self.copy_fixture()
+        try:
+            board = project / BOARD
+            board.write_text(board.read_text().replace(
+                'status = "in_progress"', 'status = "bogus"', 1))
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("invalid status", routed.reason)
+            self.assertNotIn("malformed TOML", routed.reason)
+        finally:
+            temp.cleanup()
+
 
 if __name__ == "__main__":
     unittest.main()
