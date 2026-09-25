@@ -36,9 +36,9 @@ Milestone R01) are recorded as non-terminal and must never be treated as
 currently active authority.
 
 Prospective use only: tests replay these fixtures through the corrected
-contracts without mutating any historical record. Out of scope here: the
-REQ-127 intentional live-consumer prerequisite, BOOT-D Worker discipline,
-M03 and any authority change.
+contracts without mutating any historical record. Out of scope here: BOOT-D
+Worker discipline, M03 and any authority change. The REQ-127 intentional
+live-consumer prerequisite lives in ``tools/live_consumer_contract.py``.
 """
 
 from __future__ import annotations

@@ -52,9 +52,10 @@ merely by being present. Missing, stale, ambiguous, forged or contradictory
 trigger/materiality/reconciliation bindings fail closed, as do
 tracker-derived approval and Worker self-authorization.
 
-Intentional live-consumer prerequisites (REQ-127), immutable historical
-replay/corpus (REQ-125/126), BOOT-D Worker discipline (REQ-131/132) and M03+
-are intentionally out of scope.
+Intentional live-consumer prerequisites (REQ-127) live in
+``tools/live_consumer_contract.py`` and compose with this gate; immutable
+historical replay/corpus (REQ-125/126), BOOT-D Worker discipline
+(REQ-131/132) and M03+ are intentionally out of scope.
 """
 
 from __future__ import annotations

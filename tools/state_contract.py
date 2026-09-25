@@ -49,6 +49,10 @@ try:
         validate_finding_trigger_gates,
         validate_live_findings,
     )
+    from tools.live_consumer_contract import (
+        LiveConsumerError,
+        validate_live_consumer_gates,
+    )
 except ModuleNotFoundError:  # direct script execution from tools/
     from review_contract import (
         CONVERGENCE_FIELDS,
@@ -87,6 +91,10 @@ except ModuleNotFoundError:  # direct script execution from tools/
         LiveFindingError,
         validate_finding_trigger_gates,
         validate_live_findings,
+    )
+    from live_consumer_contract import (
+        LiveConsumerError,
+        validate_live_consumer_gates,
     )
 
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
@@ -948,6 +956,13 @@ def validate_board(
     try:
         validate_finding_trigger_gates(validated_findings, data.get("jit_triggers", []))
     except LiveFindingError as exc:
+        raise ValidationError(f"{exc}") from exc
+
+    try:
+        validate_live_consumer_gates(
+            data.get("jit_triggers", []), workstream["workstream_id"]
+        )
+    except LiveConsumerError as exc:
         raise ValidationError(f"{exc}") from exc
 
     for index, card in enumerate(cards):

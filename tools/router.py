@@ -32,6 +32,11 @@ from tools.live_finding_contract import (
     verify_finding_trigger_records,
     verify_live_finding_records,
 )
+from tools.live_consumer_contract import (
+    LiveConsumerError,
+    validate_live_consumer_gates,
+    verify_live_consumer_records,
+)
 from tools.state_contract import (
     ValidationError,
     read_project,
@@ -677,6 +682,24 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
         except LiveFindingError as exc:
             return recovery(reads, f"affected-JIT reconciliation verification failed: {exc}")
 
+    if board.get("jit_triggers"):
+        def _consumer_record_reader(raw: str) -> str | None:
+            try:
+                return reads.project(raw).read_text(encoding="utf-8")
+            except (OSError, ValidationError):
+                return None
+
+        try:
+            verify_live_consumer_records(
+                board,
+                record_reader=_consumer_record_reader,
+                git_reader=project_git_blob_reader(
+                    reads.project_root, project["repository"]
+                ),
+            )
+        except LiveConsumerError as exc:
+            return recovery(reads, f"live-consumer admission verification failed: {exc}")
+
     late = pending_late_return(board)
     handoff = bound_handoff_hold(board) if late is None else None
     held = late if late is not None else handoff
@@ -972,6 +995,36 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                 "reconciliation must be accepted and read back before "
                 "Execution Prep consumes the affected trigger",
                 subject=held[0], owner_module=owner_module,
+            )
+
+    if board.get("jit_triggers"):
+        try:
+            consumer_holds = validate_live_consumer_gates(
+                board["jit_triggers"], workstream["workstream_id"]
+            )
+        except LiveConsumerError as exc:
+            return recovery(reads, f"live-consumer gate invalid: {exc}")
+        states = {
+            trigger["id"]: trigger.get("state")
+            for trigger in board["jit_triggers"]
+            if isinstance(trigger, dict) and isinstance(trigger.get("id"), str)
+        }
+        consumer_held = sorted(
+            trigger_id
+            for trigger_id in consumer_holds
+            if states.get(trigger_id) == "satisfied"
+        )
+        if consumer_held:
+            return result(
+                reads, "route", "live_consumer_readiness",
+                "Satisfied intentional live-consumer trigger(s) "
+                + ", ".join(consumer_held)
+                + " held by pending readiness; verified corrected authority "
+                "and every required Definition, Planning, review, predecessor "
+                "and Milestone gate must be complete and read back before "
+                "Execution Prep consumes the intended consumer",
+                subject=consumer_held[0],
+                owner_module="workflow/EXECUTION_PREP.md",
             )
 
     return result(reads, "route", "execution_prep",
