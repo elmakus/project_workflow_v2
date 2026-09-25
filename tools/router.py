@@ -24,6 +24,10 @@ from tools.late_oversize_contract import (
     pending_late_return,
     unfinished_residual_scope,
 )
+from tools.live_finding_contract import (
+    LiveFindingError,
+    verify_live_finding_records,
+)
 from tools.state_contract import (
     ValidationError,
     read_project,
@@ -651,6 +655,18 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             )
     except (OSError, ValidationError, KeyError) as exc:
         return recovery(reads, f"selected workstream identity invalid: {exc}")
+
+    if board.get("live_findings"):
+        def _live_record_reader(raw: str) -> str | None:
+            try:
+                return reads.project(raw).read_text(encoding="utf-8")
+            except (OSError, ValidationError):
+                return None
+
+        try:
+            verify_live_finding_records(board, record_reader=_live_record_reader)
+        except LiveFindingError as exc:
+            return recovery(reads, f"live-finding intake verification failed: {exc}")
 
     late = pending_late_return(board)
     handoff = bound_handoff_hold(board) if late is None else None

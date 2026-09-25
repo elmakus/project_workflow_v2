@@ -44,6 +44,10 @@ try:
         LateOversizeError,
         validate_late_returns,
     )
+    from tools.live_finding_contract import (
+        LiveFindingError,
+        validate_live_findings,
+    )
 except ModuleNotFoundError:  # direct script execution from tools/
     from review_contract import (
         CONVERGENCE_FIELDS,
@@ -77,6 +81,10 @@ except ModuleNotFoundError:  # direct script execution from tools/
     from late_oversize_contract import (
         LateOversizeError,
         validate_late_returns,
+    )
+    from live_finding_contract import (
+        LiveFindingError,
+        validate_live_findings,
     )
 
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
@@ -926,6 +934,11 @@ def validate_board(
             data.get("sizing_audits"),
         )
     except LateOversizeError as exc:
+        raise ValidationError(f"{exc}") from exc
+
+    try:
+        validate_live_findings(data.get("live_findings"), workstream["workstream_id"])
+    except LiveFindingError as exc:
         raise ValidationError(f"{exc}") from exc
 
     for index, card in enumerate(cards):

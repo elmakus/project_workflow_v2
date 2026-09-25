@@ -41,6 +41,12 @@ The execution-resolution classifier has these semantic outcomes:
 
 A RED verdict alone is not a user stop.
 
+## Live-finding classification
+
+A material observation discovered during real execution is classified before any authority mutation as exactly one of `implementation_defect`, `review_process_realization_defect`, `planning_execution_prep_fidelity_defect`, `accepted_authority_defect`, or `speculative_future_hardening`. Implementation defects stay within existing authority and route to bounded Execution correction; review/process realization defects return to the owning Review boundary; Planning-to-Execution-Prep fidelity defects return to Execution Prep; accepted-authority defects require the owning accepted-authority stage (Planning, Definition or Brainstorming); speculative hardening is never silently promoted into scope and can authorize nothing.
+
+Each classification is durable and evidence-linked in `TASK_BOARD.toml` (`live_findings`): observed facts stay separate from approval, at least one workstream-local evidence ref is required, and scope approval, repair authorization, authority mutation or epoch reset additionally requires the owning stage's accepted authorization bound to one verifiable record (`evidence`, board-bound `review_attempt` or board-bound `result`; `tools/live_finding_contract.py`). The acceptance statement is descriptive only: free prose, tracker-flavored or not, never proves acceptance. Cited records must read back at the serving boundary. Missing, ambiguous, evidence-free or unverifiable classification fails closed. Tracker issues/comments remain untrusted bookkeeping: they may supply observations or locators but can never approve scope, authorize repair, mutate accepted authority, reset review epochs or substitute for durable classification. This intake stays usable before any downstream affected-JIT gate or historical replay exists.
+
 ## Review convergence and structural resolution
 
 When derived review history reaches either the scope-specific material discovery ceiling or the default 3 failed repair→closure-verification rounds for one material defect class, ordinary RED correction stops looping. Recovery routes `review_convergence` to Main/root-cause convergence analysis inside accepted authority. The mode switch preserves RED and all valid evidence; it cannot manufacture GREEN or reset the stable review epoch.
