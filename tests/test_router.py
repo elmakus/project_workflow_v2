@@ -953,6 +953,61 @@ class RouterTests(unittest.TestCase):
         finally:
             temp.cleanup()
 
+    def test_editorial_basis_without_immutable_classification_fails_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            base = f"owner/repo@{'a' * 40}:planning/MASTER_PLAN.md@{'b' * 40}"
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(
+                    state="approved", cycle=2, revision="P2", blob="c" * 40,
+                    premium_b="satisfied", premium_c="satisfied",
+                    gate_subject=base, review_mode="editorial_exempt",
+                    exemption_basis="wording only",
+                    exemption_base_subject=base,
+                ),
+            )
+            self.install_state_record(
+                project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                self.plan_review_content("green", cycle=2, revision="P2"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("classification", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_editorial_classification_wrong_blob_fails_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            base = f"owner/repo@{'a' * 40}:planning/MASTER_PLAN.md@{'b' * 40}"
+            proof = list(self.install_editorial_classification(
+                project, cycle=2, revision="P2"
+            ))
+            proof[3] = "d" * 40
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(
+                    state="approved", cycle=2, revision="P2", blob="c" * 40,
+                    premium_b="satisfied", premium_c="satisfied",
+                    gate_subject=base, review_mode="editorial_exempt",
+                    exemption_basis="wording only",
+                    exemption_base_subject=base,
+                    exemption_classification=tuple(proof),
+                ),
+            )
+            self.install_state_record(
+                project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                self.plan_review_content("green", cycle=2, revision="P2"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("blob does not match", routed.reason)
+        finally:
+            temp.cleanup()
+
     def test_stale_premium_cycle_and_wrong_review_subject_fail_closed(self) -> None:
         temp, project = self.copy_fixture()
         try:
