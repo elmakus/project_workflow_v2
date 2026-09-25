@@ -3391,3 +3391,537 @@ I could not execute the preserved repro script in this chat's local container: d
 
 Blindness note: I did not inspect `audit/*` branches/reports, GitHub Issues, or PR comments. An initial GitHub commit fetch unexpectedly returned the merge commit's diff, which included implementation-workstream evidence files from that commit; I did not use those conclusions as a defect checklist. The finding set above was independently frozen from canonical workflow/tool/test behavior. No post-freeze historical comparison was performed.
 
+
+## S031 — audit/pwv2-swarm-v59lpyq5jxrsgegtivvtk470
+
+### S031-F01 — Immutable Git identities are self-attested instead of verified against artifact bytes
+
+- Source branch: `audit/pwv2-swarm-v59lpyq5jxrsgegtivvtk470`
+- Original verdict context: FINDINGS FOUND
+- Selected attack lenses: stale commit/blob/path/result/review identity; helper vs documented semantics / parity drift / negative space; plugin / install / update / SessionStart / bootstrap drift; Planning / Premium gates / Execution precedence
+
+- Affected workflow contract/invariant: `workflow/STATE.md` and `workflow/EXECUTION_PREP.md` require launch refresh to verify each dependency result by exact path + commit/blob identity and to fail closed on same-path-changed inputs. Planning and review contracts likewise describe immutable Git-blob subjects.
+- Expected behavior: If a dependency/result/plan/review subject claims `path@commit:blob`, the production path that consumes it must verify that the actual artifact corresponds to that immutable identity; changing bytes at the same path while retaining old identifiers must fail closed.
+- Actual behavior: `refresh_ready_card()` only compares the dependency tuple in the Task Card with the tuple already present in `TASK_BOARD.toml`, then reads the current path without hashing/resolving it against `blob` or `commit`. `validate_planning()`, `validate_review()` and `exact_result_subject()` likewise validate 40-hex syntax/equality but do not resolve the subject to Git content. Therefore same-path changed bytes remain launchable, and frozen/review subjects can be syntactically exact without being proven to name the bytes consumed.
+- Minimal reproduction: Create a DONE predecessor result with commit `a*40` and blob `b*40`; make a READY Card depend on that exact tuple; route once (Execution Prep); modify only the predecessor result file contents while leaving the Card and board tuple unchanged; route again. The selector still returns `route/execution_prep` instead of Recovery.
+- Why this is materially load-bearing: Exact immutable identity is the mechanism that prevents stale or mutated predecessor/result/review inputs from being consumed after state recovery. Trusting two self-consistent strings rather than the artifact lets stale content cross an execution/review boundary.
+- Defect class / likely siblings: Any durable `git_blob` or result locator whose SHA fields are only syntax/equality checked rather than resolved to repository content; planning frozen subject, implementation review subject and result locators are likely siblings.
+- Existing tests that failed to catch it: `test_ready_card_stale_dependency_fails_closed_before_launch` changes both the file and the board commit/blob, so tuple inequality is detected; it does not test changed bytes with unchanged identity. Planning/review tests use synthetic 40-hex values without proving them against Git objects.
+- Reproduction artifact, if any: `repros/repro_adversarial.py` (`repro_f1_same_path_changed_dependency_still_launches`).
+
+### S031-F02 — Approved Planning is not bound to the current Definition revision/authority
+
+- Source branch: `audit/pwv2-swarm-v59lpyq5jxrsgegtivvtk470`
+- Original verdict context: FINDINGS FOUND
+- Selected attack lenses: stale commit/blob/path/result/review identity; helper vs documented semantics / parity drift / negative space; plugin / install / update / SessionStart / bootstrap drift; Planning / Premium gates / Execution precedence
+
+- Affected workflow contract/invariant: `workflow/DEFINITION.md`, `workflow/PLANNING.md`, and `workflow/STATE.md` require Strategic Planning to derive from current accepted Definition authority and require stale planning/premium authorization to be invalidated by material re-entry/change.
+- Expected behavior: Changing the current Definition revision or accepted requirements/decisions after a plan was approved must make the old Planning/Plan Review chain stale, forcing Recovery or a new Planning/premium cycle before execution.
+- Actual behavior: `validate_definition()` validates Definition internally, and `validate_planning()` validates Planning internally, but no validator/router check binds `planning.entry_subject`, the approved plan, or the Plan Review to the current Definition revision/authority. After changing Definition from R1 to R2 and changing its requirements locator, an old approved R1 Planning/Plan Review record can remain valid and the router proceeds to the live Task Board/Execution.
+- Minimal reproduction: Install the normal approved-plan fixture; mutate only `DEFINITION.toml` from revision `R1` to `R2` and point requirements at a new accepted requirements file; leave Planning and Plan Review unchanged. `select_route()` still returns `route/execution` for the active Card.
+- Why this is materially load-bearing: Execution can continue under a plan reviewed against superseded product authority, bypassing the intended new Planning and A/B/C sequence after a material Definition change.
+- Defect class / likely siblings: Missing cross-record freshness bindings between phase records; any later-stage record validated only internally can remain live after an upstream authority record changes.
+- Existing tests that failed to catch it: `test_stale_premium_cycle_and_wrong_review_subject_fail_closed` checks `premium_a_subject` against the Planning record's own `entry_subject` and checks Plan Review against the Planning subject, but never mutates the current Definition beneath an otherwise self-consistent Planning chain.
+- Reproduction artifact, if any: `repros/repro_adversarial.py` (`repro_f2_stale_plan_survives_definition_change`).
+
+### S031-F03 — Card-result “exact implementation subject” accepts arbitrary non-exact text
+
+- Source branch: `audit/pwv2-swarm-v59lpyq5jxrsgegtivvtk470`
+- Original verdict context: FINDINGS FOUND
+- Selected attack lenses: stale commit/blob/path/result/review identity; helper vs documented semantics / parity drift / negative space; plugin / install / update / SessionStart / bootstrap drift; Planning / Premium gates / Execution precedence
+
+- Affected workflow contract/invariant: `workflow/EXECUTION.md` defines an accepted semantic Card result as recording an exact implementation subject; durable valid results are recovery truth and prevent replay.
+- Expected behavior: `parse_card_result()` must reject a result whose implementation subject is not a well-formed exact immutable implementation identity.
+- Actual behavior: The parser only requires the `Implementation subject` field to be non-empty and free of `<`/`>` placeholders. Values such as `banana` are accepted and returned as `implementation_subject`.
+- Minimal reproduction: Call `parse_card_result()` with all required fields but `- Implementation subject: banana`; parsing succeeds.
+- Why this is materially load-bearing: A result can become durable recovery truth and advance into reconciliation/review without identifying what implementation was actually accepted, defeating exact-subject recovery and later auditability.
+- Defect class / likely siblings: Semantic identifiers represented as unconstrained strings where the workflow contract requires exact immutable identity.
+- Existing tests that failed to catch it: `test_delegated_and_direct_realizations_share_semantic_result_contract` uses an exact-looking example but does not test malformed/non-exact implementation subjects; the remaining result tests focus on runtime-identity fields and evidence path locality.
+- Reproduction artifact, if any: `repros/repro_adversarial.py` (`repro_f3_non_exact_implementation_subject_is_accepted`).
+
+### S031-F04 — Missing result/review evidence is treated as durable proof
+
+- Source branch: `audit/pwv2-swarm-v59lpyq5jxrsgegtivvtk470`
+- Original verdict context: FINDINGS FOUND
+- Selected attack lenses: stale commit/blob/path/result/review identity; helper vs documented semantics / parity drift / negative space; plugin / install / update / SessionStart / bootstrap drift; Planning / Premium gates / Execution precedence
+
+- Affected workflow contract/invariant: `workflow/EXECUTION.md`, `workflow/REVIEW.md`, and `workflow/STATE.md` require durable evidence for accepted results and terminal review attempts, with invalid/missing bindings failing closed.
+- Expected behavior: Before treating a result as recovery truth or a GREEN review as finalization authority, the router must at least establish that every required durable evidence locator resolves to an existing permitted artifact.
+- Actual behavior: `parse_card_result()` validates only the syntax/prefix of evidence refs; the router never reads those evidence files. `validate_review()`/`validate_plan_review()` require a non-empty terminal `evidence_path` but do not resolve it, and the router does not read it. A missing result-evidence file still routes to `review_freeze`; a GREEN review whose evidence file was deleted still routes to `post_review_finalization`.
+- Minimal reproduction: (a) create a valid required-review result, delete its referenced evidence file, route; observed `route/review_freeze`. (b) create a GREEN review, delete its terminal evidence file, route; observed `route/post_review_finalization`.
+- Why this is materially load-bearing: Recovery and finalization can be authorized by records whose purported proof no longer exists, so incomplete/corrupted durable state fails open exactly at review/finalization boundaries.
+- Defect class / likely siblings: Locator validation that checks string shape but never dereferences required evidence; Plan Review terminal evidence is a direct sibling.
+- Existing tests that failed to catch it: `test_review_terminal_evidence_and_append_only_history` verifies only that the evidence string is non-empty. Router result/review tests create evidence files but never remove them to prove they are actually consumed.
+- Reproduction artifact, if any: `repros/repro_adversarial.py` (`repro_f4_missing_evidence_does_not_fail_closed`).
+
+### S031-F05 — Plan Review acceptance can be unrelated to the Definition it supposedly reviews
+
+- Source branch: `audit/pwv2-swarm-v59lpyq5jxrsgegtivvtk470`
+- Original verdict context: FINDINGS FOUND
+- Selected attack lenses: stale commit/blob/path/result/review identity; helper vs documented semantics / parity drift / negative space; plugin / install / update / SessionStart / bootstrap drift; Planning / Premium gates / Execution precedence
+
+- Affected workflow contract/invariant: `workflow/PLAN_REVIEW.md` says Plan Review judges the frozen plan against accepted Definition/requirements/decisions and owns an exact acceptance authority.
+- Expected behavior: A Plan Review attempt's acceptance identity must be bound to the current accepted Definition authority (or an exact Planning-owned acceptance surface derived from it); an unrelated authority locator must fail closed.
+- Actual behavior: `validate_review()` accepts any `authority` locator under the broad allowed roots, while `validate_plan_review()` checks only workstream, plan revision/cycle and reviewed plan subject. It never compares `acceptance` with current Definition requirements/decisions. An otherwise GREEN Plan Review can point at an unrelated `decisions/UNRELATED.md` and still be consumed; with C already satisfied, routing proceeds to Execution.
+- Minimal reproduction: Install the approved-plan fixture, create `decisions/UNRELATED.md`, change only `PLAN_REVIEW.toml` acceptance from the Definition requirements path to that unrelated decision, then route. The selector still returns `route/execution`.
+- Why this is materially load-bearing: Independent review can certify the correct plan blob against the wrong acceptance authority, allowing execution without proof that the plan was reviewed against the product requirements that currently govern it.
+- Defect class / likely siblings: Review records whose reviewed subject is exact but whose acceptance surface is only class/path-shaped rather than cross-bound to the current authority owner.
+- Existing tests that failed to catch it: `test_plan_review_must_match_frozen_subject_and_terminal_evidence` verifies the reviewed plan subject and evidence string but never substitutes a different valid authority locator; router Plan Review fixtures always use the expected requirements path.
+- Reproduction artifact, if any: `repros/repro_adversarial.py` (`repro_f5_plan_review_acceptance_is_not_bound_to_definition`).
+
+#### S031 source coverage
+
+Primary attack lenses selected from `AUDIT_SUFFIX`:
+1. stale commit/blob/path/result/review identity;
+2. helper vs documented semantics / parity drift / negative space;
+3. plugin / install / update / SessionStart / bootstrap drift;
+4. Planning / Premium gates / Execution precedence.
+
+Inspected the canonical router and workflow contracts including `workflow/ROUTER.md`, `STATE.md`, `AUTHORITY.md`, `PLANNING.md`, `PLAN_REVIEW.md`, `EXECUTION_PREP.md`, `EXECUTION.md`, `REVIEW.md`, `BRAINSTORMING.md`, `RESEARCH.md`, `DEFINITION.md`, and `USER_STOP.md`; production helpers `tools/router.py`, `state_contract.py`, `execution_contract.py`, and `recovery_contract.py`; delivery/bootstrap files under `hooks/`, `.codex-plugin/`, `.agents/plugins/`, `skills/`; and the relevant regression suites in `tests/test_router.py`, `test_state_contract.py`, `test_execution_contract.py`, `test_chatgpt_delivery.py`, and `test_codex_delivery.py`.
+
+Negative-space cases were constructed for unchanged SHA labels with changed bytes, upstream Definition changes under stale Planning, malformed implementation identity, deleted evidence, and unrelated Plan Review acceptance authority. A non-mutating executable repro script is persisted with the report.
+
+#### S031 original confidence and limitations
+
+Confidence is high for F1, F3, F4 and F5 because the fail-open path is direct in production code and the existing tests explicitly leave the negative-space case uncovered. Confidence is medium-high for F2 because the contracts clearly require Planning to derive from current Definition authority, while no cross-record freshness binding exists; the exact serialized format of `entry_subject` is intentionally not specified, so the finding is about the missing binding, not a required string format.
+
+I could not execute the production Python selector in this audit environment: the generic container has no GitHub network access, and the connected Desktop Commander device had exhausted its monthly tool-call quota. The preserved reproduction script therefore records executable falsifications constructed against the exact audited source but was not run here. Existing source/tests were read from the immutable subject commit.
+
+Blindness caveat: before this audit execution, a status check in the immediately preceding chat turn enumerated audit branch names and head SHAs. No audit branch contents, swarm reports, Issues, PR comments, historical evidence, or reviewer conclusions were opened or used. The finding set above was frozen solely from the target commit's allowed production/contracts/tests surface. No post-freeze historical comparison was performed.
+
+
+## S032 — audit/pwv2-swarm-x9m2q7v4k1c8n5r0t6p3zjha
+
+### S032-F01 — READY launch trusts self-asserted commit/blob metadata instead of verifying dependency content
+
+- Source branch: `audit/pwv2-swarm-x9m2q7v4k1c8n5r0t6p3zjha`
+- Original verdict context: FINDINGS FOUND — 4 material findings.
+- Selected attack lenses: immutable-subject-and-content-identity; review-evidence-and-gate-integrity; router-precedence-and-real-stops; issue-diagnosis-prior-art-authorization-boundary
+
+**Affected contract / invariant.** `workflow/STATE.md` and `workflow/EXECUTION_PREP.md` require READY predecessor dependencies to be bound by result path plus immutable commit/blob identity, with missing, stale, or same-path-changed inputs failing closed before execution.
+
+**Expected behavior.** If the dependency result file changes while the Task Card and Task Board still claim the previous `path@commit:blob`, launch refresh must detect the content/identity mismatch and route to Recovery.
+
+**Actual behavior.** In `tools/router.py`, `refresh_ready_card()` builds the DONE-result identity set entirely from Task Board metadata, compares the Task Card dependency tuple against that metadata, and then merely reads the dependency file. It never resolves the claimed commit, verifies that the path at that commit has the claimed blob, or verifies current file content against that blob. `tools/state_contract.py` similarly checks the commit/blob values only as 40-hex strings.
+
+A same-path content mutation with unchanged metadata therefore still reaches `route/execution_prep`.
+
+**Minimal reproduction.** Run:
+
+```bash
+python3 audits/swarm/x9m2q7v4k1c8n5r0t6p3zjha/repros/f1_dependency_content_drift.py
+```
+
+The repro changes only the dependency file contents while preserving the claimed dependency metadata. The observed selector path remains `execution_prep`; the contract requires fail-closed Recovery.
+
+**Why load-bearing.** Downstream implementation can execute against predecessor content different from the supposedly immutable result identity. This defeats launch freshness and can propagate stale or unreviewed semantics.
+
+**Defect class / likely siblings.** Unverified immutable identity / fail-open stale-content acceptance. The same trust pattern appears in plan/review/result Git subjects where validators establish syntax and string equality but do not establish repository-object truth.
+
+**Existing tests that missed it.** `test_ready_card_stale_dependency_fails_closed_before_launch` changes both the Board commit/blob metadata and the dependency file. The router catches the metadata tuple mismatch; it does not test file-only same-path drift.
+
+**Reproduction artifact.** `repros/f1_dependency_content_drift.py`
+
+### S032-F02 — GREEN review can finalize with missing terminal evidence
+
+- Source branch: `audit/pwv2-swarm-x9m2q7v4k1c8n5r0t6p3zjha`
+- Original verdict context: FINDINGS FOUND — 4 material findings.
+- Selected attack lenses: immutable-subject-and-content-identity; review-evidence-and-gate-integrity; router-precedence-and-real-stops; issue-diagnosis-prior-art-authorization-boundary
+
+**Affected contract / invariant.** `workflow/REVIEW.md` requires durable verdict evidence for terminal review attempts, and REQUIRED/activated RECOMMENDED review must block terminal Card completion until exact GREEN.
+
+**Expected behavior.** A terminal GREEN attempt whose `evidence_path` is missing or unreadable must be invalid and fail closed rather than authorize finalization.
+
+**Actual behavior.** `validate_review()` requires only a non-empty safe relative `evidence_path` for GREEN/RED. It does not verify that the evidence path exists or is readable. The router loads review TOML, validates history and subject strings, then routes an exact GREEN directly to `post_review_finalization` without reading the evidence file. The same validation pattern exists for Plan Review evidence.
+
+Deleting the evidence file after a GREEN attempt therefore leaves the review gate satisfied.
+
+**Minimal reproduction.**
+
+```bash
+python3 audits/swarm/x9m2q7v4k1c8n5r0t6p3zjha/repros/f2_missing_review_evidence.py
+```
+
+The repro creates the normal GREEN fixture attempt, deletes its evidence Markdown, and the selector still returns `route/post_review_finalization`.
+
+**Why load-bearing.** The independent-review gate can become a TOML assertion with a dangling path. Durable evidence required for audit/recovery may be absent while the workflow deterministically finalizes the Card.
+
+**Defect class / likely siblings.** Review-gate fail-open / dangling evidence locator. Plan Review evidence has the same validation shape.
+
+**Existing tests that missed it.** `test_review_terminal_evidence_and_append_only_history` checks only an empty evidence string. `test_required_review_blocks_until_green_then_routes_finalization` creates the evidence file and never removes it.
+
+**Reproduction artifact.** `repros/f2_missing_review_evidence.py`
+
+### S032-F03 — Active Research masks an explicit user stop despite declared precedence
+
+- Source branch: `audit/pwv2-swarm-x9m2q7v4k1c8n5r0t6p3zjha`
+- Original verdict context: FINDINGS FOUND — 4 material findings.
+- Selected attack lenses: immutable-subject-and-content-identity; review-evidence-and-gate-integrity; router-precedence-and-real-stops; issue-diagnosis-prior-art-authorization-boundary
+
+**Affected contract / invariant.** `tools/router.py` declares `explicit_human_or_premium_boundary` above `research_return` in `PRIORITY_FOUNDATION`. PWV2-REQ-067/068 makes an explicit user stop a real stop. `BRAINSTORM.toml` durably owns `explicit_user_stop`.
+
+**Expected behavior.** When a workstream carries a valid explicit user stop and also has active Research, routing must honor the higher-precedence human boundary, or fail closed if the combined state is contradictory. It must not continue Research past the stop.
+
+**Actual behavior.** The selector reads and dispatches active/completed top-level Research before it reads Brainstorming state. The explicit user-stop check occurs only later. `validate_brainstorm()` accepts the stop flag and `validate_research()` independently accepts active Brainstorming-origin Research; there is no cross-record guard forbidding the combination.
+
+Thus the declared precedence tuple is not enforced for this combination: the selector returns `route/research` rather than `stop/explicit_user_stop`.
+
+**Minimal reproduction.**
+
+```bash
+python3 audits/swarm/x9m2q7v4k1c8n5r0t6p3zjha/repros/f3_user_stop_precedence.py
+```
+
+**Why load-bearing.** A durable explicit human stop is a hard agency boundary. Continuing an agent-owned factual obligation after that stop is an illegal transition across the router's highest-precedence class.
+
+**Defect class / likely siblings.** Router precedence inversion / real-stop bypass. Any higher-precedence stop stored in a record read after an earlier-returning obligation deserves analogous co-bound tests.
+
+**Existing tests that missed it.** `test_priority_and_real_stop_foundations_are_runtime_neutral` asserts the constant ordering only. Research routing and Brainstorming stops are tested separately, not co-bound.
+
+**Reproduction artifact.** `repros/f3_user_stop_precedence.py`
+
+### S032-F04 — Arbitrary Intake string can bypass mandatory issue prior-art Research
+
+- Source branch: `audit/pwv2-swarm-x9m2q7v4k1c8n5r0t6p3zjha`
+- Original verdict context: FINDINGS FOUND — 4 material findings.
+- Selected attack lenses: immutable-subject-and-content-identity; review-evidence-and-gate-integrity; router-precedence-and-real-stops; issue-diagnosis-prior-art-authorization-boundary
+
+**Affected contract / invariant.** `workflow/INTAKE.md` requires a concrete issue repair subject to materialize proportional Intake-origin Research, apply and consume that exact result, and only then persist the diagnosis-prior-art subject/result binding. PWV2-REQ-049 makes the proportional prior-art check mandatory.
+
+**Expected behavior.** An authorized/completed issue with no qualifying Research provenance must route to the missing Research/reconciliation obligation or fail closed. A self-asserted string must not stand in for the required consumed Research result.
+
+**Actual behavior.** `validate_intake()` models `diagnosis_prior_art_result` as an unconstrained string and, for authorization, requires only that it be non-empty while the prior-art subject equals `repair_subject`. The router then defines stable diagnosis prior art as that subject equality plus a non-empty result string. Once those two fields are present it skips the exact Research provenance check.
+
+A completed authorized issue with `diagnosis_prior_art_result = "forged-no-research"`, no Research locator, and an existing Task Board therefore continues directly to implementation routing.
+
+**Minimal reproduction.**
+
+```bash
+python3 audits/swarm/x9m2q7v4k1c8n5r0t6p3zjha/repros/f4_forged_prior_art_binding.py
+```
+
+The base fixture's live Card routes to `execution` despite no Intake-origin Research record being materialized.
+
+**Why load-bearing.** This bypasses the mandatory diagnosis/prior-art precondition before repair implementation. User authorization may be exact while the factual/provenance prerequisite is fabricated.
+
+**Defect class / likely siblings.** Authorization-precondition bypass / unverified provenance token. Any durable field used as proof of a previously completed mandatory obligation needs provenance stronger than a free-form non-empty string.
+
+**Existing tests that missed it.** Current Intake tests reject empty or stale bindings. `test_completed_authorized_issue_continues_to_existing_board` installs valid Research but there is no negative case with a non-empty forged binding and no qualifying Research provenance.
+
+**Reproduction artifact.** `repros/f4_forged_prior_art_binding.py`
+
+#### S032 source coverage
+
+Four attack lenses were frozen before detailed inspection:
+
+1. immutable-subject-and-content identity;
+2. review-evidence-and-gate integrity;
+3. router precedence and real stops;
+4. issue-diagnosis prior-art authorization boundary.
+
+Files examined from the exact immutable subject include:
+
+- `requirements/PROJECT_WORKFLOW_V2.md`;
+- `workflow/ROUTER.md`, `STATE.md`, `INTAKE.md`, `RESEARCH.md`, `BRAINSTORMING.md`;
+- `workflow/EXECUTION_PREP.md`, `REVIEW.md`, `RECOVERY.md`, `CLOSE.md`;
+- `tools/router.py`, `state_contract.py`, `execution_contract.py`, `recovery_contract.py`, `close_contract.py`;
+- `tests/test_router.py`, `tests/test_state_contract.py`, and `scripts/test.sh`.
+
+No moving-`main` state was used as semantic audit authority. Other swarm report contents, GitHub Issues, PR discussions/comments, and historical diagnosis/review artifacts were not inspected before the finding set was frozen.
+
+#### S032 original confidence and limitations
+
+Confidence is **high** for the four reported control-flow/validation defects. Each follows directly from the frozen router/validator implementation and has a minimal runnable repro built from the repository's own fixture helpers.
+
+Execution limitation: an isolated local run was attempted on the connected Tower, but Remote Desktop Commander reported that its monthly tool-call quota was exhausted and explicitly instructed not to retry. GitHub reported no workflow runs directly associated with the exact merge commit. Therefore this report does **not** claim captured local repro stdout or exact-subject CI execution in this audit session; the deterministic repro scripts are persisted for execution in any checkout of the audited commit.
+
+This audit did not mutate canonical Project Workflow state, `main`, other work branches, Issues, pull requests, comments, or merges.
+
+
+## S033 — audit/pwv2-swarm-yc80f4r9jz0jn7b0vzdv424d
+
+### S033-F01 — Durable explicit user stop can lose router precedence
+
+- Source branch: `audit/pwv2-swarm-yc80f4r9jz0jn7b0vzdv424d`
+- Original verdict context: FINDINGS FOUND
+- Selected attack lenses: router precedence / unreachable branches / conflicting obligations; stale commit/blob/path/result/review identity; plugin / install / update / SessionStart / bootstrap drift; Task Board / READY / active / DONE / JIT-trigger lifecycle
+
+- Affected workflow contract/invariant: `workflow/BRAINSTORMING.md` defines an explicit user stop as a real stop; `workflow/ROUTER.md` and `PRIORITY_FOUNDATION` place explicit human/premium boundaries ahead of lower-precedence continuation.
+- Expected behavior: if the selected durable Brainstorming record carries `explicit_user_stop = true`, continuation must stop before Research return, Definition, Planning, or implementation-stage work can advance, or contradictory later state must fail closed to Recovery.
+- Actual behavior: `tools/router.py` returns from active/completed Research before it reads Brainstorming, and after Brainstorming is read it may return from Definition/Planning before reaching the later `explicit_user_stop` check. The Brainstorming validator permits a promoted, exactly authorized revision with `explicit_user_stop = true`. A representative valid state with promoted Brainstorming + explicit stop + GREEN Definition therefore routes to Planning instead of stopping.
+- Minimal reproduction: copy `tests/fixtures/router/valid-project`; install the existing test helper's GREEN Definition state; change only `explicit_user_stop = false` to `true` in its promoted Brainstorming record; call production `select_route`. The selected route is `route/planning`, not `stop/explicit_user_stop`.
+- Why this is materially load-bearing: a durable human stop is a workflow authority boundary. Continuing past it can cause later planning/execution obligations to be selected after the user explicitly stopped the scope.
+- Defect class / likely siblings: router-precedence defect plus contradictory-state acceptance. The same structural risk applies wherever a higher-precedence human boundary is stored in a record whose check occurs after an earlier-returning owner.
+- Existing tests that failed to catch it: `tests/test_router.py` exercises Brainstorming promotion and premium stops but contains no `explicit_user_stop = true` router case.
+- Reproduction artifact, if any: `audits/swarm/yc80f4r9jz0jn7b0vzdv424d/repros/repro_material_findings.py` (`f1_explicit_stop_loses_precedence`).
+
+### S033-F02 — Exact Git subjects are trusted as self-asserted strings instead of authenticated Git identity
+
+- Source branch: `audit/pwv2-swarm-yc80f4r9jz0jn7b0vzdv424d`
+- Original verdict context: FINDINGS FOUND
+- Selected attack lenses: router precedence / unreachable branches / conflicting obligations; stale commit/blob/path/result/review identity; plugin / install / update / SessionStart / bootstrap drift; Task Board / READY / active / DONE / JIT-trigger lifecycle
+
+- Affected workflow contract/invariant: `workflow/STATE.md`, `workflow/EXECUTION_PREP.md`, and `workflow/REVIEW.md` require immutable path + commit/blob binding, stale/same-path-changed inputs to fail closed, and review verdicts to apply only to the exact current Git content subject.
+- Expected behavior: before an exact Git subject is used to authorize READY launch, Plan Review reuse, implementation review finalization, or another exact-subject gate, the declared repository/commit/path/blob tuple must resolve to the actual Git object being consumed; changed file bytes under unchanged declared metadata must not retain prior review/dependency authority.
+- Actual behavior: `tools/state_contract.py` validates commit/blob only as 40-hex strings. `_git_blob_subject_key` does not resolve Git, bind the repository to `PROJECT.repository`, or prove `commit:path -> blob`. READY dependency refresh compares the Card tuple only to the Task Board's tuple and then reads the current filesystem path. Implementation review compares the review tuple only to the Task Board result tuple. Consequently a result file can change while its board/review metadata stays unchanged and production routing still returns `post_review_finalization`; similarly arbitrary syntactically valid hashes can authenticate READY dependencies. Planning subjects also accept a different repository string from the consumer PROJECT.
+- Minimal reproduction: create an active REQUIRED-review Card using the existing test helper, add a GREEN attempt, verify `post_review_finalization`; then mutate only the result Markdown bytes while leaving the board result `commit/blob` and GREEN review subject untouched. The result remains parse-valid and `select_route` still returns `post_review_finalization`.
+- Why this is materially load-bearing: immutable content identity is the mechanism that makes stale review, stale dependency and recovery truth safe. If the tuple is merely self-asserted metadata, reviewed or depended-on content can change without invalidating the authority that was supposed to cover the prior bytes.
+- Defect class / likely siblings: stale-subject / trust-the-wrong-blob defect across READY dependencies, implementation reviews, frozen plan subjects, Plan Review, and any future consumer of the same syntactic Git-subject helpers.
+- Existing tests that failed to catch it: router fixtures intentionally use synthetic `"a"*40` / `"b"*40` identities and consider them valid. The stale dependency/review tests change the metadata hashes themselves; they do not mutate same-path bytes while leaving the asserted hashes unchanged. Planning test data also uses `owner/repo` while the fixture PROJECT repository is `owner/router-fixture`.
+- Reproduction artifact, if any: `audits/swarm/yc80f4r9jz0jn7b0vzdv424d/repros/repro_material_findings.py` (`f2_changed_result_bytes_keep_green_review`).
+- Repair direction: centralize Git-subject resolution and authenticate repository + commit:path -> blob against repository truth before consuming any exact-subject gate.
+
+### S033-F03 — Task Board status can bypass required review and can replay an already durable result
+
+- Source branch: `audit/pwv2-swarm-yc80f4r9jz0jn7b0vzdv424d`
+- Original verdict context: FINDINGS FOUND
+- Selected attack lenses: router precedence / unreachable branches / conflicting obligations; stale commit/blob/path/result/review identity; plugin / install / update / SessionStart / bootstrap drift; Task Board / READY / active / DONE / JIT-trigger lifecycle
+
+- Affected workflow contract/invariant: `workflow/STATE.md`, `workflow/EXECUTION.md`, and `workflow/REVIEW.md` require REQUIRED/activated RECOMMENDED review to block terminal Card completion until exact GREEN, and require a valid durable semantic result to prevent implementation replay.
+- Expected behavior: Task Board lifecycle validation must reject terminal `done` for a Card whose stable contract requires review unless its exact current result has completed the required GREEN/finalization path. Likewise a Card with an accepted durable result must not be treated as an ordinary READY implementation launch.
+- Actual behavior: `validate_board` checks only that a `done` Card has a result locator; it does not parse the Card contract, validate review requirement/history/verdict, or bind terminal status to post-review finalization. Review history is evaluated only inside the router's `active` branch. Therefore an otherwise valid REQUIRED-review Card with a pending (or RED/no) attempt can be changed from `in_progress` to `done`; the router skips review and routes `close`. The sibling state `status = ready` plus a valid result locator is also accepted; READY routing ignores that result and routes Execution Prep, allowing accepted work to be replayed.
+- Minimal reproduction: use the existing test helper to install a REQUIRED-review result and a pending review attempt, then change only the Task Board status from `in_progress` to `done`. `validate_board` accepts the state and `select_route` returns `route/close` without reading or enforcing the pending review.
+- Why this is materially load-bearing: Task Board status is the control surface deciding whether review/finalization remains blocking. Accepting contradictory cross-field lifecycle state permits required independent review to be bypassed and can also replay already accepted implementation work.
+- Defect class / likely siblings: malformed/contradictory cross-record state not validated fail-closed. Siblings include `done + pending/RED/stale/no review`, `ready + result`, and other statuses carrying result/review fields whose legality depends on the stable Card.
+- Existing tests that failed to catch it: required-review lifecycle tests keep the Card `in_progress`; the all-terminal-to-Close test uses review requirement `none`. State-contract tests validate fields mostly in isolation and do not assert the cross-record terminal-review invariant.
+- Reproduction artifact, if any: `audits/swarm/yc80f4r9jz0jn7b0vzdv424d/repros/repro_material_findings.py` (`f3_done_card_bypasses_pending_required_review`).
+
+#### S033 source coverage
+
+The audit remained bound to exact commit `4fb4bfb7d7b1481d6f347c182fc96a5a1135e045`. Before freezing findings I did not inspect `audit/*` branches, swarm reports, GitHub Issues/PR comments, or historical workstream evidence/review narratives.
+
+Inspected and cross-checked the canonical router/state/authority modules and selected stage modules, production selectors/validators/helpers, Task Board/Card/review contracts, Close helpers, SessionStart/plugin/Skill/bootstrap code, repository test entrypoint, and focused router/state/delivery tests. The four selected attack lenses were exercised as follows:
+
+- router precedence: explicit user-stop ordering against Research/Definition/Planning early returns;
+- stale identity: result/review/dependency/plan Git-subject binding and same-path mutation negative space;
+- plugin/bootstrap drift: package-root resolution, router marker validation, fail-closed tests and ChatGPT/Codex authority-source split;
+- Task Board/JIT lifecycle: READY launch refresh, result/review state, DONE finalization, and JIT-to-Close interaction.
+
+The material finding set was frozen as F1-F3 before any historical comparison.
+
+#### S033 original confidence and limitations
+
+Confidence is high for F1-F3 because each follows directly from production control flow plus accepted validator state, and each has a minimal preserved reproduction using the repository's own fixture/helpers and production selector.
+
+I could not execute those reproduction scripts inside this ChatGPT session: the local container could not resolve `github.com`, and the connected Remote Desktop Commander device reported its monthly tool-call quota paused and instructed not to retry. I therefore inspected exact-commit source through the connected GitHub repository API and preserved executable non-mutating repros on the audit branch. The subject commit had no GitHub Actions workflow run returned by the repository API at audit time.
+
+
+## S034 — audit/pwv2-swarm-ze8eya3df1xsxsb7q93smiac
+
+### S034-F01 — A JIT trigger can be consumed without materializing its downstream Card, allowing Close to absorb unfinished approved work
+
+- Source branch: `audit/pwv2-swarm-ze8eya3df1xsxsb7q93smiac`
+- Original verdict context: FINDINGS FOUND
+- Selected attack lenses: helper vs documented semantics / parity drift / negative space; Close / finalization / end-of-approved-scope; stale commit/blob/path/result/review identity; Task Board / READY / active / DONE / JIT-trigger lifecycle
+
+- Affected workflow contract/invariant:
+  - `workflow/EXECUTION_PREP.md`: predecessor-dependent work remains a JIT trigger until its stable downstream Card can be materialized; lifecycle is `waiting -> satisfied -> consumed`.
+  - `workflow/STATE.md`: Task Board owns bounded predecessor-dependent JIT triggers.
+  - `workflow/CLOSE.md`: Close may stop only when no already-authorized obligation remains.
+- Expected behavior:
+  - `consumed` must prove that the trigger was actually consumed by durable downstream work (normally a materialized Card), or the trigger must remain non-terminal and route back to Execution Prep.
+- Actual behavior:
+  - `validate_board()` treats `satisfied` and `consumed` identically: both require only a DONE predecessor with a result.
+  - A `consumed` trigger has no required downstream-Card binding or other consumption proof.
+  - `tools/router.py` does not inspect `jit_triggers` after board validation. If all existing Cards are DONE, it routes to `close`.
+  - `tools/close_contract.py` has no JIT/Task-Board input that can reconstruct the missing downstream materialization.
+- Minimal reproduction:
+  1. Start from the canonical router fixture.
+  2. Mark the only Card DONE and give it a result.
+  3. Add a JIT trigger with `after_card` equal to that DONE Card and `state = "consumed"`.
+  4. Do not create any downstream Card.
+  5. `validate_board()` accepts the state and `select_route()` returns `route/close`.
+- Why this is materially load-bearing:
+  - An authorized predecessor-dependent unit of work can disappear from durable state and the workflow can enter Close with no executable representation of that work.
+- Defect class / likely siblings:
+  - JIT lifecycle lacks a durable consumed-by/materialization invariant.
+  - A `satisfied` trigger with no downstream Card is also invisible to the production selector and can be routed into Close when all current Cards are DONE.
+- Existing tests that failed to catch it:
+  - `tests/test_state_contract.py::test_jit_trigger_preserves_predecessor_boundary_without_placeholder_card` exercises `waiting` and `satisfied`, but not a `consumed` trigger without a downstream Card.
+  - `tests/test_router.py` contains no `jit_triggers` case.
+  - `tests/test_close_contract.py` contains no JIT/Task-Board case.
+- Reproduction artifact, if any:
+  - `audits/swarm/ze8eya3df1xsxsb7q93smiac/repros/jit_consumed_without_card.py`
+
+### S034-F02 — DONE status bypasses the REQUIRED review gate
+
+- Source branch: `audit/pwv2-swarm-ze8eya3df1xsxsb7q93smiac`
+- Original verdict context: FINDINGS FOUND
+- Selected attack lenses: helper vs documented semantics / parity drift / negative space; Close / finalization / end-of-approved-scope; stale commit/blob/path/result/review identity; Task Board / READY / active / DONE / JIT-trigger lifecycle
+
+- Affected workflow contract/invariant:
+  - `workflow/REVIEW.md`: for REQUIRED/activated RECOMMENDED review, no attempt, pending, in-progress, or RED blocks terminal Card completion; only exact GREEN permits deterministic finalization.
+  - `workflow/STATE.md`: the same blocking rule is part of durable-state semantics.
+- Expected behavior:
+  - A Card whose stable contract says `Review requirement: required` cannot be accepted as terminal DONE unless exact current GREEN review history is proven.
+- Actual behavior:
+  - `validate_board()` validates a DONE Card only by requiring a result locator. It does not read the stable Card to learn its review requirement and does not require/validate review history as a terminal invariant.
+  - `select_route()` only runs result/review logic for `in_progress` Cards. When the same Card is already marked `done`, the router skips the Card contract, result, and review attempts entirely; if all Cards are DONE it returns `route/close`.
+- Minimal reproduction:
+  1. Use one Card with a complete stable contract containing `Review requirement: required`.
+  2. Give the Card a valid-looking result locator/result.
+  3. Provide no review attempt.
+  4. Set Card status directly to `done`.
+  5. `select_route()` returns `route/close` instead of Recovery/review.
+- Why this is materially load-bearing:
+  - A durable state mutation can bypass the independent implementation-review safety gate and advance directly toward Close.
+- Defect class / likely siblings:
+  - Terminal state is trusted as an assertion rather than re-derived from terminal invariants.
+  - The same bypass applies to DONE Cards with pending, RED, stale, or otherwise insufficient review history because that history is not loaded on the DONE path.
+- Existing tests that failed to catch it:
+  - REQUIRED-review router tests keep the Card `in_progress`.
+  - `test_all_terminal_cards_route_to_close_not_directly_to_stop` explicitly installs `review_requirement = "none"` before changing status to DONE.
+- Reproduction artifact, if any:
+  - `audits/swarm/ze8eya3df1xsxsb7q93smiac/repros/router_adversarial_repros.py` (`repro_done_bypasses_required_review`)
+
+### S034-F03 — READY dependency refresh trusts declared commit/blob tuples without verifying the actual dependency bytes
+
+- Source branch: `audit/pwv2-swarm-ze8eya3df1xsxsb7q93smiac`
+- Original verdict context: FINDINGS FOUND
+- Selected attack lenses: helper vs documented semantics / parity drift / negative space; Close / finalization / end-of-approved-scope; stale commit/blob/path/result/review identity; Task Board / READY / active / DONE / JIT-trigger lifecycle
+
+- Affected workflow contract/invariant:
+  - `workflow/EXECUTION_PREP.md`: READY launch refresh must verify exact dependency result path + immutable commit/blob identity.
+  - `workflow/STATE.md`: missing/stale or same-path-changed dependency inputs fail closed before execution.
+- Expected behavior:
+  - If a DONE predecessor result changes at the same path while the Task Board/Card still claim the old commit/blob identity, launch refresh must detect the mismatch and fail closed.
+- Actual behavior:
+  - `refresh_ready_card()` compares the dependency tuple declared in the Task Card against the tuple declared in DONE Board state.
+  - After tuple equality, it merely `read_text()`s the dependency path. It never resolves the claimed commit, hashes the file, or verifies that the bytes at the path equal the claimed blob.
+  - Therefore both durable records can retain the same stale tuple while the dependency file changes, and the READY Card still routes to `execution_prep`.
+- Minimal reproduction:
+  1. Create a DONE predecessor with result `path=P, commit=A, blob=B`.
+  2. Create a READY Card whose dependency is exactly `P@A:B`.
+  3. Initial launch refresh returns `execution_prep`.
+  4. Change the bytes at `P` while leaving both declared tuples unchanged.
+  5. Launch refresh still returns `execution_prep`.
+- Why this is materially load-bearing:
+  - A downstream Card can execute against dependency content that is not the immutable result it was authorized to consume.
+- Defect class / likely siblings:
+  - Git identity is treated as self-declared metadata rather than verified identity.
+  - The same structural risk exists anywhere the selector compares claimed commit/blob strings without resolving the Git object, including current result/review and planning subjects.
+- Existing tests that failed to catch it:
+  - `test_ready_card_stale_dependency_fails_closed_before_launch` changes the predecessor's declared Board commit/blob, creating a tuple mismatch. It does not test same-path changed bytes while both declared tuples stay stale.
+- Reproduction artifact, if any:
+  - `audits/swarm/ze8eya3df1xsxsb7q93smiac/repros/stale_dependency_blob.py`
+
+### S034-F04 — A GREEN implementation review remains valid after its Task Card acceptance surface changes
+
+- Source branch: `audit/pwv2-swarm-ze8eya3df1xsxsb7q93smiac`
+- Original verdict context: FINDINGS FOUND
+- Selected attack lenses: helper vs documented semantics / parity drift / negative space; Close / finalization / end-of-approved-scope; stale commit/blob/path/result/review identity; Task Board / READY / active / DONE / JIT-trigger lifecycle
+
+- Affected workflow contract/invariant:
+  - `workflow/REVIEW.md`: each review attempt binds one exact acceptance surface, normally the stable Task Card.
+  - `workflow/EXECUTION_PREP.md`: an in-progress Card must not be silently rewritten through JIT refinement.
+- Expected behavior:
+  - If the acceptance/tests/scope of the Task Card change after a GREEN attempt, the old attempt no longer proves the current acceptance surface; the state must fail closed or require a new exact review.
+- Actual behavior:
+  - `validate_review()` represents task-card acceptance only as `class + path`; it has no immutable commit/blob/content identity.
+  - On the active-result path the router reparses the current Card, but uses it only to obtain `review_requirement`.
+  - Review freshness compares only the result subject. If the result tuple is unchanged and the last verdict is GREEN, the router returns `post_review_finalization` even when the Card's acceptance text changed after review.
+- Minimal reproduction:
+  1. Create an in-progress review-required Card, a result, and exact GREEN attempt.
+  2. Confirm route is `post_review_finalization`.
+  3. Change only the Task Card's `Acceptance` (or required tests/readback) text at the same path.
+  4. Route remains `post_review_finalization`.
+- Why this is materially load-bearing:
+  - Finalization can rely on a review whose reviewer never evaluated the currently binding acceptance criteria.
+- Defect class / likely siblings:
+  - Path-only acceptance identity is not exact content identity.
+  - Any post-review mutation of scope/acceptance/tests at the same Task Card path is invisible to review freshness.
+- Existing tests that failed to catch it:
+  - Review freshness tests change the result blob tuple, not the Task Card acceptance content.
+  - No router test mutates the Task Card after GREEN.
+- Reproduction artifact, if any:
+  - `audits/swarm/ze8eya3df1xsxsb7q93smiac/repros/router_adversarial_repros.py` (`repro_changed_acceptance_reuses_green_review`)
+
+### S034-F05 — Missing result and terminal-review evidence files do not block GREEN finalization
+
+- Source branch: `audit/pwv2-swarm-ze8eya3df1xsxsb7q93smiac`
+- Original verdict context: FINDINGS FOUND
+- Selected attack lenses: helper vs documented semantics / parity drift / negative space; Close / finalization / end-of-approved-scope; stale commit/blob/path/result/review identity; Task Board / READY / active / DONE / JIT-trigger lifecycle
+
+- Affected workflow contract/invariant:
+  - `workflow/EXECUTION.md`: an accepted semantic result records one or more durable evidence refs and verified tests/readback.
+  - `workflow/REVIEW.md`: terminal attempts keep durable verdict evidence.
+- Expected behavior:
+  - Before result reconciliation/review finalization, evidence referenced as durable proof must exist and be readable/bound to the selected workstream; missing proof is incomplete state and must fail closed.
+- Actual behavior:
+  - `parse_card_result()` validates only the syntax/location of result evidence refs.
+  - `validate_review()` validates only that terminal `evidence_path` is non-empty and syntactically safe.
+  - `select_route()` never opens either the result evidence refs or terminal review evidence before returning `post_review_finalization`.
+  - Deleting both referenced evidence files leaves routing unchanged.
+- Minimal reproduction:
+  1. Build a valid in-progress review-required Card with a result, result evidence, GREEN review attempt, and review evidence.
+  2. Confirm `post_review_finalization`.
+  3. Delete the result-evidence file and terminal-review-evidence file while retaining their references.
+  4. Route still returns `post_review_finalization`.
+- Why this is materially load-bearing:
+  - A terminal GREEN path can proceed after its durable proof has disappeared, defeating recovery/audit integrity and turning evidence into an unchecked string assertion.
+- Defect class / likely siblings:
+  - Referenced proof is syntax-checked but not dereferenced.
+  - Similar string-only terminal proof patterns should be checked in Plan Review and Research/return reconciliation.
+- Existing tests that failed to catch it:
+  - Router helpers create evidence files for the happy path.
+  - No router test removes or omits referenced evidence before reconciliation/finalization.
+- Reproduction artifact, if any:
+  - `audits/swarm/ze8eya3df1xsxsb7q93smiac/repros/router_adversarial_repros.py` (`repro_missing_evidence_still_finalizes`)
+
+#### S034 source coverage
+
+The audit remained bound to subject commit `4fb4bfb7d7b1481d6f347c182fc96a5a1135e045` for product semantics.
+
+Inspected/test-designed surfaces included:
+
+- `workflow/ROUTER.md`
+- `workflow/STATE.md`
+- `workflow/EXECUTION_PREP.md`
+- `workflow/EXECUTION.md`
+- `workflow/REVIEW.md`
+- `workflow/RECOVERY.md`
+- `workflow/CLOSE.md`
+- `tools/router.py`
+- `tools/state_contract.py`
+- `tools/execution_contract.py`
+- `tools/recovery_contract.py`
+- `tools/close_contract.py`
+- `tests/test_router.py`
+- `tests/test_state_contract.py`
+- `tests/test_execution_contract.py`
+- `tests/test_recovery_contract.py`
+- `tests/test_close_contract.py`
+- exact router/state fixtures needed to construct negative-space reproductions.
+
+Selected attack lenses exercised:
+
+1. helper vs documented semantics / parity drift / negative space — F1, F2, F5;
+2. Close / finalization / end-of-approved-scope — F1, F2;
+3. stale commit/blob/path/result/review identity — F3, F4, F5;
+4. Task Board / READY / active / DONE / JIT-trigger lifecycle — F1, F2, F3.
+
+Sibling/negative-space variants were checked in code against the existing tests, especially DONE-vs-in-progress review handling, declared-tuple-vs-actual-content dependency changes, and evidence existence.
+
+#### S034 original confidence and limitations
+
+Confidence is high in the code-path demonstrations: each finding follows directly from the production selector/validator behavior at the exact subject and is paired with a non-mutating reproduction script that imports the real production helpers.
+
+Execution limitations:
+
+- I attempted to run the exact checkout on the connected Tower, but the Desktop Commander monthly usage limit prevented execution.
+- I then attempted a temporary container checkout of the exact public commit, but the container cannot resolve external network hosts.
+- Therefore the preserved reproduction scripts were not executed inside this session. They are designed to run from the exact subject checkout (or this audit branch) and invoke `tools.router.select_route` directly.
+- No product code was modified to construct a reproduction.
+
+
+## Aggregator limitations
+
+- No independent product review was performed.
+- No source finding was technically confirmed, rejected, repaired, or re-ranked as valid/invalid by this aggregation.
+- Clustering is semantic normalization only and may itself require later verification or splitting/merging during technical triage.
+- Frequency is evidence of independent rediscovery, not proof of validity.
+- Unique findings are intentionally preserved and are not discounted for single-source frequency.
+- Source reports and their persisted reproduction artifacts remain authoritative for their original details, exact wording, source-level confidence, and limitations.
+- The aggregation used only persisted source audit reports/metadata/reproduction references for defect consolidation; it did not search the product implementation for new bugs.
+- The frozen source set was enumerated exactly twice as specified. No indefinite polling occurred after the second enumeration.
+- Two matching branches were retained explicitly as incomplete/empty and were not silently discarded.
