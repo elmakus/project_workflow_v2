@@ -46,6 +46,7 @@ try:
     )
     from tools.live_finding_contract import (
         LiveFindingError,
+        validate_finding_trigger_gates,
         validate_live_findings,
     )
 except ModuleNotFoundError:  # direct script execution from tools/
@@ -84,6 +85,7 @@ except ModuleNotFoundError:  # direct script execution from tools/
     )
     from live_finding_contract import (
         LiveFindingError,
+        validate_finding_trigger_gates,
         validate_live_findings,
     )
 
@@ -937,7 +939,14 @@ def validate_board(
         raise ValidationError(f"{exc}") from exc
 
     try:
-        validate_live_findings(data.get("live_findings"), workstream["workstream_id"])
+        validated_findings = validate_live_findings(
+            data.get("live_findings"), workstream["workstream_id"]
+        )
+    except LiveFindingError as exc:
+        raise ValidationError(f"{exc}") from exc
+
+    try:
+        validate_finding_trigger_gates(validated_findings, data.get("jit_triggers", []))
     except LiveFindingError as exc:
         raise ValidationError(f"{exc}") from exc
 

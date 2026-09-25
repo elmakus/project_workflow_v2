@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Runtime-neutral live-finding classification and trusted authority boundary (BOOT-C, REQ-122/124).
+"""Runtime-neutral live-finding classification, trusted authority boundary and
+affected-JIT reconciliation gate (BOOT-C, REQ-122/123/124).
 
 Material observations discovered during real execution are classified before
 any authority mutation as exactly one of five classes:
@@ -36,10 +37,24 @@ Tracker pointers are informational only and never satisfy the evidence or
 authorization requirement. No free prose appears in the acceptance proof, so
 neither arbitrary text nor tracker shorthand can become authority.
 
-Affected downstream JIT reconciliation (REQ-123/127), immutable historical
+A classified finding may additionally target one exact downstream JIT trigger
+it materially affects (REQ-123): the targeting names the trigger, the next
+affected facet (authority, topology or semantics), durable materiality
+evidence and a pending/reconciled state. A satisfied trigger with a pending
+material finding is held until the owning stage's reconciliation is accepted
+through one typed reconciliation-decision record (``findings/*.toml`` naming
+the exact finding id, finding class, trigger id and accepting stage with an
+explicit reconciled decision) and verified by readback at the serving
+boundary; only then may the affected trigger be consumed, without erasing
+the finding or its decision history. Explicitly unrelated findings,
+speculative hardening and already-reconciled findings never block a trigger
+merely by being present. Missing, stale, ambiguous, forged or contradictory
+trigger/materiality/reconciliation bindings fail closed, as do
+tracker-derived approval and Worker self-authorization.
+
+Intentional live-consumer prerequisites (REQ-127), immutable historical
 replay/corpus (REQ-125/126), BOOT-D Worker discipline (REQ-131/132) and M03+
-are intentionally out of scope: this intake stays usable before the
-downstream JIT gate exists.
+are intentionally out of scope.
 """
 
 from __future__ import annotations
@@ -112,6 +127,33 @@ ACCEPTANCE_DECISION_FIELDS = frozenset({
 })
 
 ACCEPTANCE_DECISION_ACCEPTED = "accepted"
+
+DOWNSTREAM_DISPOSITIONS = frozenset({"material", "unrelated"})
+
+MATERIALITY_ASPECTS = frozenset({"authority", "topology", "semantics"})
+
+RECONCILIATION_STATES = frozenset({"pending", "reconciled"})
+
+RECONCILIATION_RECORD_CLASSES = frozenset({"finding_reconciliation"})
+
+RECONCILIATION_DECISION_FIELDS = frozenset({
+    "finding_id",
+    "finding_class",
+    "trigger_id",
+    "accepting_stage",
+    "decision",
+})
+
+RECONCILIATION_DECISION_RECONCILED = "reconciled"
+
+DOWNSTREAM_MATERIAL_KEYS = frozenset({
+    "disposition",
+    "trigger",
+    "aspect",
+    "material_evidence_refs",
+    "reconciliation",
+    "acceptance",
+})
 
 FORBIDDEN_AUTHORITY_KEYS = frozenset({
     "scope_approved",
@@ -232,6 +274,10 @@ def _validate_record_path(
             f"implementation/workstreams/{workstream_id}/findings/",
             ".toml",
         ),
+        "finding_reconciliation": (
+            f"implementation/workstreams/{workstream_id}/findings/",
+            ".toml",
+        ),
     }[record_class]
     if (
         pure.is_absolute()
@@ -291,6 +337,198 @@ def _validate_acceptance(
     return {
         "stage": owner_stage,
         "record": {"class": str(record_class), "path": record_path},
+    }
+
+
+def _is_worker_identity(stage: Any) -> bool:
+    """Return whether an accepting stage value claims Worker identity.
+
+    Worker output can never finalize shared workflow state, so a Worker
+    stage value in a reconciliation citation is self-authorization, not an
+    owning-stage decision, and fails with an explicit reason.
+    """
+    if not isinstance(stage, str):
+        return False
+    head = stage.strip().lower().replace("-", "_").replace(":", "_").replace(" ", "_")
+    return head == "worker" or head.startswith("worker_")
+
+
+def _validate_reconciliation_acceptance(
+    acceptance: Any, label: str, *, workstream_id: str, owner_stage: str
+) -> dict[str, Any]:
+    """Validate the owning stage's structured reconciliation citation.
+
+    Reconciliation binds the owning stage to one typed
+    reconciliation-decision record (``findings/*.toml``). Only the owning
+    stage can reconcile: tracker provenance, Worker identity stages and
+    free-prose statements can never satisfy this citation. The decision
+    document's content — exact finding id, finding class, trigger id,
+    accepting stage and explicit reconciled decision — is the proof,
+    verified by readback at the serving boundary.
+    """
+    if not isinstance(acceptance, Mapping):
+        raise LiveFindingError(
+            f"{label}: reconciliation must bind the owning stage to one "
+            "typed reconciliation-decision record"
+        )
+    if "statement" in acceptance:
+        raise LiveFindingError(
+            f"{label}: free-form reconciliation statements cannot prove "
+            "reconciliation; the typed decision record carries the proof"
+        )
+    unexpected = set(acceptance) - {"stage", "record"}
+    if unexpected:
+        raise LiveFindingError(
+            f"{label}: unexpected reconciliation acceptance keys "
+            f"({', '.join(sorted(str(key) for key in unexpected))}); expected "
+            "exactly stage and record"
+        )
+    stage = acceptance.get("stage")
+    if _is_worker_identity(stage):
+        raise LiveFindingError(
+            f"{label}: Worker self-authorization cannot reconcile an affected "
+            f"JIT trigger; only the owning stage {owner_stage!r} can reconcile"
+        )
+    if stage != owner_stage:
+        raise LiveFindingError(
+            f"{label}: reconciliation stage {stage!r} does not match the finding's "
+            f"owning stage {owner_stage!r}; only the owning stage can reconcile"
+        )
+    cited = acceptance.get("record")
+    if not isinstance(cited, Mapping):
+        raise LiveFindingError(
+            f"{label}: reconciliation must cite one reconciliation-decision record table"
+        )
+    unexpected_record = set(cited) - {"class", "path"}
+    if unexpected_record:
+        raise LiveFindingError(
+            f"{label}: unexpected reconciliation record keys "
+            f"({', '.join(sorted(str(key) for key in unexpected_record))}); "
+            "expected exactly class and path"
+        )
+    record_class = cited.get("class")
+    if record_class not in RECONCILIATION_RECORD_CLASSES:
+        raise LiveFindingError(
+            f"{label}: unknown reconciliation record class {record_class!r}; "
+            "expected one of " + ", ".join(sorted(RECONCILIATION_RECORD_CLASSES))
+        )
+    record_path = _validate_record_path(
+        cited.get("path"), f"{label}: record", workstream_id, str(record_class)
+    )
+    return {
+        "stage": owner_stage,
+        "record": {"class": str(record_class), "path": record_path},
+    }
+
+
+def _validate_downstream(
+    downstream: Any,
+    label: str,
+    *,
+    workstream_id: str,
+    finding_class: str,
+    owner_stage: str,
+) -> dict[str, Any] | None:
+    """Validate one finding's durable downstream materiality disposition.
+
+    A missing disposition stays valid and never blocks: findings recorded
+    before the affected-JIT gate, or with no downstream effect, impose no
+    hold merely by being present. An explicit ``unrelated`` disposition
+    records that absence of effect and must not claim targeting or
+    reconciliation. A ``material`` disposition durably targets exactly one
+    downstream JIT trigger id, the next affected facet (``authority``,
+    ``topology`` or ``semantics``), at least one workstream-local
+    materiality evidence ref, and a ``pending``/``reconciled`` state; a
+    ``reconciled`` state binds the owning stage's typed reconciliation
+    citation while a ``pending`` state must not claim one. Speculative
+    future hardening can never be material. Trigger existence and the
+    consumed/pending hold are enforced at the board boundary, where the
+    trigger set is visible.
+    """
+    if downstream is None:
+        return None
+    if not isinstance(downstream, Mapping):
+        raise LiveFindingError(
+            f"{label}: downstream must be a table carrying the finding's "
+            "materiality disposition"
+        )
+    if "reconciliation_basis" in downstream or "statement" in downstream:
+        raise LiveFindingError(
+            f"{label}: free-prose reconciliation claims cannot prove targeting or "
+            "reconciliation; record exact trigger/aspect/evidence bindings plus the "
+            "typed decision record"
+        )
+    unexpected = set(downstream) - DOWNSTREAM_MATERIAL_KEYS
+    if unexpected:
+        raise LiveFindingError(
+            f"{label}: unexpected downstream keys "
+            f"({', '.join(sorted(str(key) for key in unexpected))}); downstream "
+            "carries only disposition, trigger, aspect, material_evidence_refs, "
+            "reconciliation and acceptance"
+        )
+    disposition = downstream.get("disposition")
+    if disposition not in DOWNSTREAM_DISPOSITIONS:
+        raise LiveFindingError(
+            f"{label}: missing or ambiguous downstream disposition {disposition!r}; "
+            "expected exactly one of " + ", ".join(sorted(DOWNSTREAM_DISPOSITIONS))
+        )
+    if finding_class == "speculative_future_hardening" and disposition == "material":
+        raise LiveFindingError(
+            f"{label}: speculative future hardening must not be targeted as "
+            "material to a downstream trigger; it stays non-blocking and can "
+            "authorize nothing"
+        )
+    if disposition == "unrelated":
+        if set(downstream) != {"disposition"}:
+            raise LiveFindingError(
+                f"{label}: explicitly unrelated findings must not claim trigger "
+                "targeting, materiality evidence or reconciliation"
+            )
+        return {"disposition": "unrelated"}
+    trigger_id = downstream.get("trigger")
+    if not isinstance(trigger_id, str) or not trigger_id.strip():
+        raise LiveFindingError(
+            f"{label}: material targeting requires the exact affected JIT trigger id"
+        )
+    aspect = downstream.get("aspect")
+    if aspect not in MATERIALITY_ASPECTS:
+        raise LiveFindingError(
+            f"{label}: missing or ambiguous materiality aspect {aspect!r}; "
+            "expected exactly one of " + ", ".join(sorted(MATERIALITY_ASPECTS))
+        )
+    material_evidence_refs = _validate_evidence_refs(
+        downstream.get("material_evidence_refs"),
+        f"{label}: material_evidence_refs",
+        workstream_id,
+    )
+    reconciliation = downstream.get("reconciliation")
+    if reconciliation not in RECONCILIATION_STATES:
+        raise LiveFindingError(
+            f"{label}: missing or ambiguous reconciliation state {reconciliation!r}; "
+            "expected one of " + ", ".join(sorted(RECONCILIATION_STATES))
+        )
+    acceptance = downstream.get("acceptance")
+    if reconciliation == "reconciled":
+        validated_acceptance = _validate_reconciliation_acceptance(
+            acceptance,
+            f"{label}: acceptance",
+            workstream_id=workstream_id,
+            owner_stage=owner_stage,
+        )
+    elif acceptance is not None:
+        raise LiveFindingError(
+            f"{label}: pending reconciliation must not claim acceptance; "
+            "the affected trigger stays held until the owning stage reconciles"
+        )
+    else:
+        validated_acceptance = None
+    return {
+        "disposition": "material",
+        "trigger": trigger_id,
+        "aspect": str(aspect),
+        "material_evidence_refs": material_evidence_refs,
+        "reconciliation": str(reconciliation),
+        "acceptance": validated_acceptance,
     }
 
 
@@ -379,6 +617,106 @@ def verify_acceptance_decision(
         )
 
 
+def parse_reconciliation_decision(text: str, record_path: str) -> dict[str, str]:
+    """Parse one typed reconciliation-decision document.
+
+    The document must be TOML carrying exactly ``finding_id``,
+    ``finding_class``, ``trigger_id``, ``accepting_stage`` and ``decision``
+    as non-empty strings. The five-field shape is deliberately distinct
+    from the four-field acceptance-decision shape, so an authority-mutation
+    acceptance can never prove trigger reconciliation and a reconciliation
+    can never prove authority mutation. Anything else — Markdown notes,
+    result prose, review attempts, tracker exports — fails here, so
+    unrelated records can never satisfy a reconciliation proof no matter
+    how readable they are.
+    """
+    try:
+        document = tomllib.loads(text)
+    except (tomllib.TOMLDecodeError, ValueError) as exc:
+        raise LiveFindingError(
+            f"reconciliation record {record_path!r} is not a typed "
+            f"reconciliation-decision document: {exc}"
+        ) from exc
+    if not isinstance(document, dict):
+        raise LiveFindingError(
+            f"reconciliation record {record_path!r} must be a TOML table"
+        )
+    keys = set(document)
+    if keys != RECONCILIATION_DECISION_FIELDS:
+        missing = sorted(RECONCILIATION_DECISION_FIELDS - keys)
+        extra = sorted(keys - RECONCILIATION_DECISION_FIELDS)
+        raise LiveFindingError(
+            f"reconciliation record {record_path!r} has wrong decision fields "
+            f"missing={missing} extra={extra}; expected exactly "
+            + ", ".join(sorted(RECONCILIATION_DECISION_FIELDS))
+        )
+    decision: dict[str, str] = {}
+    for key in sorted(RECONCILIATION_DECISION_FIELDS):
+        value = document[key]
+        if not isinstance(value, str) or not value.strip():
+            raise LiveFindingError(
+                f"reconciliation record {record_path!r}: decision field {key!r} "
+                "must be a non-empty string"
+            )
+        decision[key] = value
+    return decision
+
+
+def verify_reconciliation_decision(
+    finding: Mapping[str, Any],
+    downstream: Mapping[str, Any],
+    record_path: str,
+    record_text: str | None,
+) -> None:
+    """Verify a cited decision document proves this trigger reconciliation.
+
+    ``record_text`` is the read-back file content, or ``None`` when the path
+    cannot be read. The document must name this exact finding id and class,
+    the exact targeted trigger id, the finding's owning stage, and an
+    explicit reconciled decision; a decision for another finding, another
+    class, another trigger, another stage, or any other verdict fails
+    closed.
+    """
+    finding_id = finding.get("id")
+    if record_text is None:
+        raise LiveFindingError(
+            f"live finding {finding_id!r} cites reconciliation record "
+            f"{record_path!r} that cannot be read back; unverifiable "
+            "reconciliation fails closed to Recovery"
+        )
+    decision = parse_reconciliation_decision(record_text, record_path)
+    if decision["finding_id"] != finding_id:
+        raise LiveFindingError(
+            f"live finding {finding_id!r} cites reconciliation record "
+            f"{record_path!r} decided for finding {decision['finding_id']!r}; "
+            "unrelated decisions cannot release an affected trigger"
+        )
+    if decision["finding_class"] != finding.get("finding_class"):
+        raise LiveFindingError(
+            f"live finding {finding_id!r} cites reconciliation record "
+            f"{record_path!r} decided for class "
+            f"{decision['finding_class']!r}; mismatched classes fail closed"
+        )
+    if decision["trigger_id"] != downstream.get("trigger"):
+        raise LiveFindingError(
+            f"live finding {finding_id!r} cites reconciliation record "
+            f"{record_path!r} decided for trigger {decision['trigger_id']!r}; "
+            "a reconciliation for another trigger cannot release this one"
+        )
+    if decision["accepting_stage"] != finding.get("owner_stage"):
+        raise LiveFindingError(
+            f"live finding {finding_id!r} cites reconciliation record "
+            f"{record_path!r} reconciled by stage "
+            f"{decision['accepting_stage']!r}; only the owning stage can reconcile"
+        )
+    if decision["decision"] != RECONCILIATION_DECISION_RECONCILED:
+        raise LiveFindingError(
+            f"live finding {finding_id!r} cites reconciliation record "
+            f"{record_path!r} with decision {decision['decision']!r}; only an "
+            "explicit reconciled decision releases the affected trigger"
+        )
+
+
 def validate_live_finding(
     record: Mapping[str, Any],
     label: str,
@@ -392,7 +730,11 @@ def validate_live_finding(
     correction, while ``owning_stage_accepted`` binds the owning stage to one
     verifiable durable acceptance record. Speculative hardening must stay
     unauthorized. Tracker locators may be retained as untrusted input in
-    ``tracker_locators`` but never satisfy evidence or authorization.
+    ``tracker_locators`` but never satisfy evidence or authorization. The
+    optional ``downstream`` table records the finding's affected-JIT
+    disposition: absent or ``unrelated`` never blocks, while ``material``
+    durably targets exactly one downstream trigger id plus aspect, evidence
+    and pending/reconciled state.
     """
     if not isinstance(record, Mapping):
         raise LiveFindingError(f"{label}: live finding must be a table")
@@ -468,6 +810,13 @@ def validate_live_finding(
             f"{label}: tracker_locators must be an array of non-empty strings; "
             "tracker input stays untrusted bookkeeping"
         )
+    downstream = _validate_downstream(
+        record.get("downstream"),
+        f"{label}: downstream",
+        workstream_id=workstream_id,
+        finding_class=str(finding_class),
+        owner_stage=owner_stage,
+    )
     return {
         "id": finding_id,
         "finding_class": str(finding_class),
@@ -477,6 +826,7 @@ def validate_live_finding(
         "authorization": str(authorization),
         "acceptance": validated_acceptance,
         "tracker_locators": list(tracker_locators),
+        "downstream": downstream,
     }
 
 
@@ -665,6 +1015,200 @@ def verify_live_finding_records(
         cited = acceptance["record"]
         verify_acceptance_decision(
             finding, cited["path"], record_reader(cited["path"])
+        )
+
+
+def validate_finding_trigger_gates(
+    findings: Mapping[str, Mapping[str, Any]],
+    triggers: Any,
+) -> dict[str, list[str]]:
+    """Enforce the affected-JIT hold between material findings and triggers.
+
+    ``findings`` are validated live findings keyed by finding id (see
+    ``validate_live_findings``) and ``triggers`` is the Task Board
+    ``jit_triggers`` array. Every material targeting must name an existing
+    trigger; a trigger already ``consumed`` while a material finding
+    targeting it is still ``pending`` fails closed, since the affected
+    trigger cannot be consumed before owning-stage reconciliation.
+    Returns the pending hold set: trigger ids mapped to the sorted
+    blocking finding ids. Untargeted triggers, explicitly unrelated
+    findings, findings without a downstream disposition and reconciled
+    findings impose no hold. Reconciliation content is verified by
+    readback at the serving boundary (see
+    ``verify_finding_trigger_records``).
+    """
+    if triggers is None:
+        triggers = []
+    if not isinstance(triggers, list):
+        raise LiveFindingError("task_board jit_triggers must be an array of trigger records")
+    states: dict[str, str] = {}
+    for index, trigger in enumerate(triggers):
+        if not isinstance(trigger, Mapping):
+            raise LiveFindingError(
+                f"task_board.jit_triggers[{index}]: trigger must be a table"
+            )
+        trigger_id = trigger.get("id")
+        if not isinstance(trigger_id, str) or not trigger_id.strip():
+            raise LiveFindingError(
+                f"task_board.jit_triggers[{index}]: trigger id must be a non-empty string"
+            )
+        state = trigger.get("state")
+        if not isinstance(state, str) or not state.strip():
+            raise LiveFindingError(
+                f"task_board.jit_triggers[{index}]: trigger state must be a non-empty string"
+            )
+        states[trigger_id] = state
+    holds: dict[str, list[str]] = {}
+    for finding_id in sorted(findings):
+        finding = findings[finding_id]
+        downstream = finding.get("downstream")
+        if not isinstance(downstream, Mapping):
+            continue
+        if downstream.get("disposition") != "material":
+            continue
+        trigger_id = downstream.get("trigger")
+        if trigger_id not in states:
+            raise LiveFindingError(
+                f"live finding {finding_id!r} targets unknown JIT trigger "
+                f"{trigger_id!r}; missing, stale or forged targeting fails closed"
+            )
+        if downstream.get("reconciliation") == "reconciled":
+            continue
+        if states[trigger_id] == "consumed":
+            raise LiveFindingError(
+                f"JIT trigger {trigger_id!r} is consumed while material live "
+                f"finding {finding_id!r} is still pending reconciliation; the "
+                "affected trigger cannot be consumed before the owning stage "
+                f"{finding.get('owner_stage')!r} reconciles"
+            )
+        holds.setdefault(trigger_id, []).append(finding_id)
+    return {trigger_id: sorted(ids) for trigger_id, ids in sorted(holds.items())}
+
+
+def require_reconciled_trigger_consumption(
+    board: Mapping[str, Any],
+    trigger_id: str,
+    *,
+    record_reader: Callable[[str], str | None] | None = None,
+) -> str:
+    """Require owning-stage reconciliation before one trigger is consumed.
+
+    ``board`` is the Task Board table and ``trigger_id`` names the JIT
+    trigger Execution Prep is about to consume. The trigger must exist and
+    no material live finding targeting it may still be pending: pending
+    blockers fail closed naming the findings and their owning stages.
+    Unrelated findings, findings without a downstream disposition and
+    reconciled findings never block. When ``record_reader`` is given, the
+    targeting findings' materiality evidence and reconciliation decisions
+    must additionally read back and verify by content; citation shape
+    alone never releases the hold. Trigger lifecycle (waiting, satisfied,
+    DONE predecessor) stays owned by the state contract — this guard owns
+    reconciliation only. Returns the trigger id.
+    """
+    if not isinstance(board, Mapping):
+        raise LiveFindingError("trigger consumption requires a Task Board table")
+    workstream_id = board.get("workstream_id")
+    if not isinstance(workstream_id, str) or not workstream_id.strip():
+        raise LiveFindingError(
+            "trigger consumption requires a workstream-bound Task Board"
+        )
+    triggers = board.get("jit_triggers", [])
+    if not isinstance(triggers, list) or not any(
+        isinstance(trigger, Mapping) and trigger.get("id") == trigger_id
+        for trigger in triggers
+    ):
+        raise LiveFindingError(
+            f"JIT trigger {trigger_id!r} does not exist on this Task Board; "
+            "consuming an unknown trigger fails closed"
+        )
+    findings = validate_live_findings(board.get("live_findings"), workstream_id)
+    holds = validate_finding_trigger_gates(findings, triggers)
+    blockers = holds.get(trigger_id, [])
+    if blockers:
+        owners = sorted({str(findings[fid].get("owner_stage")) for fid in blockers})
+        raise LiveFindingError(
+            f"JIT trigger {trigger_id!r} is held by pending material live "
+            f"finding(s) {', '.join(blockers)}; owning-stage reconciliation "
+            f"({', '.join(owners)}) must be accepted and read back before "
+            "the affected trigger is consumed"
+        )
+    if record_reader is not None:
+        for finding_id, finding in sorted(findings.items()):
+            downstream = finding.get("downstream")
+            if not isinstance(downstream, Mapping):
+                continue
+            if downstream.get("disposition") != "material":
+                continue
+            if downstream.get("trigger") != trigger_id:
+                continue
+            for ref in downstream.get("material_evidence_refs", []):
+                if record_reader(ref) is None:
+                    raise LiveFindingError(
+                        f"live finding {finding_id!r} cites durable materiality "
+                        f"evidence {ref!r} that cannot be read back; unverifiable "
+                        "targeting fails closed to Recovery"
+                    )
+            acceptance = downstream.get("acceptance")
+            if acceptance is None:
+                continue
+            cited = acceptance["record"]
+            verify_reconciliation_decision(
+                finding, downstream, cited["path"], record_reader(cited["path"])
+            )
+    return trigger_id
+
+
+def verify_finding_trigger_records(
+    board: Mapping[str, Any],
+    *,
+    record_reader: Callable[[str], str | None],
+) -> None:
+    """Verify cited affected-JIT targeting records by readback.
+
+    ``record_reader`` returns file text for a workstream-local path, or
+    ``None`` when the path cannot be read. Every material targeting's
+    evidence refs must read back, and every cited reconciliation-decision
+    record must read back and prove this finding's reconciliation by
+    content: exact finding id and class, exact trigger id, the owning
+    stage, and an explicit reconciled decision. Dangling targeting and
+    consumed/pending contradictions fail closed as well. A board without
+    material findings verifies trivially, preserving historical boards.
+    """
+    if not isinstance(board, Mapping):
+        raise LiveFindingError("affected-JIT verification requires a Task Board table")
+    workstream_id = board.get("workstream_id")
+    if not isinstance(workstream_id, str) or not workstream_id.strip():
+        raise LiveFindingError(
+            "affected-JIT verification requires a workstream-bound Task Board"
+        )
+    findings = validate_live_findings(
+        board.get("live_findings"), workstream_id
+    )
+    material = {
+        finding_id: finding
+        for finding_id, finding in findings.items()
+        if isinstance(finding.get("downstream"), Mapping)
+        and finding["downstream"].get("disposition") == "material"
+    }
+    if not material:
+        return
+    validate_finding_trigger_gates(findings, board.get("jit_triggers", []))
+    for finding_id in sorted(material):
+        finding = material[finding_id]
+        downstream = finding["downstream"]
+        for ref in downstream["material_evidence_refs"]:
+            if record_reader(ref) is None:
+                raise LiveFindingError(
+                    f"live finding {finding_id!r} cites durable materiality "
+                    f"evidence {ref!r} that cannot be read back; nonexistent "
+                    "materiality evidence fails closed to Recovery"
+                )
+        acceptance = downstream["acceptance"]
+        if acceptance is None:
+            continue
+        cited = acceptance["record"]
+        verify_reconciliation_decision(
+            finding, downstream, cited["path"], record_reader(cited["path"])
         )
 
 

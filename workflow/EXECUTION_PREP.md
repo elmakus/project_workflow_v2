@@ -93,7 +93,11 @@ The return preserves the durable result locator and review-attempt history, neve
 
 ## Live-finding intake
 
-Planning-to-Execution-Prep fidelity defects discovered during real execution return to Execution Prep through the durable `live_findings` intake (see `workflow/RECOVERY.md`); accepted-authority defects escalate to their owning accepted-authority stage, and speculative hardening never auto-materializes Cards or scope. Downstream affected-JIT gating of classified findings is a later boundary and stays out of this intake.
+Planning-to-Execution-Prep fidelity defects discovered during real execution return to Execution Prep through the durable `live_findings` intake (see `workflow/RECOVERY.md`); accepted-authority defects escalate to their owning accepted-authority stage, and speculative hardening never auto-materializes Cards or scope.
+
+## Affected-JIT reconciliation
+
+Before consuming a satisfied downstream JIT trigger, Execution Prep checks the durable affected-JIT bindings (`live_findings.downstream`, see `workflow/STATE.md`): a trigger with a `pending` material finding stays held until the owning stage's reconciliation is accepted through a typed reconciliation-decision record and verified by readback; consuming it earlier is invalid and fails closed. Explicitly unrelated findings, findings without a downstream disposition, already-reconciled findings and speculative hardening never block consumption merely by being present. Intentional live-consumer prerequisites stay a later boundary and out of this gate.
 
 ## Selective technical contract
 

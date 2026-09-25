@@ -26,6 +26,10 @@ from tools.late_oversize_contract import (
 )
 from tools.live_finding_contract import (
     LiveFindingError,
+    live_finding_owner_module,
+    validate_finding_trigger_gates,
+    validate_live_findings,
+    verify_finding_trigger_records,
     verify_live_finding_records,
 )
 from tools.state_contract import (
@@ -668,6 +672,11 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
         except LiveFindingError as exc:
             return recovery(reads, f"live-finding intake verification failed: {exc}")
 
+        try:
+            verify_finding_trigger_records(board, record_reader=_live_record_reader)
+        except LiveFindingError as exc:
+            return recovery(reads, f"affected-JIT reconciliation verification failed: {exc}")
+
     late = pending_late_return(board)
     handoff = bound_handoff_hold(board) if late is None else None
     held = late if late is not None else handoff
@@ -921,6 +930,49 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             "must not equate a returned Card alone with accepted completion",
             owner_module="workflow/CLOSE.md",
         )
+
+    if board.get("live_findings") and board.get("jit_triggers"):
+        try:
+            validated = validate_live_findings(
+                board.get("live_findings"), workstream["workstream_id"]
+            )
+            holds = validate_finding_trigger_gates(validated, board["jit_triggers"])
+        except LiveFindingError as exc:
+            return recovery(reads, f"affected-JIT gate invalid: {exc}")
+        states = {
+            trigger["id"]: trigger.get("state")
+            for trigger in board["jit_triggers"]
+            if isinstance(trigger, dict) and isinstance(trigger.get("id"), str)
+        }
+        held = sorted(
+            trigger_id for trigger_id in holds if states.get(trigger_id) == "satisfied"
+        )
+        if held:
+            parts = []
+            for trigger_id in held:
+                owners = sorted({
+                    str(validated[finding_id].get("owner_stage"))
+                    for finding_id in holds[trigger_id]
+                })
+                parts.append(
+                    f"{trigger_id} (finding(s) "
+                    f"{', '.join(holds[trigger_id])} @ {', '.join(owners)})"
+                )
+            first_finding = holds[held[0]][0]
+            first_owner = str(validated[first_finding].get("owner_stage"))
+            try:
+                owner_module = live_finding_owner_module(first_owner)
+            except LiveFindingError as exc:
+                return recovery(reads, f"affected-JIT gate invalid: {exc}")
+            return result(
+                reads, "route", "finding_reconciliation",
+                "Satisfied JIT trigger(s) "
+                + "; ".join(parts)
+                + " held by pending material live finding(s); owning-stage "
+                "reconciliation must be accepted and read back before "
+                "Execution Prep consumes the affected trigger",
+                subject=held[0], owner_module=owner_module,
+            )
 
     return result(reads, "route", "execution_prep",
                   "No executable Card is selected; common Execution Prep owns bounded JIT materialization/refinement",
