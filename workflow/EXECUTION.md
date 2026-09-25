@@ -36,6 +36,10 @@ When all qualify, Main delegates substantive implementation/debugging/testing. O
 
 Runtime-internal work may use zero, one or many workers sequentially or concurrently inside the one active Card. Those workers may produce multiple evidence contributions, but only Main may reconcile them into the single semantic result.
 
+## Worker falsification-first evidence
+
+Where an accepted Card outcome can be meaningfully falsified, the Worker starts from a failing automated or observable acceptance check on the pre-implementation subject, then implements the minimum in-scope change and demonstrates the same check GREEN on the implemented subject. Documentation, migration and workflow-policy outcomes that cannot naturally use a unit test use an explicit justified observable check instead of an artificial test. Deterministic validation lives in `tools/worker_evidence_contract.py`: RED baseline, bounded implementation and GREEN verification bind strict chronology, exact Git subject identity and distinct baseline/verification evidence. Missing, generic, retrospective or out-of-order baselines and GREEN-before-implementation claims fail the Worker evidence check and return to `correct`; absence of a Worker evidence record stays legacy-compatible for historical results. This SHOULD-level discipline creates no new Card, Milestone or premium gate and records no runtime worker identity. YAGNI/refactor/DRY scope discipline is separate and out of scope here.
+
 ## Returned result classification
 
 Returned implementation is classified before durable reconciliation:
