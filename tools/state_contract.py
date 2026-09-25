@@ -97,6 +97,17 @@ except ModuleNotFoundError:  # direct script execution from tools/
         validate_live_consumer_gates,
     )
 
+try:
+    from tools.editorial_exemption_contract import (
+        EditorialExemptionError,
+        validate_editorial_classification_locator,
+    )
+except ModuleNotFoundError:  # direct script execution from tools/
+    from editorial_exemption_contract import (
+        EditorialExemptionError,
+        validate_editorial_classification_locator,
+    )
+
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 CARD_STATUSES = {"planned", "ready", "in_progress", "blocked", "done", "returned"}
 INTAKE_KINDS = {"issue", "feature", "change"}
@@ -513,17 +524,24 @@ def validate_planning(data: dict[str, Any], workstream_id: str) -> None:
     _require(review_mode in PLANNING_REVIEW_MODES, f"planning: invalid review_mode {review_mode!r}")
     exemption_basis = data.get("review_exemption_basis")
     exemption_base_subject = data.get("review_exemption_base_subject")
+    exemption_classification = data.get("review_exemption_classification")
     _require(isinstance(exemption_basis, str), "planning: review_exemption_basis must be a string")
     _require(isinstance(exemption_base_subject, str),
              "planning: review_exemption_base_subject must be a string")
     if review_mode == "independent":
         _require(exemption_basis == "" and exemption_base_subject == "",
                  "planning: independent review mode must not claim an editorial exemption")
+        _require(exemption_classification is None,
+                 "planning: independent review mode must not claim an editorial classification proof")
     else:
         _require(bool(exemption_basis.strip()),
                  "planning: editorial exemption requires a bounded semantic basis")
         _require(bool(exemption_base_subject.strip()),
                  "planning: editorial exemption requires the prior reviewed subject")
+        try:
+            validate_editorial_classification_locator(exemption_classification, workstream_id)
+        except EditorialExemptionError as exc:
+            raise ValidationError(f"{exc}") from exc
 
     premium_a = data.get("premium_a")
     premium_b = data.get("premium_b")
