@@ -1185,6 +1185,16 @@ class StateEnvelopeTests(unittest.TestCase):
         planning["review_mode"] = "editorial_exempt"
         planning["review_exemption_basis"] = "Wording only; no strategy, milestones, coverage or gates changed."
         planning["review_exemption_base_subject"] = prior
+        planning["review_exemption_classification"] = {
+            "class": "git_blob",
+            "repository": "owner/repo",
+            "commit": "d" * 40,
+            "path": (
+                "implementation/workstreams/sample-workstream/"
+                "planning_classifications/P1-E01.toml"
+            ),
+            "blob": "e" * 40,
+        }
         planning["premium_c"] = "satisfied"
         planning["premium_b_subject"] = prior
         planning["premium_c_subject"] = prior
@@ -1216,6 +1226,18 @@ class StateEnvelopeTests(unittest.TestCase):
         bad["review_exemption_basis"] = ""
         with self.assertRaisesRegex(ValidationError, "bounded semantic basis"):
             validate_planning(bad, "sample-workstream")
+
+        missing_proof = copy.deepcopy(planning)
+        missing_proof.pop("review_exemption_classification")
+        with self.assertRaisesRegex(ValidationError, "classification"):
+            validate_planning(missing_proof, "sample-workstream")
+
+        independent_with_proof = self.planning_record("approved")
+        independent_with_proof["review_exemption_classification"] = copy.deepcopy(
+            planning["review_exemption_classification"]
+        )
+        with self.assertRaisesRegex(ValidationError, "must not claim"):
+            validate_planning(independent_with_proof, "sample-workstream")
 
     def test_planning_and_plan_review_locators_are_exact(self) -> None:
         workstream = copy.deepcopy(self.workstream)
