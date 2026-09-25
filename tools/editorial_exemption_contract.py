@@ -53,10 +53,18 @@ def _safe_relative_path(raw: Any, label: str) -> str:
     return raw
 
 
-def git_blob_subject_key(subject: Any, label: str) -> str:
+def git_blob_subject_key(
+    subject: Any,
+    label: str,
+    *,
+    planning_subject: bool = False,
+) -> str:
     _require(isinstance(subject, Mapping), f"{label}: subject must be a table")
-    _exact_keys(subject, {"class", "repository", "commit", "path", "blob"}, label)
-    _require(subject.get("class") == "git_blob", f"{label}: class must be 'git_blob'")
+    if planning_subject:
+        _exact_keys(subject, {"repository", "commit", "path", "blob"}, label)
+    else:
+        _exact_keys(subject, {"class", "repository", "commit", "path", "blob"}, label)
+        _require(subject.get("class") == "git_blob", f"{label}: class must be 'git_blob'")
     repository = subject.get("repository")
     commit = subject.get("commit")
     path = subject.get("path")
@@ -141,7 +149,11 @@ def validate_editorial_exemption_classification(
     base_key = git_blob_subject_key(data.get("base_subject"), "editorial classification.base_subject")
     changed_key = git_blob_subject_key(data.get("changed_subject"), "editorial classification.changed_subject")
     expected_base = planning.get("review_exemption_base_subject")
-    expected_changed = git_blob_subject_key(planning.get("subject"), "planning.subject")
+    expected_changed = git_blob_subject_key(
+        planning.get("subject"),
+        "planning.subject",
+        planning_subject=True,
+    )
     _require(base_key == expected_base,
              "editorial classification: base subject does not match prior GREEN-reviewed exemption base")
     _require(changed_key == expected_changed,
