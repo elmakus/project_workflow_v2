@@ -84,6 +84,10 @@ For REQUIRED/activated RECOMMENDED review:
 - GREEN is not a verdict-only user stop;
 - RED remains attached to its failed subject and routes to corrective classification; RED itself is not automatically a user stop.
 
+## Card versus Milestone layering
+
+Card Review owns bounded local correctness for one Card's coherent outcome; Milestone Review owns broader composition/integration acceptance across Cards. Execution Prep must not draw a Card boundary so broad that Card Review effectively substitutes for Milestone integration review: such a boundary is rejected by the prelaunch topology gate unless concrete atomicity evidence justifies the single boundary, and it always receives a fresh independent topology challenge before first launch. Deterministic helpers live in `tools/topology_contract.py`.
+
 ## Attempt history
 
 The selected Card owns ordered review-attempt locators in its Task Board state. Attempt files are workstream-local under `reviews/`.

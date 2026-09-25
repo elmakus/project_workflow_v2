@@ -36,6 +36,10 @@ try:
         CardSizingError,
         validate_sizing_audits,
     )
+    from tools.topology_contract import (
+        TopologyError,
+        validate_topology_audits,
+    )
 except ModuleNotFoundError:  # direct script execution from tools/
     from review_contract import (
         CONVERGENCE_FIELDS,
@@ -61,6 +65,10 @@ except ModuleNotFoundError:  # direct script execution from tools/
     from card_sizing_contract import (
         CardSizingError,
         validate_sizing_audits,
+    )
+    from topology_contract import (
+        TopologyError,
+        validate_topology_audits,
     )
 
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
@@ -844,6 +852,17 @@ def validate_board(
     try:
         validate_sizing_audits(data.get("sizing_audits"), cards, triggers)
     except CardSizingError as exc:
+        raise ValidationError(f"{exc}") from exc
+
+    try:
+        validate_topology_audits(
+            data.get("topology_audits"),
+            cards,
+            data.get("sizing_audits"),
+            data.get("seam_decisions"),
+            planning_seams,
+        )
+    except TopologyError as exc:
         raise ValidationError(f"{exc}") from exc
 
 

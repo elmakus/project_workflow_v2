@@ -614,6 +614,7 @@ class SizingBoardBindingTests(unittest.TestCase):
         board = read_toml(VALID / "TASK_BOARD.toml")
         board["cards"] = [card for card in board["cards"] if card["status"] == "done"]
         board.pop("sizing_audits", None)
+        board.pop("topology_audits", None)
         validate_board(board, self.workstream)
         self.assertEqual([card["id"] for card in board["cards"]], ["M01-T01"])
 
@@ -822,6 +823,15 @@ class SplitTopologyBoardTests(unittest.TestCase):
             ),
             _audit(card_id="M01-T03"),
         ]
+        board["topology_audits"].append({
+            "card_id": "M01-T03",
+            "risk": "simple",
+            "triggers": [],
+            "risk_basis": "Single coherent outcome in one invariant family; no seam merge or deviation.",
+            "review_scope": "card_local",
+            "atomicity_rationale_class": "",
+            "atomicity_rationale": "",
+        })
         validate_board(board, self.workstream)
 
     def test_split_to_waiting_trigger_is_valid(self) -> None:

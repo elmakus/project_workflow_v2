@@ -18,6 +18,7 @@ from tools.review_contract import (
     review_kind,
 )
 from tools.policy_kernel import MechanicalDecision, PolicyKernel
+from tools.topology_contract import compute_card_contract_digest, ready_topology_hold
 from tools.state_contract import (
     ValidationError,
     read_project,
@@ -195,6 +196,12 @@ def classify_jit_refinement(change_class: str) -> tuple[str, str]:
             "Preferred-seam merge/split deviation stays in Execution Prep only with "
             "qualifying durable technical rationale",
         ),
+        "topology_challenge": (
+            "execution_prep",
+            "Materially risky Card topology requires a fresh independent "
+            "topology challenge before first launch; Execution Prep owns the "
+            "challenge and any bounded re-decomposition",
+        ),
     }
     if change_class not in routes:
         raise ValidationError(f"unknown JIT refinement class {change_class!r}")
@@ -224,6 +231,21 @@ def refresh_ready_card(
     contract_path = card["contract"]["path"]
     text = reads.project(contract_path).read_text(encoding="utf-8")
     contract = parse_task_card(text, card["id"], workstream["workstream_id"])
+
+    for audit in board.get("topology_audits", []) or []:
+        if audit.get("card_id") == card["id"] and audit.get("risk") == "risky":
+            challenge = audit.get("challenge") or {}
+            expected = challenge.get("card_contract_digest", "")
+            actual = compute_card_contract_digest(
+                reads.project(contract_path).read_bytes()
+            )
+            if actual != expected:
+                raise ValidationError(
+                    f"READY Card {card['id']} topology challenge subject does not "
+                    "match the exact current Card contract; the challenge is stale "
+                    "and must be renewed before launch"
+                )
+            break
 
     for authority_path in contract["authority_refs"]:
         reads.project(authority_path).read_text(encoding="utf-8")
@@ -762,6 +784,23 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             reads, "stop" if is_stop else "route", route,
             "Blocked Card classification reached an exact durable owner",
             subject=card["id"], owner_module="workflow/RECOVERY.md",
+        )
+
+    held = ready_topology_hold(board)
+    if held is not None:
+        triggers = next(
+            (
+                ", ".join(audit.get("triggers", []))
+                for audit in board.get("topology_audits", [])
+                if audit.get("card_id") == held
+            ),
+            "",
+        )
+        return result(
+            reads, "route", "topology_challenge",
+            f"READY Card {held} has materially risky topology ({triggers}); "
+            "a fresh independent topology challenge must be GREEN before first launch",
+            subject=held, owner_module="workflow/EXECUTION_PREP.md",
         )
 
     if (decision := kernel.route("PWV21-K011", {"board": board})) is not None:

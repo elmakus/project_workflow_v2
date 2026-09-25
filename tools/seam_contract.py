@@ -9,8 +9,9 @@ for accepted revision), it preserves a ``preferred_seam`` by default (merge or
 split deviation needs durable qualifying technical rationale), and it may
 freely ignore ``illustrative`` intent as non-binding.
 
-Later BOOT-B outcomes REQ-119..121 (topology challenge/review layering) and
-REQ-130 (late oversize return) are intentionally not implemented here. The
+The REQ-119..121 topology challenge/review layering lives in
+``tools/topology_contract.py`` as a second-order safeguard over seam fidelity;
+REQ-130 (late oversize return) is intentionally not implemented here. The
 REQ-118 decomposition audit and REQ-128/129 semantic Card sizing decision live
 in ``tools/card_sizing_contract.py`` and apply on top of this seam fidelity.
 """

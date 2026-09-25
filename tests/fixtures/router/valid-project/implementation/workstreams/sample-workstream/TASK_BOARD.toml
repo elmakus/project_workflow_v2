@@ -12,6 +12,16 @@ status = "in_progress"
 class = "task_card"
 path = "implementation/workstreams/sample-workstream/cards/M01-T04.md"
 
+# topology audit for M01-T04: simple single-outcome scope needs no fresh challenge.
+[[topology_audits]]
+card_id = "M01-T04"
+risk = "simple"
+triggers = []
+risk_basis = "Single coherent outcome in one invariant family with no seam merge, milestone absorption or material deviation."
+review_scope = "card_local"
+atomicity_rationale_class = ""
+atomicity_rationale = ""
+
 # sizing audit for M01-T04: retained by router tests proving the valid path,
 # stripped by tests proving the missing-audit gate.
 [[sizing_audits]]

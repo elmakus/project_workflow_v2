@@ -34,10 +34,11 @@ The semantic judgments (is this outcome falsifiable, substantial, separable)
 remain Execution Prep owned; this module only validates that the durable
 record is complete, internally coherent and honestly classified.
 
-Out of scope here: fresh independent topology challenge and Card/Milestone
-review layering (REQ-119..121), late oversized-Card return to Execution Prep
-(REQ-130), BOOT-C/BOOT-D, and changes to accepted seam fidelity (REQ-115..117
-in ``tools/seam_contract.py``).
+The fresh independent topology challenge and Card/Milestone review layering
+(REQ-119..121) live in ``tools/topology_contract.py`` as a second-order
+safeguard over this sizing decision. Out of scope here: late oversized-Card
+return to Execution Prep (REQ-130), BOOT-C/BOOT-D, and changes to accepted
+seam fidelity (REQ-115..117 in ``tools/seam_contract.py``).
 """
 
 from __future__ import annotations

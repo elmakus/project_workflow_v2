@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import shutil
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -21,6 +22,7 @@ from tools.state_contract import (
     validate_board,
     validate_planning,
 )
+from tools.topology_contract import compute_proposal_digest
 
 ROOT = Path(__file__).resolve().parents[1]
 VALID = ROOT / "tests" / "fixtures" / "state" / "valid"
@@ -257,6 +259,34 @@ class SeamBoardBindingTests(unittest.TestCase):
              "rationale": "Single atomic migration cannot land across two Cards."},
             {"seam_id": "example-split", "decision": "split"},
         ]
+        preserved["topology_audits"] = [{
+            "card_id": "M01-T02",
+            "risk": "risky",
+            "triggers": ["preferred_seam_merge"],
+            "risk_basis": "Merges preferred seam helper-less-derivation with atomicity rationale.",
+            "review_scope": "card_local",
+            "atomicity_rationale_class": "",
+            "atomicity_rationale": "",
+            "challenge": {
+                "verdict": "green",
+                "evaluated": ["boundary_fidelity", "falsifiability", "review_separation"],
+                "scope_statement": "Merged preferred seam boundary checked for fidelity, falsifiability and review split.",
+                "independent": True,
+                "independence_basis": "Challenger did not author the Execution Prep topology proposal.",
+                "fresh": True,
+                "challenge_basis": "Fresh review of the merged boundary against seam intent and sizing outcomes.",
+                "proposal_digest": "sha256:" + "0" * 64,
+                "card_contract_digest": "sha256:" + "1" * 64,
+            },
+        }]
+        sizing = next(audit for audit in preserved["sizing_audits"] if audit["card_id"] == "M01-T02")
+        preserved["topology_audits"][0]["challenge"]["proposal_digest"] = compute_proposal_digest(
+            card_id="M01-T02",
+            sizing_audit=sizing,
+            topology_audit=preserved["topology_audits"][0],
+            seam_decisions=preserved["seam_decisions"],
+            planning_seams=_seams(),
+        )
         validate_board(preserved, self.workstream, planning_seams=_seams())
 
         merged_required = copy.deepcopy(board)
@@ -427,7 +457,38 @@ class SeamRouterPathTests(unittest.TestCase):
             )
             self.assertIn("insufficient", routed.reason)
 
-            board.write_text(base + (
+            risky_base = base.replace(
+                '# topology audit for M01-T04: simple single-outcome scope needs no fresh challenge.\n'
+                '[[topology_audits]]\n'
+                'card_id = "M01-T04"\n'
+                'risk = "simple"\n'
+                'triggers = []\n'
+                'risk_basis = "Single coherent outcome in one invariant family with no seam merge, milestone absorption or material deviation."\n'
+                'review_scope = "card_local"\n'
+                'atomicity_rationale_class = ""\n'
+                'atomicity_rationale = ""\n',
+                '# topology audit for M01-T04: preferred merge challenged before launch.\n'
+                '[[topology_audits]]\n'
+                'card_id = "M01-T04"\n'
+                'risk = "risky"\n'
+                'triggers = ["preferred_seam_merge"]\n'
+                'risk_basis = "Merges preferred seam helper-less-derivation with atomicity rationale."\n'
+                'review_scope = "card_local"\n'
+                'atomicity_rationale_class = ""\n'
+                'atomicity_rationale = ""\n'
+                '[topology_audits.challenge]\n'
+                'verdict = "green"\n'
+                'evaluated = ["boundary_fidelity", "falsifiability", "review_separation"]\n'
+                'scope_statement = "Merged preferred seam boundary checked for fidelity, falsifiability and review split."\n'
+                'independent = true\n'
+                'independence_basis = "Challenger did not author the Execution Prep topology proposal."\n'
+                'fresh = true\n'
+                'challenge_basis = "Fresh review of the merged boundary against seam intent and sizing outcomes."\n'
+                'proposal_digest = "sha256:' + "0" * 64 + '"\n'
+                'card_contract_digest = "sha256:' + "1" * 64 + '"\n',
+            )
+            self.assertNotEqual(risky_base, base)
+            board.write_text(risky_base + (
                 '[[seam_decisions]]\n'
                 'seam_id = "BOOT-A"\n'
                 'decision = "preserved"\n'
@@ -439,6 +500,20 @@ class SeamRouterPathTests(unittest.TestCase):
                 '[[seam_decisions]]\n'
                 'seam_id = "example-split"\n'
                 'decision = "split"\n'
+            ))
+            data = tomllib.loads(board.read_text())
+            planning = tomllib.loads((project / ROUTER_PLANNING).read_text())
+            sizing = next(audit for audit in data["sizing_audits"] if audit["card_id"] == "M01-T04")
+            audit = next(audit for audit in data["topology_audits"] if audit["card_id"] == "M01-T04")
+            board.write_text(board.read_text().replace(
+                "sha256:" + "0" * 64,
+                compute_proposal_digest(
+                    card_id="M01-T04",
+                    sizing_audit=sizing,
+                    topology_audit=audit,
+                    seam_decisions=data.get("seam_decisions"),
+                    planning_seams=planning.get("seams"),
+                ),
             ))
             routed = select_route(project, [ROUTER_MANIFEST], package_root=ROOT)
             self.assertEqual(
