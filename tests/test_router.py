@@ -1289,7 +1289,7 @@ class RouterTests(unittest.TestCase):
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertNotEqual(routed.disposition, "recovery", routed.reason)
             self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_prep"))
-            self.assertIn("Editorial/mechanical-only", routed.reason)
+            self.assertIn("Exact independent GREEN editorial-only classification", routed.reason)
             self.assertNotIn(f"project:{BOARD}", routed.read_set)
         finally:
             temp.cleanup()
