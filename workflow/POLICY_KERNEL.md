@@ -17,6 +17,14 @@ It is not a workflow DSL, does not own semantic judgment, and authorizes no cano
 - Owner: `workflow/RECOVERY.md`
 - Semantics: An ambiguous durable tracker binding fails closed to Recovery; duplicate create is forbidden.
 
+## PWV21-K009 — `brainstorm_explicit_user_stop`
+
+- Precedence: `150`
+- Canonical inputs: `brainstorm.explicit_user_stop`
+- Outcome: `stop / explicit_user_stop`
+- Owner: `workflow/BRAINSTORMING.md`
+- Semantics: An explicit durable Brainstorming user stop remains a real user stop.
+
 ## PWV21-K002 — `definition_premium_a_due`
 
 - Precedence: `200`
@@ -72,14 +80,6 @@ It is not a workflow DSL, does not own semantic judgment, and authorizes no cano
 - Outcome: `stop / premium_C`
 - Owner: `workflow/PLANNING.md`
 - Semantics: An approved GREEN-reviewed plan with exact premium C due stops before Execution Prep.
-
-## PWV21-K009 — `brainstorm_explicit_user_stop`
-
-- Precedence: `300`
-- Canonical inputs: `brainstorm.explicit_user_stop`
-- Outcome: `stop / explicit_user_stop`
-- Owner: `workflow/BRAINSTORMING.md`
-- Semantics: An explicit durable Brainstorming user stop remains a real user stop.
 
 ## PWV21-K010 — `brainstorm_active`
 

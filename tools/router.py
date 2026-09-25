@@ -615,6 +615,18 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             ):
                 raise ValidationError("Definition source does not match exact promoted Brainstorming revision")
 
+        # RF002 stop precedence is pre-execution only: Board-coupled Definition
+        # routes keep parent behavior, while brainstorm-only stop is unchanged.
+        if brainstorm is not None and ("task_board" not in workstream or definition is None):
+            exact_scope = f"{brainstorm['scope_id']}@{brainstorm['revision']}"
+            if (decision := kernel.route("PWV21-K009", {"brainstorm": brainstorm})) is not None:
+                return policy_result(
+                    reads,
+                    decision,
+                    "Brainstorming carries an explicit user stop",
+                    subject=exact_scope,
+                )
+
         plan_gate_passed_with_board = False
         if definition is not None:
             if definition["state"] == "active":
@@ -750,13 +762,6 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
 
         if not plan_gate_passed_with_board and brainstorm is not None:
             exact_scope = f"{brainstorm['scope_id']}@{brainstorm['revision']}"
-            if (decision := kernel.route("PWV21-K009", {"brainstorm": brainstorm})) is not None:
-                return policy_result(
-                    reads,
-                    decision,
-                    "Brainstorming carries an explicit user stop",
-                    subject=exact_scope,
-                )
             if (decision := kernel.route("PWV21-K010", {"brainstorm": brainstorm})) is not None:
                 return policy_result(
                     reads,

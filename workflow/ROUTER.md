@@ -33,6 +33,7 @@ The registry is deliberately not an expression language. It names exact canonica
 - tracker create_pending_readback -> GitHub Issues readback before any retry;
 - ambiguous tracker -> Recovery; duplicate create is forbidden;
 - linked/unavailable tracker -> continue without treating tracker as authority;
+- explicit Brainstorming user stop (after exact promotion/Definition validation) -> `explicit_user_stop` stop owned by Brainstorming: ahead of Definition/Planning dispatch only without a Task Board locator; brainstorm-only stop keeps its prior owner position; Board-coupled routes are preserved;
 - active Brainstorming -> Brainstorming;
 - ready Brainstorming without exact promotion -> Definition-promotion stop;
 - exact promoted revision -> Definition;

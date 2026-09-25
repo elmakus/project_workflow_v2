@@ -119,7 +119,7 @@
     },
     {
       "id": "PWV21-K009",
-      "precedence": 300,
+      "precedence": 150,
       "predicate": "brainstorm_explicit_user_stop",
       "inputs": [
         "brainstorm.explicit_user_stop"

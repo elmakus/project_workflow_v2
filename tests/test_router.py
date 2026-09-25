@@ -837,6 +837,19 @@ class RouterTests(unittest.TestCase):
             '[requirements]\nclass = "authority"\npath = "requirements/REQUIREMENTS.md"\n'
         )
 
+    @staticmethod
+    def rf002_definition_green_content(*, premium_a: str = "satisfied") -> str:
+        return (
+            'workstream_id = "sample-workstream"\n'
+            'source_scope_subject = "scope-a@2"\n'
+            'revision = "R1"\n'
+            'state = "green"\n'
+            'completeness_audit = "green"\n'
+            f'premium_a = "{premium_a}"\n'
+            'decisions = [{ class = "authority", path = "decisions/ADR-001.md" }]\n'
+            '[requirements]\nclass = "authority"\npath = "requirements/REQUIREMENTS.md"\n'
+        )
+
     def test_rf002_b1_active_brainstorming_with_exact_authorization_cannot_enter_definition(self) -> None:
         temp, project = self.copy_fixture()
         try:
@@ -989,6 +1002,347 @@ class RouterTests(unittest.TestCase):
                 finally:
                     temp.cleanup()
 
+
+    def test_rf002_a1_promoted_stop_with_definition_active_returns_explicit_stop(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.remove_board_locator(project)
+            self.install_state_record(
+                project, "brainstorm", "brainstorm", "BRAINSTORM.toml",
+                self.rf002_brainstorm_content(
+                    state="promoted", promotion_state="authorized",
+                    promotion_subject="scope-a@2", explicit_user_stop=True,
+                ),
+            )
+            self.install_state_record(
+                project, "definition", "definition", "DEFINITION.toml",
+                self.rf002_definition_content(),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation), ("stop", "explicit_user_stop")
+            )
+            self.assertEqual(routed.subject, "scope-a@2")
+            self.assertEqual(routed.owner_module, "workflow/BRAINSTORMING.md")
+            self.assertIn("package:workflow/USER_STOP.md", routed.read_set)
+        finally:
+            temp.cleanup()
+
+    def test_rf002_a2_promoted_stop_with_definition_green_a_due_returns_explicit_stop(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.remove_board_locator(project)
+            self.install_state_record(
+                project, "brainstorm", "brainstorm", "BRAINSTORM.toml",
+                self.rf002_brainstorm_content(
+                    state="promoted", promotion_state="authorized",
+                    promotion_subject="scope-a@2", explicit_user_stop=True,
+                ),
+            )
+            self.install_state_record(
+                project, "definition", "definition", "DEFINITION.toml",
+                self.rf002_definition_green_content(premium_a="due"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation), ("stop", "explicit_user_stop")
+            )
+            self.assertEqual(routed.subject, "scope-a@2")
+            self.assertEqual(routed.owner_module, "workflow/BRAINSTORMING.md")
+            self.assertIn("package:workflow/USER_STOP.md", routed.read_set)
+        finally:
+            temp.cleanup()
+
+    def test_rf002_promoted_stop_persists_across_planning_branches(self) -> None:
+        cases: list[tuple[str, str | None, str | None]] = [
+            ("no_planning_record", None, None),
+            ("draft_cycle", self.planning_content(state="draft"), None),
+            (
+                "material_reentry_a_due",
+                self.planning_content(
+                    state="draft", cycle=2, revision="P2", premium_a="due"
+                ),
+                None,
+            ),
+            (
+                "frozen_b_due",
+                self.planning_content(state="frozen", premium_b="due"),
+                None,
+            ),
+            (
+                "review_pending",
+                self.planning_content(state="frozen", premium_b="satisfied"),
+                self.plan_review_content("pending"),
+            ),
+            (
+                "review_green",
+                self.planning_content(state="frozen", premium_b="satisfied"),
+                self.plan_review_content("green"),
+            ),
+            (
+                "review_red",
+                self.planning_content(state="frozen", premium_b="satisfied"),
+                self.plan_review_content("red"),
+            ),
+            (
+                "approved_c_due",
+                self.planning_content(
+                    state="approved", premium_b="satisfied", premium_c="due"
+                ),
+                self.plan_review_content("green"),
+            ),
+            (
+                "approved_c_satisfied",
+                self.planning_content(
+                    state="approved", premium_b="satisfied", premium_c="satisfied"
+                ),
+                self.plan_review_content("green"),
+            ),
+        ]
+        for label, planning_text, review_text in cases:
+            with self.subTest(branch=label):
+                temp, project = self.copy_fixture()
+                try:
+                    self.remove_board_locator(project)
+                    self.install_state_record(
+                        project, "brainstorm", "brainstorm", "BRAINSTORM.toml",
+                        self.rf002_brainstorm_content(
+                            state="promoted", promotion_state="authorized",
+                            promotion_subject="scope-a@2", explicit_user_stop=True,
+                        ),
+                    )
+                    self.install_state_record(
+                        project, "definition", "definition", "DEFINITION.toml",
+                        self.rf002_definition_green_content(premium_a="satisfied"),
+                    )
+                    if planning_text is not None:
+                        self.install_state_record(
+                            project, "planning", "planning", "PLANNING.toml", planning_text
+                        )
+                    if review_text is not None:
+                        self.install_state_record(
+                            project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                            review_text,
+                        )
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertEqual(
+                        (routed.disposition, routed.obligation),
+                        ("stop", "explicit_user_stop"),
+                    )
+                    self.assertEqual(routed.subject, "scope-a@2")
+                    self.assertEqual(routed.owner_module, "workflow/BRAINSTORMING.md")
+                    self.assertIn("package:workflow/USER_STOP.md", routed.read_set)
+                finally:
+                    temp.cleanup()
+
+    def test_rf002_board_coupled_routes_preserve_parent_despite_stop(self) -> None:
+        # RF002 stop precedence is pre-execution only: with a Task Board
+        # locator and a Definition record, Board-coupled dispatch stays exactly
+        # as on parent 9077fe8 even when explicit_user_stop is true.
+        temp, project = self.copy_fixture()
+        try:
+            self.install_state_record(
+                project, "brainstorm", "brainstorm", "BRAINSTORM.toml",
+                self.rf002_brainstorm_content(
+                    state="promoted", promotion_state="authorized",
+                    promotion_subject="scope-a@2", explicit_user_stop=True,
+                ),
+            )
+            self.install_state_record(
+                project, "definition", "definition", "DEFINITION.toml",
+                self.rf002_definition_green_content(premium_a="satisfied"),
+            )
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(
+                    state="approved", premium_b="satisfied", premium_c="satisfied"
+                ),
+            )
+            self.install_state_record(
+                project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                self.plan_review_content("green"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution"))
+            self.assertEqual(routed.subject, "M01-T04")
+            self.assertEqual(routed.owner_module, "workflow/EXECUTION.md")
+            self.assertIn(f"project:{BOARD}", routed.read_set)
+        finally:
+            temp.cleanup()
+
+        temp, project = self.copy_fixture()
+        try:
+            self.install_editorial_plan(project)
+            brainstorm_path = (
+                project / "implementation/workstreams/sample-workstream/BRAINSTORM.toml"
+            )
+            brainstorm_path.write_text(
+                'workstream_id = "sample-workstream"\n'
+                'scope_id = "scope-plan"\n'
+                "revision = 1\n"
+                'state = "promoted"\n'
+                'challenge_audit = "green"\n'
+                "explicit_user_stop = true\n"
+                'promotion_state = "authorized"\n'
+                'promotion_subject = "scope-plan@1"\n'
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution"))
+            self.assertEqual(routed.subject, "M01-T04")
+            self.assertEqual(routed.owner_module, "workflow/EXECUTION.md")
+            self.assertIn(f"project:{BOARD}", routed.read_set)
+        finally:
+            temp.cleanup()
+
+    def test_rf002_stop_with_contradictory_binding_stays_recovery(self) -> None:
+        cases = (
+            (
+                "stale_promotion",
+                {"revision": 3, "state": "ready_for_definition",
+                 "promotion_state": "authorized", "promotion_subject": "scope-a@2"},
+                "scope-a@3",
+            ),
+            (
+                "cross_scope_source",
+                {"state": "promoted", "promotion_state": "authorized",
+                 "promotion_subject": "scope-a@2"},
+                "scope-b@2",
+            ),
+            (
+                "pending_promotion",
+                {"state": "ready_for_definition", "promotion_state": "pending",
+                 "promotion_subject": ""},
+                "scope-a@2",
+            ),
+        )
+        for label, brainstorm_kwargs, definition_source in cases:
+            with self.subTest(binding=label):
+                temp, project = self.copy_fixture()
+                try:
+                    self.install_state_record(
+                        project, "brainstorm", "brainstorm", "BRAINSTORM.toml",
+                        self.rf002_brainstorm_content(
+                            explicit_user_stop=True, **brainstorm_kwargs
+                        ),
+                    )
+                    self.install_state_record(
+                        project, "definition", "definition", "DEFINITION.toml",
+                        self.rf002_definition_content(
+                            source_scope_subject=definition_source
+                        ),
+                    )
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertEqual(
+                        (routed.disposition, routed.obligation),
+                        ("recovery", "recovery_boundary"),
+                    )
+                finally:
+                    temp.cleanup()
+
+    def test_rf002_brainstorm_only_stop_retains_explicit_stop(self) -> None:
+        for state, promotion_state, promotion_subject in (
+            ("promoted", "authorized", "scope-a@2"),
+            ("active", "pending", ""),
+        ):
+            with self.subTest(state=state):
+                temp, project = self.copy_fixture()
+                try:
+                    self.install_state_record(
+                        project, "brainstorm", "brainstorm", "BRAINSTORM.toml",
+                        self.rf002_brainstorm_content(
+                            state=state, promotion_state=promotion_state,
+                            promotion_subject=promotion_subject,
+                            explicit_user_stop=True,
+                        ),
+                    )
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertEqual(
+                        (routed.disposition, routed.obligation),
+                        ("stop", "explicit_user_stop"),
+                    )
+                    self.assertEqual(routed.subject, "scope-a@2")
+                    self.assertEqual(routed.owner_module, "workflow/BRAINSTORMING.md")
+                    self.assertIn("package:workflow/USER_STOP.md", routed.read_set)
+                finally:
+                    temp.cleanup()
+
+    def test_rf002_promoted_no_stop_planning_branches_keep_legal_routes(self) -> None:
+        cases: list[
+            tuple[str, str | None, str | None, tuple[str, str], str | None]
+        ] = [
+            ("no_planning_record", None, None, ("route", "planning"), "R1"),
+            (
+                "draft_cycle",
+                self.planning_content(state="draft"),
+                None,
+                ("route", "planning"),
+                "definition:R1|planning-cycle:1",
+            ),
+            (
+                "material_reentry_a_due",
+                self.planning_content(
+                    state="draft", cycle=2, revision="P2", premium_a="due"
+                ),
+                None,
+                ("stop", "premium_A"),
+                "definition:R1|planning-cycle:2",
+            ),
+            (
+                "frozen_b_due",
+                self.planning_content(state="frozen", premium_b="due"),
+                None,
+                ("stop", "premium_B"),
+                None,
+            ),
+            (
+                "review_pending",
+                self.planning_content(state="frozen", premium_b="satisfied"),
+                self.plan_review_content("pending"),
+                ("route", "plan_review"),
+                None,
+            ),
+            (
+                "approved_c_due",
+                self.planning_content(
+                    state="approved", premium_b="satisfied", premium_c="due"
+                ),
+                self.plan_review_content("green"),
+                ("stop", "premium_C"),
+                None,
+            ),
+        ]
+        for label, planning_text, review_text, expected, subject in cases:
+            with self.subTest(branch=label):
+                temp, project = self.copy_fixture()
+                try:
+                    self.install_state_record(
+                        project, "brainstorm", "brainstorm", "BRAINSTORM.toml",
+                        self.rf002_brainstorm_content(
+                            state="promoted", promotion_state="authorized",
+                            promotion_subject="scope-a@2",
+                        ),
+                    )
+                    self.install_state_record(
+                        project, "definition", "definition", "DEFINITION.toml",
+                        self.rf002_definition_green_content(premium_a="satisfied"),
+                    )
+                    if planning_text is not None:
+                        self.install_state_record(
+                            project, "planning", "planning", "PLANNING.toml", planning_text
+                        )
+                    if review_text is not None:
+                        self.install_state_record(
+                            project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                            review_text,
+                        )
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertEqual(
+                        (routed.disposition, routed.obligation), expected
+                    )
+                    if subject is not None:
+                        self.assertEqual(routed.subject, subject)
+                finally:
+                    temp.cleanup()
 
     def test_planning_routes_after_exact_premium_a_satisfaction(self) -> None:
         temp, project = self.copy_fixture()
