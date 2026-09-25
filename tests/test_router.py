@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -104,9 +105,53 @@ class RouterTests(unittest.TestCase):
             finally:
                 temp.cleanup()
 
+    @staticmethod
+    def git_identity_for(project: Path, relpath: str) -> tuple[str, str]:
+        """Commit one fixture file and return its real (commit, blob) identity."""
+        if not (project / ".git").exists():
+            subprocess.run(["git", "init", "-q", str(project)], check=True)
+            subprocess.run(["git", "-C", str(project), "config", "user.email", "fixture@example.invalid"], check=True)
+            subprocess.run(["git", "-C", str(project), "config", "user.name", "Fixture"], check=True)
+        subprocess.run(["git", "-C", str(project), "add", relpath], check=True)
+        subprocess.run(["git", "-C", str(project), "commit", "-q", "-m", f"fixture {relpath}"], check=True)
+        commit = subprocess.run(
+            ["git", "-C", str(project), "rev-parse", "HEAD"],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        blob = subprocess.run(
+            ["git", "-C", str(project), "rev-parse", f"HEAD:{relpath}"],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        return commit, blob
+
+    @staticmethod
+    def board_result_identity(project: Path) -> tuple[str, str]:
+        """Return the current board result (commit, blob) for the active Card."""
+        section = (project / BOARD).read_text().split("[cards.result]", 1)[1]
+        commit = re.search(r'commit = "([0-9a-f]{40})"', section).group(1)  # type: ignore[union-attr]
+        blob = re.search(r'blob = "([0-9a-f]{40})"', section).group(1)  # type: ignore[union-attr]
+        return commit, blob
+
+    def commit_result_version(self, project: Path, result_path: str, content: str) -> tuple[str, str]:
+        """Write new result bytes, commit them, and rebind the board locator."""
+        old_commit, old_blob = self.board_result_identity(project)
+        (project / result_path).write_text(content)
+        commit, blob = self.git_identity_for(project, result_path)
+        board = project / BOARD
+        board.write_text(
+            board.read_text()
+            .replace(f'commit = "{old_commit}"', f'commit = "{commit}"', 1)
+            .replace(f'blob = "{old_blob}"', f'blob = "{blob}"', 1)
+        )
+        return commit, blob
+
     def install_done_predecessor(
-        self, project: Path, *, path: str, commit: str, blob: str,
-    ) -> None:
+        self, project: Path, *, path: str,
+    ) -> tuple[str, str]:
+        result_path = project / path
+        result_path.parent.mkdir(parents=True, exist_ok=True)
+        result_path.write_text("# predecessor result\n")
+        commit, blob = self.git_identity_for(project, path)
         board = project / BOARD
         existing = board.read_text()
         predecessor = (
@@ -125,18 +170,14 @@ class RouterTests(unittest.TestCase):
         board.write_text(existing.replace('[[cards]]\n', predecessor + '[[cards]]\n', 1))
         predecessor_card = project / "implementation/workstreams/sample-workstream/cards/M01-T03.md"
         predecessor_card.write_text("# predecessor Card\n")
-        result_path = project / path
-        result_path.parent.mkdir(parents=True, exist_ok=True)
-        result_path.write_text("# predecessor result\n")
+        return commit, blob
 
     def test_ready_card_stale_dependency_fails_closed_before_launch(self) -> None:
         temp, project = self.copy_fixture()
         try:
             dependency_path = "implementation/workstreams/sample-workstream/results/M01-T03.md"
-            commit = "a" * 40
-            blob = "b" * 40
+            commit, blob = self.install_done_predecessor(project, path=dependency_path)
             dependency = f"{dependency_path}@{commit}:{blob}"
-            self.install_done_predecessor(project, path=dependency_path, commit=commit, blob=blob)
             self.make_ready_card(project, dependencies=dependency)
 
             current = select_route(project, [MANIFEST], package_root=ROOT)
@@ -1384,31 +1425,7 @@ class RouterTests(unittest.TestCase):
     def test_durable_semantic_result_routes_to_reconciliation_without_replay(self) -> None:
         temp, project = self.copy_fixture()
         try:
-            result_path = "implementation/workstreams/sample-workstream/results/M01-T04.md"
-            (project / CARD).write_text(self.task_card_content())
-            authority = project / "requirements" / "REQUIREMENTS.md"
-            authority.parent.mkdir(parents=True, exist_ok=True)
-            authority.write_text("# Accepted authority\n")
-            board = project / BOARD
-            board.write_text(
-                board.read_text()
-                + '\n[cards.result]\nclass = "result"\n'
-                + f'path = "{result_path}"\n'
-                + f'commit = "{"a" * 40}"\n'
-                + f'blob = "{"b" * 40}"\n'
-            )
-            evidence_dir = project / "implementation/workstreams/sample-workstream/evidence"
-            evidence_dir.mkdir(parents=True, exist_ok=True)
-            (evidence_dir / "M01-T04.md").write_text("# Verified evidence\n")
-            result_file = project / result_path
-            result_file.parent.mkdir(parents=True, exist_ok=True)
-            result_file.write_text(
-                "# Card Result\n"
-                "- Card ID: M01-T04\n"
-                "- Implementation subject: owner/repo@commit:" + ("a" * 40) + "\n"
-                "- Evidence refs: implementation/workstreams/sample-workstream/evidence/M01-T04.md\n"
-                "- Tests/readback summary: GREEN\n"
-            )
+            result_path = self.install_reviewable_result(project, "none")
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("route", "result_reconciliation"))
             self.assertIn("do not replay", routed.reason)
@@ -1416,31 +1433,37 @@ class RouterTests(unittest.TestCase):
         finally:
             temp.cleanup()
 
+    def result_version_content(self, *, subject: str) -> str:
+        return (
+            "# Card Result\n"
+            "- Card ID: M01-T04\n"
+            f"- Implementation subject: {subject}\n"
+            "- Evidence refs: implementation/workstreams/sample-workstream/evidence/M01-T04.md\n"
+            "- Tests/readback summary: GREEN\n"
+        )
+
     def install_reviewable_result(self, project: Path, review_requirement: str) -> str:
         result_path = "implementation/workstreams/sample-workstream/results/M01-T04.md"
         (project / CARD).write_text(self.task_card_content(review_requirement=review_requirement))
         authority = project / "requirements" / "REQUIREMENTS.md"
         authority.parent.mkdir(parents=True, exist_ok=True)
         authority.write_text("# Accepted authority\n")
-        board = project / BOARD
-        board.write_text(
-            board.read_text()
-            + '\n[cards.result]\nclass = "result"\n'
-            + f'path = "{result_path}"\n'
-            + f'commit = "{"a" * 40}"\n'
-            + f'blob = "{"b" * 40}"\n'
-        )
         evidence_dir = project / "implementation/workstreams/sample-workstream/evidence"
         evidence_dir.mkdir(parents=True, exist_ok=True)
         (evidence_dir / "M01-T04.md").write_text("# Verified evidence\n")
         result_file = project / result_path
         result_file.parent.mkdir(parents=True, exist_ok=True)
         result_file.write_text(
-            "# Card Result\n"
-            "- Card ID: M01-T04\n"
-            "- Implementation subject: owner/repo@commit:" + ("a" * 40) + "\n"
-            "- Evidence refs: implementation/workstreams/sample-workstream/evidence/M01-T04.md\n"
-            "- Tests/readback summary: GREEN\n"
+            self.result_version_content(subject="owner/repo@commit:" + ("a" * 40))
+        )
+        commit, blob = self.git_identity_for(project, result_path)
+        board = project / BOARD
+        board.write_text(
+            board.read_text()
+            + '\n[cards.result]\nclass = "result"\n'
+            + f'path = "{result_path}"\n'
+            + f'commit = "{commit}"\n'
+            + f'blob = "{blob}"\n'
         )
         return result_path
 
@@ -1461,6 +1484,7 @@ class RouterTests(unittest.TestCase):
         epoch_reset_basis: str = "",
         post_convergence_validation: bool = False,
         convergence_basis: str = "",
+        subject_commit: str | None = None,
         subject_blob: str | None = None,
     ) -> str:
         review_path = f"implementation/workstreams/sample-workstream/reviews/M01-T04-{attempt}.toml"
@@ -1490,7 +1514,9 @@ class RouterTests(unittest.TestCase):
             evidence_path = project / evidence
             evidence_path.parent.mkdir(parents=True, exist_ok=True)
             evidence_path.write_text("# Review evidence\n")
-        blob = subject_blob or ("b" * 40)
+        board_commit, board_blob = self.board_result_identity(project)
+        commit = subject_commit or board_commit
+        blob = subject_blob or board_blob
         extra = ""
         if review_kind == "discovery" and verdict in {"green", "red"}:
             discovery_complete = True
@@ -1538,7 +1564,7 @@ class RouterTests(unittest.TestCase):
             + '[subject]\n'
             'class = "git_blob"\n'
             'repository = "owner/router-fixture"\n'
-            f'commit = "{"a" * 40}"\n'
+            f'commit = "{commit}"\n'
             'path = "implementation/workstreams/sample-workstream/results/M01-T04.md"\n'
             f'blob = "{blob}"\n'
             '[acceptance]\n'
@@ -1706,8 +1732,9 @@ class RouterTests(unittest.TestCase):
                 subject_blob="e" * 40,
             )
             reset = project / reset_path
+            board_commit, _ = self.board_result_identity(project)
             reset_text = reset.read_text().replace(
-                f'commit = "{"a" * 40}"',
+                f'commit = "{board_commit}"',
                 f'commit = "{"c" * 40}"',
                 1,
             )
@@ -1761,7 +1788,7 @@ class RouterTests(unittest.TestCase):
     def test_green_closure_requires_all_known_findings_before_fresh_discovery(self) -> None:
         temp, project = self.copy_fixture()
         try:
-            self.install_reviewable_result(project, "required")
+            result_path = self.install_reviewable_result(project, "required")
             self.add_review_attempt(
                 project,
                 "red",
@@ -1771,12 +1798,9 @@ class RouterTests(unittest.TestCase):
                 finding_ids=("F1", "F2"),
             )
 
-            board = project / BOARD
-            board.write_text(
-                board.read_text().replace(
-                    'blob = "' + ("b" * 40) + '"',
-                    'blob = "' + ("c" * 40) + '"',
-                )
+            _, repaired_blob = self.commit_result_version(
+                project, result_path,
+                self.result_version_content(subject="repaired implementation v2"),
             )
             self.add_review_attempt(
                 project,
@@ -1785,7 +1809,7 @@ class RouterTests(unittest.TestCase):
                 review_kind="closure_verification",
                 source_discovery_attempt="R01",
                 finding_ids=("F1",),
-                subject_blob="c" * 40,
+                subject_blob=repaired_blob,
             )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("route", "review_freeze"))
@@ -1798,7 +1822,7 @@ class RouterTests(unittest.TestCase):
                 review_kind="closure_verification",
                 source_discovery_attempt="R01",
                 finding_ids=("F2",),
-                subject_blob="c" * 40,
+                subject_blob=repaired_blob,
             )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("route", "review_freeze"))
@@ -1811,7 +1835,7 @@ class RouterTests(unittest.TestCase):
                 review_kind="discovery",
                 discovery_complete=True,
                 finding_ids=(),
-                subject_blob="c" * 40,
+                subject_blob=repaired_blob,
             )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual(
@@ -1942,16 +1966,20 @@ class RouterTests(unittest.TestCase):
     def test_third_failed_closure_round_routes_review_convergence(self) -> None:
         temp, project = self.copy_fixture()
         try:
-            self.install_reviewable_result(project, "required")
+            result_path = self.install_reviewable_result(project, "required")
             self.add_review_attempt(
                 project, "red", "R01",
                 finding_ids=("F1",), defect_class_ids=("class-a",),
             )
-            for attempt, subject_blob in (
-                ("R02", "4" * 40),
-                ("R03", "5" * 40),
-                ("R04", "6" * 40),
+            for attempt, version in (
+                ("R02", "v2"),
+                ("R03", "v3"),
+                ("R04", "v4"),
             ):
+                _, subject_blob = self.commit_result_version(
+                    project, result_path,
+                    self.result_version_content(subject=f"repair attempt {version}"),
+                )
                 self.add_review_attempt(
                     project,
                     "red",
@@ -1962,13 +1990,6 @@ class RouterTests(unittest.TestCase):
                     defect_class_ids=("class-a",),
                     subject_blob=subject_blob,
                 )
-            board = project / BOARD
-            board.write_text(
-                board.read_text().replace(
-                    'blob = "' + ("b" * 40) + '"',
-                    'blob = "' + ("6" * 40) + '"',
-                )
-            )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("route", "review_convergence"))
         finally:
@@ -1991,7 +2012,6 @@ class RouterTests(unittest.TestCase):
                     source_discovery_attempt="R01",
                     finding_ids=("F1",),
                     defect_class_ids=("class-a",),
-                    subject_blob="b" * 40,
                 )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_resolution"))
@@ -2042,10 +2062,12 @@ class RouterTests(unittest.TestCase):
     def test_changed_result_after_terminal_review_requires_new_attempt(self) -> None:
         temp, project = self.copy_fixture()
         try:
-            self.install_reviewable_result(project, "required")
+            result_path = self.install_reviewable_result(project, "required")
             self.add_review_attempt(project, "green")
-            board = project / BOARD
-            board.write_text(board.read_text().replace('blob = "' + ("b" * 40) + '"', 'blob = "' + ("c" * 40) + '"'))
+            self.commit_result_version(
+                project, result_path,
+                self.result_version_content(subject="changed implementation v2"),
+            )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("route", "review_freeze"))
             self.assertIn("changed", routed.reason)
@@ -2055,10 +2077,12 @@ class RouterTests(unittest.TestCase):
     def test_active_review_for_changed_result_fails_closed(self) -> None:
         temp, project = self.copy_fixture()
         try:
-            self.install_reviewable_result(project, "required")
+            result_path = self.install_reviewable_result(project, "required")
             self.add_review_attempt(project, "pending")
-            board = project / BOARD
-            board.write_text(board.read_text().replace('blob = "' + ("b" * 40) + '"', 'blob = "' + ("c" * 40) + '"'))
+            self.commit_result_version(
+                project, result_path,
+                self.result_version_content(subject="changed implementation v2"),
+            )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
             self.assertIn("stale", routed.reason)

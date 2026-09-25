@@ -14,6 +14,12 @@ from tools.editorial_exemption_contract import (
     EditorialExemptionError,
     validate_editorial_exemption_classification,
 )
+from tools.exact_locator import (
+    ExactLocatorError,
+    normalize_locator_path,
+    verify_exact_git_locator,
+    verify_worktree_freshness,
+)
 from tools.execution_contract import ExecutionContractError, parse_card_result
 from tools.recovery_contract import RecoveryContractError, classify_resolution, exact_result_subject, review_subject
 from tools.review_contract import (
@@ -98,9 +104,11 @@ class Reads:
         self.items: list[str] = []
 
     def _read_path(self, root: Path, raw: str, owner: str) -> Path:
-        rel = PurePosixPath(raw)
-        if rel.is_absolute() or "." in rel.parts or ".." in rel.parts:
-            raise ValidationError(f"unsafe {owner} path {raw!r}")
+        try:
+            canonical = normalize_locator_path(raw, owner)
+        except ExactLocatorError as exc:
+            raise ValidationError(f"unsafe {owner} path {raw!r}: {exc}") from exc
+        rel = PurePosixPath(canonical)
         path = (root / Path(*rel.parts)).resolve()
         try:
             path.relative_to(root)
@@ -176,8 +184,8 @@ def read_exact_editorial_classification(
 ) -> dict[str, object]:
     """Read the one RF008 proof record by exact Git identity.
 
-    This is intentionally local to the editorial-exemption serving boundary;
-    RF007 owns any future generalized locator/readback resolver.
+    Identity proof reuses the shared RF007 exact-locator resolver; the
+    RF008 serving boundary keeps its accepted messages and readback shape.
     """
     repository = ref.get("repository")
     commit = ref.get("commit")
@@ -187,33 +195,33 @@ def read_exact_editorial_classification(
         raise ValidationError("editorial classification repository does not match selected project")
     if not isinstance(commit, str) or not isinstance(path, str) or not isinstance(expected_blob, str):
         raise ValidationError("editorial classification locator is incomplete")
-    rel = PurePosixPath(path)
-    if rel.is_absolute() or "." in rel.parts or ".." in rel.parts:
-        raise ValidationError("editorial classification path is unsafe")
     try:
-        resolved = subprocess.run(
-            ["git", "-C", str(reads.project_root), "rev-parse", "--verify", f"{commit}:{path}"],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=5,
+        normalize_locator_path(path, "editorial classification")
+    except ExactLocatorError as exc:
+        raise ValidationError("editorial classification path is unsafe") from exc
+    try:
+        verify_exact_git_locator(
+            project_root=reads.project_root,
+            repository=repository,
+            expected_repository=project_repository,
+            commit=commit,
+            path=path,
+            blob=expected_blob,
+            label="editorial classification",
         )
-        if resolved.returncode != 0:
-            raise ValidationError("editorial classification exact Git subject does not resolve")
-        actual_blob = resolved.stdout.strip()
-        if actual_blob != expected_blob:
-            raise ValidationError("editorial classification blob does not match exact locator")
-        kind = subprocess.run(
-            ["git", "-C", str(reads.project_root), "cat-file", "-t", actual_blob],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=5,
-        )
-        if kind.returncode != 0 or kind.stdout.strip() != "blob":
-            raise ValidationError("editorial classification locator does not resolve to a Git blob")
+    except ExactLocatorError as exc:
+        if exc.kind == "dangling":
+            raise ValidationError("editorial classification exact Git subject does not resolve") from exc
+        if exc.kind == "blob_mismatch":
+            raise ValidationError("editorial classification blob does not match exact locator") from exc
+        if exc.kind == "not_blob":
+            raise ValidationError("editorial classification locator does not resolve to a Git blob") from exc
+        if exc.kind == "git_unavailable":
+            raise ValidationError(f"editorial classification Git readback failed: {exc}") from exc
+        raise ValidationError(f"editorial classification locator is invalid: {exc}") from exc
+    try:
         payload = subprocess.run(
-            ["git", "-C", str(reads.project_root), "cat-file", "-p", actual_blob],
+            ["git", "-C", str(reads.project_root), "cat-file", "-p", expected_blob],
             capture_output=True,
             text=True,
             check=False,
@@ -318,11 +326,62 @@ def accepted_planning_seams(reads: Reads, workstream: dict) -> list[dict] | None
     return planning.get("seams")
 
 
+def read_verified_card_result(
+    reads: Reads,
+    project_repository: str,
+    card: dict,
+) -> str:
+    """Read the active Card result only after proving its exact locator.
+
+    A declared ``(commit, blob)`` identity must resolve in Git and the
+    current worktree bytes must still match that blob (H010/H020); legacy
+    locators without declared identity keep worktree existence/readback.
+    Returns the verified text so callers never re-read past the proof.
+    """
+    ref = card["result"]
+    locator_path = ref["path"]
+    if "commit" in ref or "blob" in ref:
+        try:
+            verified = verify_exact_git_locator(
+                project_root=reads.project_root,
+                repository=project_repository,
+                expected_repository=project_repository,
+                commit=ref.get("commit"),
+                path=locator_path,
+                blob=ref.get("blob"),
+                label="card result",
+            )
+            content = verify_worktree_freshness(
+                project_root=reads.project_root,
+                path=locator_path,
+                blob=ref.get("blob"),
+                label="card result",
+            )
+        except ExactLocatorError as exc:
+            raise ValidationError(str(exc)) from exc
+        reads.items.append(f"project-git:{verified.key}")
+        reads.project(locator_path)
+        try:
+            return content.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValidationError(
+                f"card result {locator_path!r} is not UTF-8 text: {exc}"
+            ) from exc
+    try:
+        return reads.project(locator_path).read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValidationError(
+            f"card result {locator_path!r} is not UTF-8 text: {exc}"
+        ) from exc
+
+
 def refresh_ready_card(
     reads: Reads,
     board: dict,
     workstream: dict,
     card: dict,
+    *,
+    project_repository: str,
 ) -> dict:
     contract_path = card["contract"]["path"]
     text = reads.project(contract_path).read_text(encoding="utf-8")
@@ -365,6 +424,25 @@ def refresh_ready_card(
             raise ValidationError(
                 f"ready Card dependency {dependency['path']!r} no longer matches the exact current DONE predecessor result"
             )
+        try:
+            verified = verify_exact_git_locator(
+                project_root=reads.project_root,
+                repository=project_repository,
+                expected_repository=project_repository,
+                commit=dependency["commit"],
+                path=dependency["path"],
+                blob=dependency["blob"],
+                label="ready Card dependency",
+            )
+            verify_worktree_freshness(
+                project_root=reads.project_root,
+                path=dependency["path"],
+                blob=dependency["blob"],
+                label="ready Card dependency",
+            )
+        except ExactLocatorError as exc:
+            raise ValidationError(str(exc)) from exc
+        reads.items.append(f"project-git:{verified.key}")
         reads.project(dependency["path"]).read_text(encoding="utf-8")
 
     technical_contract = contract["technical_contract"]
@@ -841,8 +919,19 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
         try:
             reads.project(card["contract"]["path"]).read_text(encoding="utf-8")
             if "result" in card:
-                result_text = reads.project(card["result"]["path"]).read_text(encoding="utf-8")
-                parse_card_result(result_text, card["id"], workstream["workstream_id"])
+                result_text = read_verified_card_result(
+                    reads, project["repository"], card
+                )
+                parsed_result = parse_card_result(
+                    result_text, card["id"], workstream["workstream_id"]
+                )
+                for evidence_ref in parsed_result["evidence_refs"]:
+                    try:
+                        reads.project(evidence_ref).read_text(encoding="utf-8")
+                    except (OSError, ValidationError) as exc:
+                        raise ValidationError(
+                            f"card result evidence {evidence_ref!r} cannot be read back: {exc}"
+                        ) from exc
                 contract = parse_task_card(
                     reads.project(card["contract"]["path"]).read_text(encoding="utf-8"),
                     card["id"],
@@ -999,7 +1088,10 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
     if (decision := kernel.route("PWV21-K011", {"board": board})) is not None:
         card = ready[0]
         try:
-            refresh_ready_card(reads, board, workstream, card)
+            refresh_ready_card(
+                reads, board, workstream, card,
+                project_repository=project["repository"],
+            )
         except (OSError, ValidationError, KeyError) as exc:
             return recovery(reads, f"ready Card launch refresh failed: {exc}")
         return policy_result(

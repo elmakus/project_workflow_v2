@@ -62,8 +62,12 @@ from __future__ import annotations
 
 import tomllib
 from collections.abc import Callable, Mapping
-from pathlib import PurePosixPath
 from typing import Any
+
+try:
+    from tools.exact_locator import ExactLocatorError, normalize_locator_path
+except ModuleNotFoundError:  # direct script execution from tools/
+    from exact_locator import ExactLocatorError, normalize_locator_path
 
 LIVE_FINDING_CLASSES = frozenset({
     "implementation_defect",
@@ -241,14 +245,13 @@ def _validate_evidence_refs(refs: Any, label: str, workstream_id: str) -> list[s
                 f"{item}: tracker/issue pointers are untrusted locators and cannot "
                 "serve as durable classification evidence"
             )
-        path = PurePosixPath(ref)
-        if (
-            path.is_absolute()
-            or "." in path.parts
-            or ".." in path.parts
-            or not ref.startswith(prefix)
-            or not ref.endswith(".md")
-        ):
+        try:
+            normalize_locator_path(ref, item)
+        except ExactLocatorError as exc:
+            raise LiveFindingError(
+                f"{item}: invalid workstream evidence ref {ref!r}; expected {prefix}*.md: {exc}"
+            ) from exc
+        if not ref.startswith(prefix) or not ref.endswith(".md"):
             raise LiveFindingError(
                 f"{item}: invalid workstream evidence ref {ref!r}; expected {prefix}*.md"
             )
@@ -269,7 +272,6 @@ def _validate_record_path(
             f"{label}: tracker/issue pointers are untrusted locators and cannot "
             "serve as durable records"
         )
-    pure = PurePosixPath(path)
     expected = {
         "finding_acceptance": (
             f"implementation/workstreams/{workstream_id}/findings/",
@@ -280,13 +282,14 @@ def _validate_record_path(
             ".toml",
         ),
     }[record_class]
-    if (
-        pure.is_absolute()
-        or "." in pure.parts
-        or ".." in pure.parts
-        or not path.startswith(expected[0])
-        or not path.endswith(expected[1])
-    ):
+    try:
+        normalize_locator_path(path, label)
+    except ExactLocatorError as exc:
+        raise LiveFindingError(
+            f"{label}: invalid {record_class} record path {path!r}; "
+            f"expected {expected[0]}*{expected[1]}: {exc}"
+        ) from exc
+    if not path.startswith(expected[0]) or not path.endswith(expected[1]):
         raise LiveFindingError(
             f"{label}: invalid {record_class} record path {path!r}; "
             f"expected {expected[0]}*{expected[1]}"
@@ -901,11 +904,12 @@ def _require_guard_acceptance(
         raise LiveFindingError(
             f"{mutation} requires a verifiable acceptance record path"
         )
-    pure = PurePosixPath(record_path)
-    if pure.is_absolute() or "." in pure.parts or ".." in pure.parts:
+    try:
+        normalize_locator_path(record_path, mutation)
+    except ExactLocatorError as exc:
         raise LiveFindingError(
-            f"{mutation} requires a safe workstream-local acceptance record path"
-        )
+            f"{mutation} requires a safe workstream-local acceptance record path: {exc}"
+        ) from exc
     if is_tracker_provenance(record_path):
         raise LiveFindingError(
             f"{mutation} cannot rest on tracker issue/comment approval; only the "

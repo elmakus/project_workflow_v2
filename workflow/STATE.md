@@ -73,6 +73,8 @@ Exactly one Card remains the canonical execution unit. Runtime-internal zero/one
 
 Only Main/coordinator reconciles an accepted implementation into the Card's exact workstream-local `result` locator. The result stores semantic implementation subject, evidence and verified tests/readback, never runtime/provider/model/session/worker/invocation identity. A durable valid result is recovery truth and prevents replay solely because a runtime context disappeared.
 
+No locator serves as workflow proof before the shared exact-locator readback (`tools/exact_locator.py`) resolves its actual target: the path must use canonical repo-relative POSIX spelling inside the declared semantic root, a declared `(commit, blob)` identity must resolve to that blob in Git, and where the route relies on current worktree bytes those bytes must still hash to the declared blob. Dangling/mismatched identity, same-path mutation, wrong root, symlink escape and separator/traversal aliases fail closed to the owning Recovery/validation boundary. Bare-path evidence and observation records prove existence, root confinement and readability; only a declared exact identity additionally proves Git immutability.
+
 An incomplete/incorrect return with a still-valid Card remains `in_progress` for correction. Only a real unresolved blocker moves the Card to `blocked`.
 
 ## Independent review attempts

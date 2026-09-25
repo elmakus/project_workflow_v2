@@ -39,7 +39,6 @@ live-finding classification and BOOT-D Worker discipline stay out of scope.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from pathlib import PurePosixPath
 from typing import Any
 
 try:
@@ -49,6 +48,7 @@ try:
         separable_outcomes,
         validate_outcome,
     )
+    from tools.exact_locator import ExactLocatorError, normalize_locator_path
 except ModuleNotFoundError:  # direct script execution from tools/
     from card_sizing_contract import (
         CardSizingError,
@@ -56,6 +56,7 @@ except ModuleNotFoundError:  # direct script execution from tools/
         separable_outcomes,
         validate_outcome,
     )
+    from exact_locator import ExactLocatorError, normalize_locator_path
 
 LATE_ORIGINS = frozenset({"execution", "review"})
 
@@ -102,14 +103,14 @@ def _validate_preserved_refs(
         item = f"{label}[{index}]"
         if not isinstance(ref, str) or not ref:
             raise LateOversizeError(f"{item}: evidence ref must be a non-empty string")
-        path = PurePosixPath(ref)
-        if (
-            path.is_absolute()
-            or "." in path.parts
-            or ".." in path.parts
-            or not ref.startswith(prefix)
-            or not ref.endswith(".md")
-        ):
+        try:
+            normalize_locator_path(ref, item)
+        except ExactLocatorError as exc:
+            raise LateOversizeError(
+                f"{item}: invalid workstream evidence ref {ref!r}; expected "
+                f"{prefix}*.md: {exc}"
+            ) from exc
+        if not ref.startswith(prefix) or not ref.endswith(".md"):
             raise LateOversizeError(
                 f"{item}: invalid workstream evidence ref {ref!r}; expected "
                 f"{prefix}*.md"

@@ -3,8 +3,9 @@
 
 from __future__ import annotations
 
-from pathlib import PurePosixPath
 from typing import Any
+
+from tools.exact_locator import ExactLocatorError, normalize_locator_path
 
 
 class ExecutionContractError(ValueError):
@@ -71,13 +72,14 @@ def parse_card_result(text: str, expected_card_id: str, workstream_id: str) -> d
     _require(evidence, "card_result: at least one evidence ref is required")
     prefix = f"implementation/workstreams/{workstream_id}/evidence/"
     for index, raw in enumerate(evidence):
-        path = PurePosixPath(raw)
+        try:
+            normalize_locator_path(raw, f"card_result.evidence[{index}]")
+        except ExactLocatorError as exc:
+            raise ExecutionContractError(
+                f"card_result.evidence[{index}]: invalid workstream evidence ref: {exc}"
+            ) from exc
         _require(
-            not path.is_absolute()
-            and "." not in path.parts
-            and ".." not in path.parts
-            and raw.startswith(prefix)
-            and raw.endswith(".md"),
+            raw.startswith(prefix) and raw.endswith(".md"),
             f"card_result.evidence[{index}]: invalid workstream evidence ref",
         )
 

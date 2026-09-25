@@ -7,16 +7,20 @@ binds the exact old/new plan subjects, records the inspected semantic diff,
 and was produced by a context independent of the changed subject.
 
 This module validates the semantic record and its exact locator shape.  Exact
-Git object readback is performed by the router at the serving boundary; a
-future generalized locator resolver remains outside RF008.
+Git object readback is performed by the router at the serving boundary
+through the shared RF007 exact-locator resolver.
 """
 
 from __future__ import annotations
 
 import re
 from collections.abc import Mapping
-from pathlib import PurePosixPath
 from typing import Any
+
+try:
+    from tools.exact_locator import ExactLocatorError, normalize_locator_path
+except ModuleNotFoundError:  # direct script execution from tools/
+    from exact_locator import ExactLocatorError, normalize_locator_path
 
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 UNCHANGED_DIMENSIONS = (
@@ -46,11 +50,10 @@ def _exact_keys(value: Mapping[str, Any], expected: set[str], label: str) -> Non
 
 
 def _safe_relative_path(raw: Any, label: str) -> str:
-    _require(isinstance(raw, str) and raw.strip(), f"{label}: path must be non-empty string")
-    path = PurePosixPath(raw)
-    _require(not path.is_absolute(), f"{label}: absolute paths are forbidden")
-    _require("." not in path.parts and ".." not in path.parts, f"{label}: path traversal is forbidden")
-    return raw
+    try:
+        return normalize_locator_path(raw, label)
+    except ExactLocatorError as exc:
+        raise EditorialExemptionError(str(exc)) from exc
 
 
 def git_blob_subject_key(

@@ -90,8 +90,12 @@ from __future__ import annotations
 import re
 import tomllib
 from collections.abc import Callable, Mapping
-from pathlib import PurePosixPath
 from typing import Any
+
+try:
+    from tools.exact_locator import ExactLocatorError, normalize_locator_path
+except ModuleNotFoundError:  # direct script execution from tools/
+    from exact_locator import ExactLocatorError, normalize_locator_path
 
 LIVE_CONSUMER_READINESS_STATES = frozenset({"pending", "admitted"})
 
@@ -190,15 +194,15 @@ def _validate_record_path(path: Any, label: str, workstream_id: str) -> str:
             f"{label}: tracker/issue pointers are untrusted bookkeeping and cannot "
             "serve as durable readiness records"
         )
-    pure = PurePosixPath(path)
     prefix = f"implementation/workstreams/{workstream_id}/readiness/"
-    if (
-        pure.is_absolute()
-        or "." in pure.parts
-        or ".." in pure.parts
-        or not path.startswith(prefix)
-        or not path.endswith(".toml")
-    ):
+    try:
+        normalize_locator_path(path, label)
+    except ExactLocatorError as exc:
+        raise LiveConsumerError(
+            f"{label}: invalid live_consumer_admission record path {path!r}; "
+            f"expected {prefix}*.toml: {exc}"
+        ) from exc
+    if not path.startswith(prefix) or not path.endswith(".toml"):
         raise LiveConsumerError(
             f"{label}: invalid live_consumer_admission record path {path!r}; "
             f"expected {prefix}*.toml"
@@ -258,13 +262,14 @@ def _validate_authority_pin(pin: Any, label: str) -> dict[str, str]:
         raise LiveConsumerError(
             f"{label}: tracker/issue pointers cannot select corrected authority"
         )
-    pure = PurePosixPath(path)
-    if (
-        pure.is_absolute()
-        or "." in pure.parts
-        or ".." in pure.parts
-        or not path.startswith(AUTHORITY_ROOTS)
-    ):
+    try:
+        normalize_locator_path(path, label)
+    except ExactLocatorError as exc:
+        raise LiveConsumerError(
+            f"{label}: wrong-source authority pin {path!r}; expected one of "
+            f"requirements/, decisions/, planning/, workflow/: {exc}"
+        ) from exc
+    if not path.startswith(AUTHORITY_ROOTS):
         raise LiveConsumerError(
             f"{label}: wrong-source authority pin {path!r}; expected one of "
             "requirements/, decisions/, planning/, workflow/"
@@ -544,15 +549,14 @@ def _require_safe_workstream_path(
             f"{label} cites tracker/issue pointer {raw!r}; tracker bookkeeping "
             "cannot satisfy a live-consumer gate"
         )
-    pure = PurePosixPath(raw)
     prefix = f"implementation/workstreams/{workstream_id}/{subdir}"
-    if (
-        pure.is_absolute()
-        or "." in pure.parts
-        or ".." in pure.parts
-        or not raw.startswith(prefix)
-        or not raw.endswith(suffix)
-    ):
+    try:
+        normalize_locator_path(raw, label)
+    except ExactLocatorError as exc:
+        raise LiveConsumerError(
+            f"{label} cites wrong-source path {raw!r}; expected {prefix}*{suffix}: {exc}"
+        ) from exc
+    if not raw.startswith(prefix) or not raw.endswith(suffix):
         raise LiveConsumerError(
             f"{label} cites wrong-source path {raw!r}; expected {prefix}*{suffix}"
         )
@@ -776,13 +780,15 @@ def verify_admission_decision(
             f"{authority_path!r}; tracker bookkeeping cannot satisfy corrected "
             "authority"
         )
-    pure_authority = PurePosixPath(authority_path)
-    if (
-        pure_authority.is_absolute()
-        or "." in pure_authority.parts
-        or ".." in pure_authority.parts
-        or not authority_path.startswith(AUTHORITY_ROOTS)
-    ):
+    try:
+        normalize_locator_path(authority_path, f"JIT trigger {trigger_id!r} authority")
+    except ExactLocatorError as exc:
+        raise LiveConsumerError(
+            f"JIT trigger {trigger_id!r} cites wrong-source authority "
+            f"{authority_path!r}; expected one of requirements/, decisions/, "
+            f"planning/, workflow/: {exc}"
+        ) from exc
+    if not authority_path.startswith(AUTHORITY_ROOTS):
         raise LiveConsumerError(
             f"JIT trigger {trigger_id!r} cites wrong-source authority "
             f"{authority_path!r}; expected one of requirements/, decisions/, "

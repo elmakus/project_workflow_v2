@@ -11,6 +11,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 try:
+    from tools.exact_locator import ExactLocatorError, normalize_locator_path
     from tools.review_contract import (
         CONVERGENCE_FIELDS,
         REVIEW_KINDS,
@@ -54,6 +55,7 @@ try:
         validate_live_consumer_gates,
     )
 except ModuleNotFoundError:  # direct script execution from tools/
+    from exact_locator import ExactLocatorError, normalize_locator_path
     from review_contract import (
         CONVERGENCE_FIELDS,
         REVIEW_KINDS,
@@ -198,11 +200,10 @@ def reject_prohibited_keys(value: Any, where: str = "$") -> None:
 
 
 def _safe_relative_path(raw: Any, label: str) -> str:
-    _require(isinstance(raw, str) and raw, f"{label}: path must be non-empty string")
-    path = PurePosixPath(raw)
-    _require(not path.is_absolute(), f"{label}: absolute paths are not durable artifact locators")
-    _require(".." not in path.parts and "." not in path.parts, f"{label}: path traversal is forbidden")
-    return raw
+    try:
+        return normalize_locator_path(raw, label)
+    except ExactLocatorError as exc:
+        raise ValidationError(str(exc)) from exc
 
 
 def validate_locator(

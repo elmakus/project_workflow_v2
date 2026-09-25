@@ -20,6 +20,7 @@ try:
         validate_locator,
         validate_review_history,
     )
+    from tools.exact_locator import ExactLocatorError, normalize_locator_path
 except ModuleNotFoundError:  # direct script execution from tools/
     from review_contract import (
         OBSERVATION_DISPOSITIONS,
@@ -31,6 +32,7 @@ except ModuleNotFoundError:  # direct script execution from tools/
         validate_locator,
         validate_review_history,
     )
+    from exact_locator import ExactLocatorError, normalize_locator_path
 
 
 class CloseContractError(ValueError):
@@ -488,10 +490,13 @@ def verify_final_observation_reconciliation(
 
 def _read_project_toml(root: Path, raw_path: str, label: str) -> dict:
     """Read a worktree TOML file, failing closed on escape, absence or corruption."""
-    rel = PurePosixPath(raw_path)
-    if rel.is_absolute() or "." in rel.parts or ".." in rel.parts:
-        raise CloseContractError(f"{label} path escapes the project worktree: {raw_path!r}")
-    path = (root / Path(*rel.parts)).resolve()
+    try:
+        rel = normalize_locator_path(raw_path, label)
+    except ExactLocatorError as exc:
+        raise CloseContractError(
+            f"{label} path escapes the project worktree: {raw_path!r}: {exc}"
+        ) from exc
+    path = (root / Path(*PurePosixPath(rel).parts)).resolve()
     try:
         path.relative_to(root)
     except ValueError as exc:
