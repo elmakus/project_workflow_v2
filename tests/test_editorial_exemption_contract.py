@@ -28,7 +28,11 @@ class EditorialExemptionContractTests(unittest.TestCase):
             "revision": "P2",
             "review_mode": "editorial_exempt",
             "review_exemption_base_subject": base,
-            "subject": self.subject("c" * 40),
+            "subject": {
+                key: value
+                for key, value in self.subject("c" * 40).items()
+                if key != "class"
+            },
         }
 
     def classification(self) -> dict[str, object]:
