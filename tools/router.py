@@ -6,9 +6,14 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import tomllib
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 
+from tools.editorial_exemption_contract import (
+    EditorialExemptionError,
+    validate_editorial_exemption_classification,
+)
 from tools.execution_contract import ExecutionContractError, parse_card_result
 from tools.recovery_contract import RecoveryContractError, classify_resolution, exact_result_subject, review_subject
 from tools.review_contract import (
@@ -162,6 +167,72 @@ def project_git_blob_reader(project_root: Path, project_repository: str):
             return None
 
     return read_blob
+
+
+def read_exact_editorial_classification(
+    reads: Reads,
+    project_repository: str,
+    ref: dict[str, object],
+) -> dict[str, object]:
+    """Read the one RF008 proof record by exact Git identity.
+
+    This is intentionally local to the editorial-exemption serving boundary;
+    RF007 owns any future generalized locator/readback resolver.
+    """
+    repository = ref.get("repository")
+    commit = ref.get("commit")
+    path = ref.get("path")
+    expected_blob = ref.get("blob")
+    if repository != project_repository:
+        raise ValidationError("editorial classification repository does not match selected project")
+    if not isinstance(commit, str) or not isinstance(path, str) or not isinstance(expected_blob, str):
+        raise ValidationError("editorial classification locator is incomplete")
+    rel = PurePosixPath(path)
+    if rel.is_absolute() or "." in rel.parts or ".." in rel.parts:
+        raise ValidationError("editorial classification path is unsafe")
+    try:
+        resolved = subprocess.run(
+            ["git", "-C", str(reads.project_root), "rev-parse", "--verify", f"{commit}:{path}"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+        if resolved.returncode != 0:
+            raise ValidationError("editorial classification exact Git subject does not resolve")
+        actual_blob = resolved.stdout.strip()
+        if actual_blob != expected_blob:
+            raise ValidationError("editorial classification blob does not match exact locator")
+        kind = subprocess.run(
+            ["git", "-C", str(reads.project_root), "cat-file", "-t", actual_blob],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+        if kind.returncode != 0 or kind.stdout.strip() != "blob":
+            raise ValidationError("editorial classification locator does not resolve to a Git blob")
+        payload = subprocess.run(
+            ["git", "-C", str(reads.project_root), "cat-file", "-p", actual_blob],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+        if payload.returncode != 0:
+            raise ValidationError("editorial classification blob content is unreadable")
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ValidationError(f"editorial classification Git readback failed: {exc}") from exc
+    reads.items.append(
+        f"project-git:{repository}@{commit}:{path}@{expected_blob}"
+    )
+    try:
+        parsed = tomllib.loads(payload.stdout)
+    except (tomllib.TOMLDecodeError, ValueError) as exc:
+        raise ValidationError(f"editorial classification TOML is malformed: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise ValidationError("editorial classification top-level TOML must be a table")
+    return parsed
 
 
 def policy_result(
@@ -553,10 +624,24 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             if planning["review_mode"] == "editorial_exempt":
                 if plan_review is None or plan_review["verdict"] != "green":
                     raise ValidationError("editorial exemption requires prior exact GREEN Plan Review")
+                classification_ref = planning["review_exemption_classification"]
+                classification = read_exact_editorial_classification(
+                    reads,
+                    project["repository"],
+                    classification_ref,
+                )
+                try:
+                    validate_editorial_exemption_classification(
+                        classification,
+                        workstream_id=workstream["workstream_id"],
+                        planning=planning,
+                    )
+                except EditorialExemptionError as exc:
+                    raise ValidationError(f"{exc}") from exc
                 if "task_board" not in workstream:
                     return result(
                         reads, "route", "execution_prep",
-                        "Editorial/mechanical-only plan change preserves prior GREEN review and satisfied C; no new Stage-6 review is due",
+                        "Exact independent GREEN editorial-only classification preserves prior GREEN review and satisfied C; no new Stage-6 review is due",
                         subject=subject_key, owner_module="workflow/EXECUTION_PREP.md",
                     )
                 plan_gate_passed_with_board = True
