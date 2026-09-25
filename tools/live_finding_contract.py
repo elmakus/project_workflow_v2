@@ -20,18 +20,21 @@ any authority mutation as exactly one of five classes:
 Each classified finding is durable and evidence-linked: it separates observed
 facts from approval, binds non-empty workstream-local evidence refs, names
 its owning stage, and records whether the owning stage has accepted the
-correction. Claimed evidence and acceptance records are verified by readback
-at the serving boundary: a cited path that cannot be read, or an acceptance
-record that is not bound to the board, fails closed to Recovery. A material
-observation cannot mutate authority without both a valid classification and
-the owning stage's accepted authorization bound to such a verified record.
+correction. An accepted authorization cites one typed acceptance-decision
+record (``findings/*.toml``) whose content names the exact finding id,
+finding class and accepting stage and carries an explicit accepted decision;
+readable-but-unrelated files, other records, RED attempts and tracker-flavored
+prose can never satisfy this proof. Cited evidence must read back and the
+decision record must verify by content at the serving boundary, else the
+board fails closed to Recovery. A material observation cannot mutate
+authority without both a valid classification and such a verified proof.
 
 GitHub issues/comments and similar trackers may supply untrusted observations
 or locators but can never approve scope, authorize repair, mutate accepted
 authority, reset review epochs or substitute for durable classification.
 Tracker pointers are informational only and never satisfy the evidence or
-authorization requirement. Free prose alone, tracker-flavored or not, never
-proves acceptance: only the verified acceptance record confers authority.
+authorization requirement. No free prose appears in the acceptance proof, so
+neither arbitrary text nor tracker shorthand can become authority.
 
 Affected downstream JIT reconciliation (REQ-123/127), immutable historical
 replay/corpus (REQ-125/126), BOOT-D Worker discipline (REQ-131/132) and M03+
@@ -41,6 +44,7 @@ downstream JIT gate exists.
 
 from __future__ import annotations
 
+import tomllib
 from collections.abc import Callable, Mapping
 from pathlib import PurePosixPath
 from typing import Any
@@ -98,7 +102,16 @@ TRACKER_PROVENANCE_MARKERS = (
     "https://",
 )
 
-ACCEPTANCE_RECORD_CLASSES = frozenset({"evidence", "review_attempt", "result"})
+ACCEPTANCE_RECORD_CLASSES = frozenset({"finding_acceptance"})
+
+ACCEPTANCE_DECISION_FIELDS = frozenset({
+    "finding_id",
+    "finding_class",
+    "accepting_stage",
+    "decision",
+})
+
+ACCEPTANCE_DECISION_ACCEPTED = "accepted"
 
 FORBIDDEN_AUTHORITY_KEYS = frozenset({
     "scope_approved",
@@ -215,17 +228,9 @@ def _validate_record_path(
         )
     pure = PurePosixPath(path)
     expected = {
-        "evidence": (
-            f"implementation/workstreams/{workstream_id}/evidence/",
-            ".md",
-        ),
-        "review_attempt": (
-            f"implementation/workstreams/{workstream_id}/reviews/",
+        "finding_acceptance": (
+            f"implementation/workstreams/{workstream_id}/findings/",
             ".toml",
-        ),
-        "result": (
-            f"implementation/workstreams/{workstream_id}/results/",
-            ".md",
         ),
     }[record_class]
     if (
@@ -247,16 +252,21 @@ def _validate_acceptance(
 ) -> dict[str, Any]:
     """Validate the owning stage's structured acceptance citation.
 
-    Acceptance binds the owning stage to one verifiable durable record: an
-    evidence file, a board-bound review attempt, or a board-bound Card result.
-    The accompanying statement is descriptive only and confers no authority;
-    only the verified record does. Existence and board binding are verified
-    by readback at the serving boundary (see ``verify_live_finding_records``).
+    Acceptance binds the owning stage to one typed acceptance-decision
+    record (``findings/*.toml``). There is no free-prose field: the decision
+    document's content — exact finding id, finding class, accepting stage
+    and explicit accepted decision — is the proof, verified by readback at
+    the serving boundary (see ``verify_live_finding_records``).
     """
     if not isinstance(acceptance, Mapping):
         raise LiveFindingError(
             f"{label}: acceptance must be a table binding the owning stage "
-            "to one verifiable durable record; free prose cannot prove acceptance"
+            "to one typed acceptance-decision record"
+        )
+    if "statement" in acceptance:
+        raise LiveFindingError(
+            f"{label}: free-form acceptance statements cannot prove acceptance; "
+            "the typed decision record carries the proof"
         )
     stage = acceptance.get("stage")
     if stage != owner_stage:
@@ -267,7 +277,7 @@ def _validate_acceptance(
     cited = acceptance.get("record")
     if not isinstance(cited, Mapping):
         raise LiveFindingError(
-            f"{label}: acceptance must cite one verifiable record table"
+            f"{label}: acceptance must cite one acceptance-decision record table"
         )
     record_class = cited.get("class")
     if record_class not in ACCEPTANCE_RECORD_CLASSES:
@@ -278,14 +288,95 @@ def _validate_acceptance(
     record_path = _validate_record_path(
         cited.get("path"), f"{label}: record", workstream_id, str(record_class)
     )
-    statement = _require_statement(
-        acceptance.get("statement"), f"{label}: statement"
-    )
     return {
         "stage": owner_stage,
         "record": {"class": str(record_class), "path": record_path},
-        "statement": statement,
     }
+
+
+def parse_acceptance_decision(text: str, record_path: str) -> dict[str, str]:
+    """Parse one typed acceptance-decision document.
+
+    The document must be TOML carrying exactly ``finding_id``,
+    ``finding_class``, ``accepting_stage`` and ``decision`` as non-empty
+    strings. Anything else — Markdown notes, result prose, review attempts,
+    tracker exports — fails here, so unrelated records can never satisfy an
+    acceptance proof no matter how readable they are.
+    """
+    try:
+        document = tomllib.loads(text)
+    except (tomllib.TOMLDecodeError, ValueError) as exc:
+        raise LiveFindingError(
+            f"acceptance record {record_path!r} is not a typed "
+            f"acceptance-decision document: {exc}"
+        ) from exc
+    if not isinstance(document, dict):
+        raise LiveFindingError(
+            f"acceptance record {record_path!r} must be a TOML table"
+        )
+    keys = set(document)
+    if keys != ACCEPTANCE_DECISION_FIELDS:
+        missing = sorted(ACCEPTANCE_DECISION_FIELDS - keys)
+        extra = sorted(keys - ACCEPTANCE_DECISION_FIELDS)
+        raise LiveFindingError(
+            f"acceptance record {record_path!r} has wrong decision fields "
+            f"missing={missing} extra={extra}; expected exactly "
+            + ", ".join(sorted(ACCEPTANCE_DECISION_FIELDS))
+        )
+    decision: dict[str, str] = {}
+    for key in sorted(ACCEPTANCE_DECISION_FIELDS):
+        value = document[key]
+        if not isinstance(value, str) or not value.strip():
+            raise LiveFindingError(
+                f"acceptance record {record_path!r}: decision field {key!r} "
+                "must be a non-empty string"
+            )
+        decision[key] = value
+    return decision
+
+
+def verify_acceptance_decision(
+    finding: Mapping[str, Any], record_path: str, record_text: str | None
+) -> None:
+    """Verify a cited decision document proves this finding's acceptance.
+
+    ``record_text`` is the read-back file content, or ``None`` when the path
+    cannot be read. The document must name this exact finding id and class,
+    the finding's owning stage, and an explicit accepted decision; a decision
+    for another finding, another stage, or any other verdict fails closed.
+    """
+    finding_id = finding.get("id")
+    if record_text is None:
+        raise LiveFindingError(
+            f"live finding {finding_id!r} cites acceptance record "
+            f"{record_path!r} that cannot be read back; unverifiable "
+            "acceptance fails closed to Recovery"
+        )
+    decision = parse_acceptance_decision(record_text, record_path)
+    if decision["finding_id"] != finding_id:
+        raise LiveFindingError(
+            f"live finding {finding_id!r} cites acceptance record "
+            f"{record_path!r} decided for finding {decision['finding_id']!r}; "
+            "unrelated decisions cannot become authority"
+        )
+    if decision["finding_class"] != finding.get("finding_class"):
+        raise LiveFindingError(
+            f"live finding {finding_id!r} cites acceptance record "
+            f"{record_path!r} decided for class "
+            f"{decision['finding_class']!r}; mismatched classes fail closed"
+        )
+    if decision["accepting_stage"] != finding.get("owner_stage"):
+        raise LiveFindingError(
+            f"live finding {finding_id!r} cites acceptance record "
+            f"{record_path!r} accepted by stage "
+            f"{decision['accepting_stage']!r}; only the owning stage can accept"
+        )
+    if decision["decision"] != ACCEPTANCE_DECISION_ACCEPTED:
+        raise LiveFindingError(
+            f"live finding {finding_id!r} cites acceptance record "
+            f"{record_path!r} with decision {decision['decision']!r}; only an "
+            "explicit accepted decision authorizes a mutation"
+        )
 
 
 def validate_live_finding(
@@ -421,18 +512,22 @@ def validate_live_findings(
 def _require_guard_acceptance(
     finding: Mapping[str, Any], mutation: str, owner_stage: str
 ) -> None:
-    """Require a structured acceptance citation before an authority mutation.
+    """Require a typed acceptance-decision citation before a mutation.
 
-    Free prose, however convincing, never proves acceptance: the finding must
-    bind the owning stage to one durable record of an acceptable class with a
-    safe path and a descriptive statement. Existence and board binding of the
-    cited record are verified by readback at the serving boundary.
+    The finding must bind the owning stage to one ``finding_acceptance``
+    decision record at a safe path. There is no prose to judge: the decision
+    document's content is verified by readback at the serving boundary.
     """
     acceptance = finding.get("acceptance")
     if not isinstance(acceptance, Mapping):
         raise LiveFindingError(
             f"{mutation} requires the owning stage's acceptance bound to one "
-            "verifiable durable record; free prose cannot prove acceptance"
+            "typed acceptance-decision record"
+        )
+    if "statement" in acceptance:
+        raise LiveFindingError(
+            f"{mutation} cannot rest on free-form acceptance statements; only "
+            "the typed decision record proves acceptance"
         )
     if acceptance.get("stage") != owner_stage:
         raise LiveFindingError(
@@ -442,12 +537,13 @@ def _require_guard_acceptance(
     cited = acceptance.get("record")
     if not isinstance(cited, Mapping):
         raise LiveFindingError(
-            f"{mutation} requires acceptance bound to one verifiable record"
+            f"{mutation} requires acceptance bound to one decision record"
         )
     if cited.get("class") not in ACCEPTANCE_RECORD_CLASSES:
         raise LiveFindingError(
-            f"{mutation} requires an acceptance record of class evidence, "
-            "review_attempt or result"
+            f"{mutation} requires a finding_acceptance decision record; "
+            "readable-but-unrelated files, results and review attempts "
+            "cannot prove acceptance"
         )
     record_path = cited.get("path")
     if not isinstance(record_path, str) or not record_path.strip():
@@ -462,13 +558,7 @@ def _require_guard_acceptance(
     if is_tracker_provenance(record_path):
         raise LiveFindingError(
             f"{mutation} cannot rest on tracker issue/comment approval; only the "
-            "owning stage's verified durable record authorizes the mutation"
-        )
-    statement = acceptance.get("statement")
-    if not isinstance(statement, str) or not statement.strip():
-        raise LiveFindingError(
-            f"{mutation} requires a descriptive acceptance statement alongside "
-            "the verified record"
+            "owning stage's verified decision record authorizes the mutation"
         )
 
 
@@ -483,8 +573,9 @@ def require_classified_authority_mutation(
     ``authority_mutation`` or ``epoch_reset``. Returns the owning stage that
     authorized the mutation. Unclassified, ambiguous, evidence-free,
     tracker-sourced or unauthorized findings fail closed; speculative
-    hardening can never satisfy the guard. The cited evidence and acceptance
-    records must additionally verify by readback at the serving boundary.
+    hardening can never satisfy the guard. This checks the citation shape;
+    the decision document's content must additionally verify by readback at
+    the serving boundary before any downstream consumer relies on it.
     """
     if mutation not in AUTHORITY_MUTATION_KINDS:
         raise LiveFindingError(f"unknown authority mutation kind {mutation!r}")
@@ -542,10 +633,10 @@ def verify_live_finding_records(
     """Verify cited live-finding records by readback against the repository.
 
     ``record_reader`` returns file text for a workstream-local path, or
-    ``None`` when the path cannot be read. Every cited evidence ref and every
-    acceptance record must read back; acceptance records of class
-    ``review_attempt`` or ``result`` must additionally be bound to a board
-    Card, so stray unbound files cannot become authority. A board without
+    ``None`` when the path cannot be read. Every cited evidence ref must
+    read back, and every cited acceptance-decision record must read back and
+    prove this finding's acceptance by content: exact finding id and class,
+    the owning stage, and an explicit accepted decision. A board without
     findings verifies trivially, preserving historical boards.
     """
     if not isinstance(board, Mapping):
@@ -560,24 +651,6 @@ def verify_live_finding_records(
     )
     if not findings:
         return
-    cards = board.get("cards", [])
-    if not isinstance(cards, list):
-        raise LiveFindingError("live-finding verification requires a board cards array")
-    attempt_paths: set[str] = set()
-    result_paths: set[str] = set()
-    for card in cards:
-        if not isinstance(card, Mapping):
-            continue
-        attempts = card.get("review_attempts", [])
-        if isinstance(attempts, list):
-            for attempt in attempts:
-                if isinstance(attempt, Mapping) and isinstance(
-                    attempt.get("path"), str
-                ):
-                    attempt_paths.add(attempt["path"])
-        result = card.get("result")
-        if isinstance(result, Mapping) and isinstance(result.get("path"), str):
-            result_paths.add(result["path"])
     for finding_id, finding in findings.items():
         for ref in finding["evidence_refs"]:
             if record_reader(ref) is None:
@@ -590,24 +663,9 @@ def verify_live_finding_records(
         if acceptance is None:
             continue
         cited = acceptance["record"]
-        if record_reader(cited["path"]) is None:
-            raise LiveFindingError(
-                f"live finding {finding_id!r} cites acceptance record "
-                f"{cited['path']!r} that cannot be read back; unverifiable "
-                "acceptance fails closed to Recovery"
-            )
-        if cited["class"] == "review_attempt" and cited["path"] not in attempt_paths:
-            raise LiveFindingError(
-                f"live finding {finding_id!r} cites acceptance attempt "
-                f"{cited['path']!r} that is not bound to any board Card; "
-                "unbound records cannot become authority"
-            )
-        if cited["class"] == "result" and cited["path"] not in result_paths:
-            raise LiveFindingError(
-                f"live finding {finding_id!r} cites acceptance result "
-                f"{cited['path']!r} that is not bound to any board Card; "
-                "unbound records cannot become authority"
-            )
+        verify_acceptance_decision(
+            finding, cited["path"], record_reader(cited["path"])
+        )
 
 
 def tracker_cannot_authorize(kind: str, *, source: str = "tracker") -> None:

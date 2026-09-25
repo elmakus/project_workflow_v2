@@ -38,22 +38,30 @@ WORKSTREAM_ID = "sample-workstream"
 
 def _acceptance(
     stage: str = "execution",
-    record_class: str = "evidence",
     path: str | None = None,
-    statement: str = "Execution recorded acceptance of the bounded correction.",
 ) -> dict:
     if path is None:
-        directory = {
-            "evidence": "evidence/LF-001-accept.md",
-            "review_attempt": "reviews/M01-T02-R01.toml",
-            "result": "results/M01-T01.md",
-        }[record_class]
-        path = f"implementation/workstreams/{WORKSTREAM_ID}/{directory}"
+        path = (
+            f"implementation/workstreams/{WORKSTREAM_ID}/findings/LF-001.toml"
+        )
     return {
         "stage": stage,
-        "record": {"class": record_class, "path": path},
-        "statement": statement,
+        "record": {"class": "finding_acceptance", "path": path},
     }
+
+
+def _decision(
+    finding_id: str = "LF-001",
+    finding_class: str = "implementation_defect",
+    accepting_stage: str = "execution",
+    decision: str = "accepted",
+) -> str:
+    return (
+        f"finding_id = \"{finding_id}\"\n"
+        f"finding_class = \"{finding_class}\"\n"
+        f"accepting_stage = \"{accepting_stage}\"\n"
+        f"decision = \"{decision}\"\n"
+    )
 
 
 def _finding(finding_id: str = "LF-001", **overrides) -> dict:
@@ -257,13 +265,13 @@ class ClassificationValidationTests(unittest.TestCase):
             _validate(record)
 
     def test_acceptance_rejects_unknown_record_class(self) -> None:
-        record = _authorized_finding()
-        record["acceptance"] = _acceptance(
-            path=f"implementation/workstreams/{WORKSTREAM_ID}/TRACKER.toml",
-        )
-        record["acceptance"]["record"]["class"] = "tracker"
-        with self.assertRaisesRegex(LiveFindingError, "record class"):
-            _validate(record)
+        for record_class in ("tracker", "evidence", "review_attempt", "result"):
+            with self.subTest(record_class=record_class):
+                record = _authorized_finding()
+                record["acceptance"] = _acceptance()
+                record["acceptance"]["record"]["class"] = record_class
+                with self.assertRaisesRegex(LiveFindingError, "record class"):
+                    _validate(record)
 
     def test_acceptance_rejects_tracker_record_path(self) -> None:
         for path in (
@@ -276,21 +284,27 @@ class ClassificationValidationTests(unittest.TestCase):
                 with self.assertRaisesRegex(LiveFindingError, "tracker"):
                     _validate(record)
 
-    def test_acceptance_requires_descriptive_statement(self) -> None:
-        record = _authorized_finding()
-        record["acceptance"] = _acceptance(statement="  ")
-        with self.assertRaisesRegex(LiveFindingError, "statement"):
-            _validate(record)
+    def test_acceptance_rejects_free_form_statement(self) -> None:
+        for statement in ("  ", "See owner/repo#12, LGTM, ship it."):
+            with self.subTest(statement=statement):
+                record = _authorized_finding()
+                record["acceptance"] = _acceptance()
+                record["acceptance"]["statement"] = statement
+                with self.assertRaisesRegex(LiveFindingError, "statement"):
+                    _validate(record)
 
-    def test_authorized_classification_validates_per_record_class(self) -> None:
-        for record_class in ("evidence", "review_attempt", "result"):
-            with self.subTest(record_class=record_class):
-                record = _finding(authorization="owning_stage_accepted")
-                record["acceptance"] = _acceptance(record_class=record_class)
-                validated = _validate(record)
-                self.assertEqual(
-                    validated["acceptance"]["record"]["class"], record_class
-                )
+    def test_authorized_classification_validates_decision_citation(self) -> None:
+        validated = _validate(_authorized_finding())
+        self.assertEqual(
+            validated["acceptance"]["record"],
+            {
+                "class": "finding_acceptance",
+                "path": (
+                    "implementation/workstreams/sample-workstream"
+                    "/findings/LF-001.toml"
+                ),
+            },
+        )
 
     def test_tracker_style_authority_claims_fail_closed(self) -> None:
         for key in (
@@ -371,13 +385,35 @@ class AuthorityMutationGuardTests(unittest.TestCase):
                 finding, mutation="epoch_reset"
             )
 
-    def test_statement_alone_never_authorizes_mutation(self) -> None:
+    def test_missing_acceptance_never_authorizes_mutation(self) -> None:
         finding = dict(_validate(_authorized_finding()))
         finding.pop("acceptance")
-        with self.assertRaisesRegex(LiveFindingError, "free prose"):
+        with self.assertRaisesRegex(LiveFindingError, "decision record"):
             require_classified_authority_mutation(
                 finding, mutation="repair_authorization"
             )
+
+    def test_statement_form_never_authorizes_mutation(self) -> None:
+        finding = dict(_validate(_authorized_finding()))
+        finding["acceptance"] = dict(finding["acceptance"])
+        finding["acceptance"]["statement"] = "See owner/repo#12, LGTM."
+        with self.assertRaisesRegex(LiveFindingError, "statement"):
+            require_classified_authority_mutation(
+                finding, mutation="repair_authorization"
+            )
+
+    def test_wrong_class_citation_never_authorizes_mutation(self) -> None:
+        for record_class in ("evidence", "review_attempt", "result"):
+            with self.subTest(record_class=record_class):
+                finding = dict(_validate(_authorized_finding()))
+                finding["acceptance"] = _acceptance()
+                finding["acceptance"]["record"]["class"] = record_class
+                with self.assertRaisesRegex(
+                    LiveFindingError, "finding_acceptance"
+                ):
+                    require_classified_authority_mutation(
+                        finding, mutation="repair_authorization"
+                    )
 
     def test_foreign_stage_acceptance_cannot_authorize_mutation(self) -> None:
         finding = dict(_validate(_authorized_finding()))
@@ -632,30 +668,40 @@ class RouterCompatibilityTests(unittest.TestCase):
         finally:
             temp.cleanup()
 
+    def authorized_findings_toml(self) -> str:
+        return (
+            "[[live_findings]]\n"
+            "id = \"LF-001\"\n"
+            "finding_class = \"implementation_defect\"\n"
+            "observed = \"Live execution exposed a material observation.\"\n"
+            "evidence_refs = ["
+            "\"implementation/workstreams/sample-workstream/evidence/LF-001.md\""
+            "]\n"
+            "owner_stage = \"execution\"\n"
+            "authorization = \"owning_stage_accepted\"\n"
+            "tracker_locators = []\n"
+            "[live_findings.acceptance]\n"
+            "stage = \"execution\"\n"
+            "[live_findings.acceptance.record]\n"
+            "class = \"finding_acceptance\"\n"
+            "path = \"implementation/workstreams/sample-workstream/findings/LF-001.toml\"\n"
+        )
+
+    def write_decision(self, project: Path, text: str | None = None) -> None:
+        decision = (project / "implementation" / "workstreams"
+                    / "sample-workstream" / "findings" / "LF-001.toml")
+        decision.parent.mkdir(parents=True, exist_ok=True)
+        decision.write_text(text if text is not None else _decision())
+
     def test_authorized_finding_with_verified_acceptance_routes(self) -> None:
         temp, project = self.copy_fixture()
         try:
             board = project / ROUTER_BOARD
-            board.write_text(board.read_text() + (
-                "[[live_findings]]\n"
-                "id = \"LF-001\"\n"
-                "finding_class = \"implementation_defect\"\n"
-                "observed = \"Live execution exposed a material observation.\"\n"
-                "evidence_refs = ["
-                "\"implementation/workstreams/sample-workstream/evidence/LF-001.md\""
-                "]\n"
-                "owner_stage = \"execution\"\n"
-                "authorization = \"owning_stage_accepted\"\n"
-                "tracker_locators = []\n"
-                "[live_findings.acceptance]\n"
-                "stage = \"execution\"\n"
-                "statement = \"Execution recorded acceptance.\"\n"
-                "[live_findings.acceptance.record]\n"
-                "class = \"evidence\"\n"
-                "path = \"implementation/workstreams/sample-workstream/evidence/LF-001-accept.md\"\n"
-            ))
+            board.write_text(
+                board.read_text() + self.authorized_findings_toml()
+            )
             self.write_evidence(project)
-            self.write_evidence(project, "LF-001-accept.md")
+            self.write_decision(project)
             routed = select_route(project, [ROUTER_MANIFEST], package_root=ROOT)
             self.assertEqual(
                 (routed.disposition, routed.obligation, routed.subject),
@@ -668,25 +714,28 @@ class RouterCompatibilityTests(unittest.TestCase):
         temp, project = self.copy_fixture()
         try:
             board = project / ROUTER_BOARD
-            board.write_text(board.read_text() + (
-                "[[live_findings]]\n"
-                "id = \"LF-001\"\n"
-                "finding_class = \"implementation_defect\"\n"
-                "observed = \"Live execution exposed a material observation.\"\n"
-                "evidence_refs = ["
-                "\"implementation/workstreams/sample-workstream/evidence/LF-001.md\""
-                "]\n"
-                "owner_stage = \"execution\"\n"
-                "authorization = \"owning_stage_accepted\"\n"
-                "tracker_locators = []\n"
-                "[live_findings.acceptance]\n"
-                "stage = \"execution\"\n"
-                "statement = \"Execution recorded acceptance.\"\n"
-                "[live_findings.acceptance.record]\n"
-                "class = \"evidence\"\n"
-                "path = \"implementation/workstreams/sample-workstream/evidence/LF-001-accept.md\"\n"
-            ))
+            board.write_text(
+                board.read_text() + self.authorized_findings_toml()
+            )
             self.write_evidence(project)
+            routed = select_route(project, [ROUTER_MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("acceptance", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_unrelated_decision_content_recovers_at_router(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            board = project / ROUTER_BOARD
+            board.write_text(
+                board.read_text() + self.authorized_findings_toml()
+            )
+            self.write_evidence(project)
+            self.write_decision(project, "# unrelated meeting notes\n")
             routed = select_route(project, [ROUTER_MANIFEST], package_root=ROOT)
             self.assertEqual(
                 (routed.disposition, routed.obligation),
@@ -808,62 +857,103 @@ class RecordVerificationTests(unittest.TestCase):
                 record_reader=lambda path: "# evidence\n" if path == evidence else None,
             )
 
-    def test_unbound_review_attempt_acceptance_fails_verification(self) -> None:
-        record = _authorized_finding(
-            finding_class="review_process_realization_defect",
-            owner_stage="review",
-        )
-        record["acceptance"] = _acceptance(
-            stage="review", record_class="review_attempt"
-        )
-        board = self.board_with([record])
-        with self.assertRaisesRegex(LiveFindingError, "not bound to any board"):
-            verify_live_finding_records(
-                board, record_reader=lambda path: "# record\n"
-            )
-
-    def test_unbound_result_acceptance_fails_verification(self) -> None:
-        record = _authorized_finding()
-        record["acceptance"] = _acceptance(
-            record_class="result",
-            path=f"implementation/workstreams/{WORKSTREAM_ID}/results/M01-T09.md",
-        )
-        board = self.board_with([record])
-        with self.assertRaisesRegex(LiveFindingError, "not bound to any board"):
-            verify_live_finding_records(
-                board, record_reader=lambda path: "# record\n"
-            )
-
-    def test_bound_review_attempt_and_result_acceptance_verify(self) -> None:
-        board = read_toml(VALID / "TASK_BOARD.toml")
-        attempt_path = (
-            f"implementation/workstreams/{WORKSTREAM_ID}/reviews/M01-T02-R01.toml"
-        )
-        result_path = (
-            "implementation/workstreams/sample-workstream/results/M01-T01.md"
-        )
-        for card in board["cards"]:
-            if card["id"] == "M01-T02":
-                card["review_attempts"] = [
-                    {"class": "review_attempt", "path": attempt_path}
-                ]
-        review_finding = _authorized_finding(
-            "LF-010",
-            finding_class="review_process_realization_defect",
-            owner_stage="review",
-        )
-        review_finding["acceptance"] = _acceptance(
-            stage="review", record_class="review_attempt", path=attempt_path
-        )
-        result_finding = _authorized_finding("LF-011")
-        result_finding["acceptance"] = _acceptance(
-            record_class="result", path=result_path
-        )
-        board["live_findings"] = [review_finding, result_finding]
-        validate_board(board, read_toml(VALID / "WORKSTREAM.toml"))
+    def test_matching_decision_document_verifies(self) -> None:
+        board = self.board_with([_authorized_finding()])
+        findings = f"implementation/workstreams/{WORKSTREAM_ID}/findings/"
         verify_live_finding_records(
-            board, record_reader=lambda path: "# record\n"
+            board,
+            record_reader=(
+                lambda path: _decision()
+                if path.startswith(findings)
+                else "# evidence\n"
+            ),
         )
+
+    def test_unrelated_readable_file_cannot_prove_acceptance(self) -> None:
+        board = self.board_with([_authorized_finding()])
+        with self.assertRaisesRegex(LiveFindingError, "decision"):
+            verify_live_finding_records(
+                board,
+                record_reader=lambda path: "# unrelated meeting notes\n",
+            )
+
+    def test_red_attempt_document_cannot_prove_acceptance(self) -> None:
+        board = self.board_with([_authorized_finding(
+            "LF-003",
+            finding_class="review_process_realization_defect",
+            owner_stage="review",
+        )])
+        with self.assertRaisesRegex(LiveFindingError, "decision"):
+            verify_live_finding_records(
+                board, record_reader=lambda path: 'verdict = "red"\n'
+            )
+
+    def test_decision_for_another_finding_fails_verification(self) -> None:
+        board = self.board_with([_authorized_finding()])
+        findings = f"implementation/workstreams/{WORKSTREAM_ID}/findings/"
+        with self.assertRaisesRegex(LiveFindingError, "unrelated decisions"):
+            verify_live_finding_records(
+                board,
+                record_reader=(
+                    lambda path: _decision(finding_id="LF-999")
+                    if path.startswith(findings)
+                    else "# evidence\n"
+                ),
+            )
+
+    def test_decision_with_mismatched_class_fails_verification(self) -> None:
+        board = self.board_with([_authorized_finding()])
+        findings = f"implementation/workstreams/{WORKSTREAM_ID}/findings/"
+        with self.assertRaisesRegex(LiveFindingError, "mismatched classes"):
+            verify_live_finding_records(
+                board,
+                record_reader=(
+                    lambda path: _decision(
+                        finding_class="accepted_authority_defect"
+                    )
+                    if path.startswith(findings)
+                    else "# evidence\n"
+                ),
+            )
+
+    def test_decision_by_foreign_stage_fails_verification(self) -> None:
+        board = self.board_with([_authorized_finding()])
+        findings = f"implementation/workstreams/{WORKSTREAM_ID}/findings/"
+        with self.assertRaisesRegex(LiveFindingError, "owning stage"):
+            verify_live_finding_records(
+                board,
+                record_reader=(
+                    lambda path: _decision(accepting_stage="planning")
+                    if path.startswith(findings)
+                    else "# evidence\n"
+                ),
+            )
+
+    def test_non_accepted_decision_fails_verification(self) -> None:
+        board = self.board_with([_authorized_finding()])
+        findings = f"implementation/workstreams/{WORKSTREAM_ID}/findings/"
+        with self.assertRaisesRegex(LiveFindingError, "explicit accepted"):
+            verify_live_finding_records(
+                board,
+                record_reader=(
+                    lambda path: _decision(decision="rejected")
+                    if path.startswith(findings)
+                    else "# evidence\n"
+                ),
+            )
+
+    def test_decision_with_extra_fields_fails_verification(self) -> None:
+        board = self.board_with([_authorized_finding()])
+        findings = f"implementation/workstreams/{WORKSTREAM_ID}/findings/"
+        with self.assertRaisesRegex(LiveFindingError, "decision fields"):
+            verify_live_finding_records(
+                board,
+                record_reader=(
+                    lambda path: _decision() + 'tracker = "owner/repo#12"\n'
+                    if path.startswith(findings)
+                    else "# evidence\n"
+                ),
+            )
 
     def test_board_without_findings_verifies_trivially(self) -> None:
         board = read_toml(VALID / "TASK_BOARD.toml")
