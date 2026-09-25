@@ -693,10 +693,15 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                         "GREEN Plan Review must be consumed into approved plan state",
                         subject=subject_key,
                     )
-                return result(
-                    reads, "route", "planning",
-                    "RED Plan Review returns to Planning for correction classification",
-                    subject=subject_key, owner_module="workflow/PLANNING.md",
+                if plan_review["verdict"] == "red":
+                    return result(
+                        reads, "route", "planning",
+                        "RED Plan Review returns to Planning for correction classification",
+                        subject=subject_key, owner_module="workflow/PLANNING.md",
+                    )
+                raise ValidationError(
+                    f"unsupported Plan Review verdict {plan_review['verdict']!r}; "
+                    "frozen plan routes only pending, green or red"
                 )
 
             if planning["review_mode"] == "editorial_exempt":

@@ -1178,6 +1178,54 @@ class StateEnvelopeTests(unittest.TestCase):
         green["evidence_path"] = "evidence/plan-review-R01.md"
         validate_plan_review(green, "sample-workstream", planning)
 
+    def test_plan_review_verdict_domain_is_pending_green_red_only(self) -> None:
+        # H007/RF005: Plan Review narrows the shared review verdict domain to
+        # pending/green/red; generic Card Review keeps in_progress separately.
+        planning = self.planning_record("frozen")
+        planning["premium_b"] = "satisfied"
+        review = {
+            "workstream_id": "sample-workstream",
+            "plan_revision": "P1",
+            "planning_cycle": 1,
+            "attempt": "R01",
+            "verdict": "pending",
+            "evidence_path": "",
+            "subject": {
+                "class": "git_blob",
+                "repository": "owner/repo",
+                "commit": "a" * 40,
+                "path": "planning/MASTER_PLAN.md",
+                "blob": "b" * 40,
+            },
+            "acceptance": {"class": "authority", "path": "requirements/REQUIREMENTS.md"},
+            "independence": {
+                "materially_produced_or_repaired_subject": False,
+                "basis": "Fresh semantic review context.",
+            },
+        }
+        validate_plan_review(review, "sample-workstream", planning)
+
+        for verdict in ("green", "red"):
+            terminal = copy.deepcopy(review)
+            terminal["verdict"] = verdict
+            terminal["evidence_path"] = "evidence/plan-review-R01.md"
+            validate_plan_review(terminal, "sample-workstream", planning)
+
+        active = copy.deepcopy(review)
+        active["verdict"] = "in_progress"
+        with self.assertRaisesRegex(ValidationError, "plan_review: verdict"):
+            validate_plan_review(active, "sample-workstream", planning)
+
+        unknown = copy.deepcopy(review)
+        unknown["verdict"] = "deferred"
+        with self.assertRaises(ValidationError):
+            validate_plan_review(unknown, "sample-workstream", planning)
+
+        generic = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        generic["verdict"] = "in_progress"
+        generic["evidence_path"] = ""
+        validate_review(generic)
+
     def test_editorial_plan_exemption_preserves_prior_green_subject(self) -> None:
         planning = self.planning_record("approved")
         prior = planning["premium_b_subject"]

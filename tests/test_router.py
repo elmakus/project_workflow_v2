@@ -325,10 +325,11 @@ class RouterTests(unittest.TestCase):
 
     def plan_review_content(
         self, verdict: str = "pending", *, blob: str | None = None,
-        cycle: int = 1, revision: str = "P1",
+        cycle: int = 1, revision: str = "P1", evidence: str | None = None,
     ) -> str:
         blob = blob or ("b" * 40)
-        evidence = "" if verdict == "pending" else "evidence/plan-review-R01.md"
+        if evidence is None:
+            evidence = "" if verdict == "pending" else "evidence/plan-review-R01.md"
         return (
             'workstream_id = "sample-workstream"\n'
             f'plan_revision = "{revision}"\n'
@@ -1094,6 +1095,53 @@ class RouterTests(unittest.TestCase):
             self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
         finally:
             temp.cleanup()
+
+    def test_frozen_plan_review_verdict_domain_is_exhaustive_and_fail_closed(self) -> None:
+        # H007/RF005: frozen plan + satisfied B routes only pending/green/red,
+        # each to its owning step; any other verdict fails closed to Recovery
+        # and never acquires the RED-correction route through fallthrough.
+        for verdict, expected, reason_part in (
+            ("pending", ("route", "plan_review"), "independent Plan Review"),
+            ("green", ("route", "planning"), "consumed"),
+            ("red", ("route", "planning"), "correction classification"),
+        ):
+            temp, project = self.copy_fixture()
+            try:
+                self.install_green_definition(project)
+                self.install_state_record(
+                    project, "planning", "planning", "PLANNING.toml",
+                    self.planning_content(state="frozen", premium_b="satisfied"),
+                )
+                self.install_state_record(
+                    project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                    self.plan_review_content(verdict),
+                )
+                routed = select_route(project, [MANIFEST], package_root=ROOT)
+                self.assertEqual((routed.disposition, routed.obligation), expected)
+                self.assertIn(reason_part, routed.reason)
+            finally:
+                temp.cleanup()
+
+        for verdict in ("in_progress", "deferred"):
+            temp, project = self.copy_fixture()
+            try:
+                self.install_green_definition(project)
+                self.install_state_record(
+                    project, "planning", "planning", "PLANNING.toml",
+                    self.planning_content(state="frozen", premium_b="satisfied"),
+                )
+                self.install_state_record(
+                    project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                    self.plan_review_content(verdict, evidence=""),
+                )
+                routed = select_route(project, [MANIFEST], package_root=ROOT)
+                self.assertEqual(
+                    (routed.disposition, routed.obligation),
+                    ("recovery", "recovery_boundary"),
+                )
+                self.assertNotIn("correction classification", routed.reason)
+            finally:
+                temp.cleanup()
 
     def install_editorial_classification(
         self,

@@ -44,6 +44,7 @@ The registry is deliberately not an expression language. It names exact canonica
 - frozen plan with B due -> premium B fresh independent best-available-context stop;
 - B satisfied + exact pending Plan Review -> independent Plan Review;
 - GREEN/RED Plan Review -> Planning consumption/correction;
+- unsupported Plan Review verdict -> Recovery; no default RED-correction fallthrough;
 - approved GREEN-reviewed plan with C due -> premium C stop with a human-facing recommendation to switch to a lighter/cheaper model/context before Execution Prep;
 - approved bounded `editorial_exempt` change with exact prior GREEN review + satisfied prior C -> Execution Prep identified without a new Stage-6 review;
 - C satisfied -> common Execution Prep;

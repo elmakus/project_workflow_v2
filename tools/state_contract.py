@@ -612,6 +612,8 @@ def validate_planning(data: dict[str, Any], workstream_id: str) -> None:
 
 def validate_plan_review(data: dict[str, Any], workstream_id: str, planning: dict[str, Any]) -> None:
     validate_review(data)
+    _require(data.get("verdict") in {"pending", "green", "red"},
+             "plan_review: verdict must be pending, green or red")
     _require(data.get("workstream_id") == workstream_id, "plan_review: wrong workstream_id")
     _require(data.get("plan_revision") == planning.get("revision"),
              "plan_review: wrong plan_revision")

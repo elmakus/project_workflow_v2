@@ -1,4 +1,5 @@
 # TEMPLATE ONLY — append a new attempt for a changed exact plan subject.
+# Verdict domain is pending/green/red only; in_progress and unknown verdicts fail closed.
 workstream_id = "example-workstream"
 plan_revision = "P1"
 planning_cycle = 1
