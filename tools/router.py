@@ -608,7 +608,8 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                 raise ValidationError("Definition locator requires durable Brainstorming promotion state")
             expected_scope = f"{brainstorm['scope_id']}@{brainstorm['revision']}"
             if (
-                brainstorm["promotion_state"] != "authorized"
+                brainstorm["state"] != "promoted"
+                or brainstorm["promotion_state"] != "authorized"
                 or brainstorm["promotion_subject"] != expected_scope
                 or definition["source_scope_subject"] != expected_scope
             ):
@@ -769,9 +770,14 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     "Brainstorming is ready but exact current revision is not authorized for Definition",
                     subject=exact_scope, owner_module="workflow/BRAINSTORMING.md",
                 )
+            if brainstorm["state"] != "promoted":
+                raise ValidationError(
+                    "Brainstorming carries exact promotion authorization but is not promoted; "
+                    "Definition entry requires promoted state"
+                )
             return result(
                 reads, "route", "definition",
-                "Exact current exploratory revision is authorized for Definition",
+                "Exact current exploratory revision is promoted and authorized for Definition",
                 subject=exact_scope, owner_module="workflow/DEFINITION.md",
             )
 

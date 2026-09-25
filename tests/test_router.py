@@ -801,6 +801,194 @@ class RouterTests(unittest.TestCase):
         finally:
             temp.cleanup()
 
+    @staticmethod
+    def rf002_brainstorm_content(
+        *,
+        scope_id: str = "scope-a",
+        revision: int = 2,
+        state: str,
+        challenge_audit: str = "green",
+        explicit_user_stop: bool = False,
+        promotion_state: str,
+        promotion_subject: str,
+    ) -> str:
+        stop = "true" if explicit_user_stop else "false"
+        return (
+            'workstream_id = "sample-workstream"\n'
+            f'scope_id = "{scope_id}"\n'
+            f"revision = {revision}\n"
+            f'state = "{state}"\n'
+            f'challenge_audit = "{challenge_audit}"\n'
+            f"explicit_user_stop = {stop}\n"
+            f'promotion_state = "{promotion_state}"\n'
+            f'promotion_subject = "{promotion_subject}"\n'
+        )
+
+    @staticmethod
+    def rf002_definition_content(*, source_scope_subject: str = "scope-a@2") -> str:
+        return (
+            'workstream_id = "sample-workstream"\n'
+            f'source_scope_subject = "{source_scope_subject}"\n'
+            'revision = "R1"\n'
+            'state = "active"\n'
+            'completeness_audit = "pending"\n'
+            'premium_a = "not_due"\n'
+            "decisions = []\n"
+            '[requirements]\nclass = "authority"\npath = "requirements/REQUIREMENTS.md"\n'
+        )
+
+    def test_rf002_b1_active_brainstorming_with_exact_authorization_cannot_enter_definition(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_state_record(
+                project, "brainstorm", "brainstorm", "BRAINSTORM.toml",
+                self.rf002_brainstorm_content(
+                    state="active", promotion_state="authorized", promotion_subject="scope-a@2",
+                ),
+            )
+            self.install_state_record(
+                project, "definition", "definition", "DEFINITION.toml",
+                self.rf002_definition_content(),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("promoted", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_rf002_b2_ready_brainstorming_with_exact_authorization_cannot_enter_definition(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_state_record(
+                project, "brainstorm", "brainstorm", "BRAINSTORM.toml",
+                self.rf002_brainstorm_content(
+                    state="ready_for_definition", promotion_state="authorized",
+                    promotion_subject="scope-a@2",
+                ),
+            )
+            self.install_state_record(
+                project, "definition", "definition", "DEFINITION.toml",
+                self.rf002_definition_content(),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("promoted", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_rf002_ready_authorized_without_definition_record_fails_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_state_record(
+                project, "brainstorm", "brainstorm", "BRAINSTORM.toml",
+                self.rf002_brainstorm_content(
+                    state="ready_for_definition", promotion_state="authorized",
+                    promotion_subject="scope-a@2",
+                ),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("promoted", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_rf002_promoted_exact_authorized_definition_active_routes_definition(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_state_record(
+                project, "brainstorm", "brainstorm", "BRAINSTORM.toml",
+                self.rf002_brainstorm_content(
+                    state="promoted", promotion_state="authorized", promotion_subject="scope-a@2",
+                ),
+            )
+            self.install_state_record(
+                project, "definition", "definition", "DEFINITION.toml",
+                self.rf002_definition_content(),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "definition"))
+            self.assertEqual(routed.subject, "scope-a@2")
+            self.assertEqual(routed.owner_module, "workflow/DEFINITION.md")
+        finally:
+            temp.cleanup()
+
+    def test_rf002_missing_authorization_with_definition_record_fails_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_state_record(
+                project, "brainstorm", "brainstorm", "BRAINSTORM.toml",
+                self.rf002_brainstorm_content(
+                    state="ready_for_definition", promotion_state="pending", promotion_subject="",
+                ),
+            )
+            self.install_state_record(
+                project, "definition", "definition", "DEFINITION.toml",
+                self.rf002_definition_content(),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+        finally:
+            temp.cleanup()
+
+    def test_rf002_stale_promotion_with_definition_record_fails_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_state_record(
+                project, "brainstorm", "brainstorm", "BRAINSTORM.toml",
+                self.rf002_brainstorm_content(
+                    revision=3, state="ready_for_definition", promotion_state="authorized",
+                    promotion_subject="scope-a@2",
+                ),
+            )
+            self.install_state_record(
+                project, "definition", "definition", "DEFINITION.toml",
+                self.rf002_definition_content(source_scope_subject="scope-a@3"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("stale", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_rf002_cross_scope_definition_source_fails_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_state_record(
+                project, "brainstorm", "brainstorm", "BRAINSTORM.toml",
+                self.rf002_brainstorm_content(
+                    state="promoted", promotion_state="authorized", promotion_subject="scope-a@2",
+                ),
+            )
+            self.install_state_record(
+                project, "definition", "definition", "DEFINITION.toml",
+                self.rf002_definition_content(source_scope_subject="scope-b@2"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+        finally:
+            temp.cleanup()
+
+    def test_rf002_active_brainstorming_without_definition_retains_owner_route(self) -> None:
+        for promotion_state, promotion_subject in (
+            ("pending", ""),
+            ("authorized", "scope-a@2"),
+        ):
+            with self.subTest(promotion_state=promotion_state):
+                temp, project = self.copy_fixture()
+                try:
+                    self.install_state_record(
+                        project, "brainstorm", "brainstorm", "BRAINSTORM.toml",
+                        self.rf002_brainstorm_content(
+                            state="active", promotion_state=promotion_state,
+                            promotion_subject=promotion_subject,
+                        ),
+                    )
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertEqual((routed.disposition, routed.obligation), ("route", "brainstorming"))
+                    self.assertEqual(routed.subject, "scope-a@2")
+                finally:
+                    temp.cleanup()
+
 
     def test_planning_routes_after_exact_premium_a_satisfaction(self) -> None:
         temp, project = self.copy_fixture()
