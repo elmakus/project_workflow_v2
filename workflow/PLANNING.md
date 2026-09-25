@@ -20,7 +20,7 @@ The planning record owns:
 - planner completeness/challenge audit;
 - premium A/B/C states and exact gate subjects;
 - exact immutable frozen plan subject once frozen;
-- review mode: normal independent review, or a bounded `editorial_exempt` classification with exact prior reviewed subject and non-empty semantic basis.
+- review mode: normal independent review, or a bounded `editorial_exempt` claim with exact prior reviewed subject, non-empty semantic basis, and an exact immutable independent classification-record locator.
 
 The planner:
 1. works only after A is satisfied for the current entry subject;
@@ -36,7 +36,7 @@ A GREEN independent Plan Review for the exact frozen subject is consumed by Plan
 - state becomes approved;
 - premium C becomes due for the same exact subject.
 
-Premium C must be satisfied before Execution Prep. RED never mutates the failed review subject; material correction creates a new planning cycle/revision and repeats A/B/C. Pure mechanical/editorial correction may remain in the same accepted cycle only when strategy, milestone structure, requirement coverage and gates do not change. It may use `editorial_exempt` only when the cycle already has an exact prior GREEN Plan Review and satisfied C: the new subject is different, the exemption records that prior reviewed subject plus a bounded semantic basis, and prior B/C subjects remain bound to the reviewed base. No new B/Plan Review/C sequence is created for that editorial-only change.
+Premium C must be satisfied before Execution Prep. RED never mutates the failed review subject; material correction creates a new planning cycle/revision and repeats A/B/C. Pure mechanical/editorial correction may remain in the same accepted cycle only when strategy, milestone topology, requirement coverage, gates and acceptance semantics do not change. Free-text `review_exemption_basis` is descriptive context, never proof. `editorial_exempt` is legal only when the cycle already has an exact prior GREEN Plan Review and satisfied C and `PLANNING.toml` points to an immutable workstream-local classification record by exact repository/commit/path/blob identity. That independently produced record must bind the exact prior GREEN-reviewed subject and exact changed subject, record the inspected diff/evidence, be GREEN with semantic classification `editorial_only`, explicitly preserve all five dimensions above, and state that its classifier did not materially produce or repair the changed subject. Prior B/C subjects remain bound to the reviewed base. Missing, stale, mismatched, non-independent, incomplete or non-editorial proof cannot authorize the exemption; the normal Premium-B → independent Plan Review → Premium-C path applies instead. No new B/Plan Review/C sequence is created only for a correctly proven editorial-only change.
 
 ## Decomposition seam intent
 
