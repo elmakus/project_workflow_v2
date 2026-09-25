@@ -947,6 +947,7 @@ class RouterTests(unittest.TestCase):
             review_path.write_text(self.plan_review_content("green", cycle=2, revision="P2"))
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             # Valid editorial exemption still dispatches the co-bound live Board.
+            self.assertNotEqual(routed.disposition, "recovery", routed.reason)
             self.assertEqual((routed.disposition, routed.obligation), ("route", "execution"))
             self.assertEqual(routed.subject, "M01-T04")
             self.assertIn(f"project:{BOARD}", routed.read_set)
@@ -1193,6 +1194,7 @@ class RouterTests(unittest.TestCase):
                         self.install_reviewable_result(project, "required")
                         self.add_review_attempt(project, verdict)
                     routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertNotEqual(routed.disposition, "recovery", routed.reason)
                     self.assertEqual((routed.disposition, routed.obligation), expected)
                     self.assertEqual(routed.owner_module, owner)
                     self.assertEqual(routed.subject, "M01-T04")
@@ -1285,6 +1287,7 @@ class RouterTests(unittest.TestCase):
             self.install_editorial_plan(project)
             self.remove_board_locator(project)
             routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertNotEqual(routed.disposition, "recovery", routed.reason)
             self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_prep"))
             self.assertIn("Editorial/mechanical-only", routed.reason)
             self.assertNotIn(f"project:{BOARD}", routed.read_set)
