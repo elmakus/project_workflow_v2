@@ -558,6 +558,18 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
         if "intake" in workstream:
             intake = read_toml(reads.project(workstream["intake"]["path"]))
             validate_intake(intake, workstream["workstream_id"])
+            # RF010/H015: issue alignment requires a concrete repair subject
+            # plus completed exact diagnosis/prior-art proof consumed via
+            # RF009. An empty repair subject stays in Intake diagnosis and
+            # never presents as stop/issue_alignment (or any alignment
+            # continuation), regardless of the recorded response class.
+            if intake["kind"] == "issue" and not intake["repair_subject"].strip():
+                return result(
+                    reads, "route", "intake",
+                    "Issue diagnosis has no concrete repair subject yet; Intake must propose "
+                    "one and consume proportional prior-art Research before repair alignment can proceed",
+                    subject=intake["kind"], owner_module="workflow/INTAKE.md",
+                )
             if intake["kind"] == "issue" and intake["repair_subject"]:
                 stable_diagnosis_prior_art = (
                     intake["diagnosis_prior_art_subject"] == intake["repair_subject"]

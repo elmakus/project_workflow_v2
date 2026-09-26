@@ -37,8 +37,9 @@ Tracker availability/state is bookkeeping only. It neither replaces alignment no
 
 ## Routing
 
-- no subsequent issue response -> real alignment stop;
-- question/concern/alternative -> Brainstorming;
+- empty repair subject -> Intake diagnosis; alignment never presents without a concrete repair subject;
+- concrete repair subject plus exact consumed prior-art proof and no subsequent issue response -> real alignment stop;
+- concrete repair subject plus exact consumed prior-art proof and question/concern/alternative -> Brainstorming;
 - exact authorized issue or completed feature/change Intake -> next durable obligation;
 - malformed/stale/cross-workstream state -> Recovery.
 

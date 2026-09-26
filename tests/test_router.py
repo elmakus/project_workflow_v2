@@ -1022,6 +1022,87 @@ class RouterTests(unittest.TestCase):
             temp.cleanup()
 
 
+    def test_h015_empty_repair_subject_pending_issue_stays_in_intake_diagnosis(self) -> None:
+        cases = (
+            ("none", False),
+            ("question", True),
+            ("concern", True),
+            ("alternative", True),
+            ("authorization", True),
+        )
+        for response_kind, observed in cases:
+            with self.subTest(response_kind=response_kind):
+                temp, project = self.copy_fixture()
+                try:
+                    self.install_intake(project, (
+                        'workstream_id = "sample-workstream"\n'
+                        'kind = "issue"\n'
+                        'state = "active"\n'
+                        'diagnosis_revision = 1\n'
+                        'repair_subject = ""\n'
+                        'diagnosis_prior_art_subject = ""\n'
+                        'diagnosis_prior_art_result = ""\n'
+                        f'response_kind = "{response_kind}"\n'
+                        f"response_observed = {'true' if observed else 'false'}\n"
+                        'alignment_state = "pending"\n'
+                        'alignment_subject = ""\n'
+                        'micro_fix_candidate = false\n'
+                    ))
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertEqual((routed.disposition, routed.obligation), ("route", "intake"))
+                    self.assertEqual(routed.subject, "issue")
+                    self.assertEqual(routed.owner_module, "workflow/INTAKE.md")
+                    self.assertIn("no concrete repair subject", routed.reason)
+                    self.assertNotIn(f"project:{BOARD}", routed.read_set)
+                finally:
+                    temp.cleanup()
+
+    def test_h015_blank_repair_subject_pending_issue_stays_in_intake_diagnosis(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_intake(project, (
+                'workstream_id = "sample-workstream"\n'
+                'kind = "issue"\n'
+                'state = "active"\n'
+                'diagnosis_revision = 1\n'
+                'repair_subject = "   "\n'
+                'diagnosis_prior_art_subject = ""\n'
+                'diagnosis_prior_art_result = ""\n'
+                'response_kind = "none"\n'
+                'response_observed = false\n'
+                'alignment_state = "pending"\n'
+                'alignment_subject = ""\n'
+                'micro_fix_candidate = false\n'
+            ))
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "intake"))
+            self.assertIn("no concrete repair subject", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_rf010_stale_diagnosis_binding_after_repair_change_fails_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_intake(project, (
+                'workstream_id = "sample-workstream"\n'
+                'kind = "issue"\n'
+                'state = "active"\n'
+                'diagnosis_revision = 2\n'
+                'repair_subject = "repair:v2"\n'
+                'diagnosis_prior_art_subject = "repair:v1"\n'
+                'diagnosis_prior_art_result = "evidence/intake-prior-art.md"\n'
+                'response_kind = "none"\n'
+                'response_observed = false\n'
+                'alignment_state = "pending"\n'
+                'alignment_subject = ""\n'
+                'micro_fix_candidate = false\n'
+            ))
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("stale diagnosis prior-art subject", routed.reason)
+        finally:
+            temp.cleanup()
+
     def test_active_and_completed_research_route_to_exact_owner(self) -> None:
         base = (
             'workstream_id = "sample-workstream"\n'
