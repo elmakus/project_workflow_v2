@@ -1294,19 +1294,20 @@ class StateEnvelopeTests(unittest.TestCase):
                 "basis": "Fresh semantic review context.",
             },
         }
-        validate_plan_review(review, "sample-workstream", planning)
+        definition = self.definition_record()
+        validate_plan_review(review, "sample-workstream", planning, definition)
 
         mismatch = copy.deepcopy(review)
         mismatch["subject"]["blob"] = "c" * 40
         with self.assertRaisesRegex(ValidationError, "does not match"):
-            validate_plan_review(mismatch, "sample-workstream", planning)
+            validate_plan_review(mismatch, "sample-workstream", planning, definition)
 
         green = copy.deepcopy(review)
         green["verdict"] = "green"
         with self.assertRaisesRegex(ValidationError, "evidence_path"):
-            validate_plan_review(green, "sample-workstream", planning)
+            validate_plan_review(green, "sample-workstream", planning, definition)
         green["evidence_path"] = "evidence/plan-review-R01.md"
-        validate_plan_review(green, "sample-workstream", planning)
+        validate_plan_review(green, "sample-workstream", planning, definition)
 
     def test_plan_review_verdict_domain_is_pending_green_red_only(self) -> None:
         # H007/RF005: Plan Review narrows the shared review verdict domain to
@@ -1333,28 +1334,158 @@ class StateEnvelopeTests(unittest.TestCase):
                 "basis": "Fresh semantic review context.",
             },
         }
-        validate_plan_review(review, "sample-workstream", planning)
+        definition = self.definition_record()
+        validate_plan_review(review, "sample-workstream", planning, definition)
 
         for verdict in ("green", "red"):
             terminal = copy.deepcopy(review)
             terminal["verdict"] = verdict
             terminal["evidence_path"] = "evidence/plan-review-R01.md"
-            validate_plan_review(terminal, "sample-workstream", planning)
+            validate_plan_review(terminal, "sample-workstream", planning, definition)
 
         active = copy.deepcopy(review)
         active["verdict"] = "in_progress"
         with self.assertRaisesRegex(ValidationError, "plan_review: verdict"):
-            validate_plan_review(active, "sample-workstream", planning)
+            validate_plan_review(active, "sample-workstream", planning, definition)
 
         unknown = copy.deepcopy(review)
         unknown["verdict"] = "deferred"
         with self.assertRaises(ValidationError):
-            validate_plan_review(unknown, "sample-workstream", planning)
+            validate_plan_review(unknown, "sample-workstream", planning, definition)
 
         generic = read_toml(VALID / "REVIEW_ATTEMPT.toml")
         generic["verdict"] = "in_progress"
         generic["evidence_path"] = ""
         validate_review(generic)
+
+    def definition_record(self) -> dict:
+        return {
+            "workstream_id": "sample-workstream",
+            "source_scope_subject": "scope-plan@1",
+            "revision": "R1",
+            "state": "green",
+            "completeness_audit": "green",
+            "premium_a": "satisfied",
+            "requirements": {"class": "authority", "path": "requirements/REQUIREMENTS.md"},
+            "decisions": [{"class": "authority", "path": "decisions/ADR-001.md"}],
+        }
+
+    def plan_review_record(self, acceptance: dict) -> tuple[dict, dict]:
+        planning = self.planning_record("frozen")
+        planning["premium_b"] = "satisfied"
+        review = {
+            "workstream_id": "sample-workstream",
+            "plan_revision": "P1",
+            "planning_cycle": 1,
+            "attempt": "R01",
+            "verdict": "green",
+            "evidence_path": "evidence/plan-review-R01.md",
+            "subject": {
+                "class": "git_blob",
+                "repository": "owner/repo",
+                "commit": "a" * 40,
+                "path": "planning/MASTER_PLAN.md",
+                "blob": "b" * 40,
+            },
+            "acceptance": acceptance,
+            "independence": {
+                "materially_produced_or_repaired_subject": False,
+                "basis": "Fresh semantic review context.",
+            },
+        }
+        return review, planning
+
+    def test_h006_plan_review_acceptance_must_be_definition_authority(self) -> None:
+        review, planning = self.plan_review_record(
+            {"class": "task_card",
+             "path": "implementation/workstreams/sample-workstream/cards/M01-T04.md"}
+        )
+        review["card_id"] = "M01-T04"
+        with self.assertRaisesRegex(
+            ValidationError, "acceptance must bind exact Definition authority"
+        ):
+            validate_plan_review(review, "sample-workstream", planning)
+        with self.assertRaisesRegex(
+            ValidationError, "acceptance must bind exact Definition authority"
+        ):
+            validate_plan_review(
+                review, "sample-workstream", planning, self.definition_record()
+            )
+
+    def test_h006_unrelated_sibling_acceptance_fails_closed(self) -> None:
+        definition = self.definition_record()
+        for unrelated in (
+            "workflow/ROUTER.md",
+            "decisions/ADR-002.md",
+            "requirements/archive/REQUIREMENTS.md",
+            "requirements/SWAPPED.md",
+            "planning/OTHER_PLAN.md",
+        ):
+            with self.subTest(path=unrelated):
+                review, planning = self.plan_review_record(
+                    {"class": "authority", "path": unrelated}
+                )
+                with self.assertRaisesRegex(
+                    ValidationError,
+                    "unrelated to the exact current Definition authority",
+                ):
+                    validate_plan_review(review, "sample-workstream", planning, definition)
+
+    def test_h006_exact_definition_members_pass(self) -> None:
+        definition = self.definition_record()
+        for member in ("requirements/REQUIREMENTS.md", "decisions/ADR-001.md"):
+            with self.subTest(path=member):
+                review, planning = self.plan_review_record(
+                    {"class": "authority", "path": member}
+                )
+                validate_plan_review(review, "sample-workstream", planning, definition)
+                exact = copy.deepcopy(review)
+                exact["acceptance"]["commit"] = "c" * 40
+                exact["acceptance"]["blob"] = "d" * 40
+                validate_plan_review(exact, "sample-workstream", planning, definition)
+
+    def test_h006_acceptance_identity_shape_is_exact(self) -> None:
+        definition = self.definition_record()
+        review, planning = self.plan_review_record(
+            {"class": "authority", "path": "requirements/REQUIREMENTS.md"}
+        )
+        half = copy.deepcopy(review)
+        half["acceptance"]["commit"] = "c" * 40
+        with self.assertRaisesRegex(ValidationError, "commit \\+ blob 40-hex"):
+            validate_plan_review(half, "sample-workstream", planning, definition)
+        malformed = copy.deepcopy(review)
+        malformed["acceptance"]["commit"] = "c" * 40
+        malformed["acceptance"]["blob"] = "not-hex"
+        with self.assertRaisesRegex(ValidationError, "commit \\+ blob 40-hex"):
+            validate_plan_review(malformed, "sample-workstream", planning, definition)
+        unknown = copy.deepcopy(review)
+        unknown["acceptance"]["note"] = "bogus"
+        with self.assertRaisesRegex(ValidationError, "unknown field"):
+            validate_plan_review(unknown, "sample-workstream", planning, definition)
+
+    def test_h006_omitted_definition_fails_closed(self) -> None:
+        # RED-before/GREEN-after direct-validator test: an omitted Definition
+        # can never authorize acceptance, even for an otherwise exact review.
+        review, planning = self.plan_review_record(
+            {"class": "authority", "path": "workflow/ROUTER.md"}
+        )
+        with self.assertRaisesRegex(ValidationError, "missing Definition authority"):
+            validate_plan_review(review, "sample-workstream", planning)
+        exact, _ = self.plan_review_record(
+            {"class": "authority", "path": "requirements/REQUIREMENTS.md"}
+        )
+        with self.assertRaisesRegex(ValidationError, "missing Definition authority"):
+            validate_plan_review(exact, "sample-workstream", planning)
+        validate_plan_review(
+            exact, "sample-workstream", planning, self.definition_record()
+        )
+        # Malformed shape still reports its specific defect first; the missing
+        # Definition never masks it and never silently succeeds.
+        malformed = copy.deepcopy(exact)
+        malformed["verdict"] = "in_progress"
+        malformed["evidence_path"] = ""
+        with self.assertRaisesRegex(ValidationError, "plan_review: verdict"):
+            validate_plan_review(malformed, "sample-workstream", planning)
 
     def test_editorial_plan_exemption_preserves_prior_green_subject(self) -> None:
         planning = self.planning_record("approved")
@@ -1398,7 +1529,7 @@ class StateEnvelopeTests(unittest.TestCase):
                 "basis": "Fresh semantic review context.",
             },
         }
-        validate_plan_review(review, "sample-workstream", planning)
+        validate_plan_review(review, "sample-workstream", planning, self.definition_record())
 
         bad = copy.deepcopy(planning)
         bad["review_exemption_basis"] = ""

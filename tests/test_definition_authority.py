@@ -311,7 +311,20 @@ class KeyShapeTests(unittest.TestCase):
                 review["definition_authority_key"] = key_value
             return review
 
-        validate_plan_review(review_with(key), "sample-workstream", planning)
+        # H006: production validation always binds the exact current
+        # Definition; key-shape negatives keep the legacy 3-arg call to lock
+        # that their specific defect still reports first.
+        definition = {
+            "workstream_id": "sample-workstream",
+            "source_scope_subject": "scope-plan@1",
+            "revision": "R1",
+            "state": "green",
+            "completeness_audit": "green",
+            "premium_a": "satisfied",
+            "requirements": {"class": "authority", "path": REQ_PATH},
+            "decisions": [{"class": "authority", "path": DEC_PATH}],
+        }
+        validate_plan_review(review_with(key), "sample-workstream", planning, definition)
         with self.assertRaisesRegex(ValidationError, "do not match"):
             validate_plan_review(review_with(other), "sample-workstream", planning)
         with self.assertRaisesRegex(ValidationError, "both be present or both absent"):
@@ -320,7 +333,8 @@ class KeyShapeTests(unittest.TestCase):
         keyless_planning.pop("definition_authority_key")
         validate_planning(keyless_planning, "sample-workstream")
         validate_plan_review(
-            review_with(None, omit=True), "sample-workstream", keyless_planning
+            review_with(None, omit=True), "sample-workstream", keyless_planning,
+            definition,
         )
         with self.assertRaisesRegex(ValidationError, "both be present or both absent"):
             validate_plan_review(review_with(key), "sample-workstream", keyless_planning)
@@ -381,9 +395,10 @@ class H021RouterTests(unittest.TestCase):
                 project, "planning", "planning", "PLANNING.toml",
                 helper.planning_explicit(commit, blob, key),
             )
+            acceptance_blob = git(project, "rev-parse", f"HEAD:{REQ_PATH}")
             install_record(
                 project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
-                helper.review_explicit(commit, blob, key),
+                helper.review_explicit(commit, blob, key, commit, acceptance_blob),
             )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("route", "execution"))
@@ -758,7 +773,27 @@ class CoEditedKeyTests(unittest.TestCase):
             f'blob = "{blob}"\n'
         )
 
-    def review_explicit(self, commit: str, blob: str, authority_key: str) -> str:
+    def review_explicit(
+        self, commit: str, blob: str, authority_key: str,
+        acceptance_commit: str | None = None,
+        acceptance_blob: str | None = None,
+    ) -> str:
+        # H006: explicit-key attempts bind exact acceptance identity; negative
+        # controls omit it and fail closed before or at the identity proof.
+        if acceptance_commit is None or acceptance_blob is None:
+            acceptance_stanza = (
+                '[acceptance]\n'
+                'class = "authority"\n'
+                'path = "requirements/REQUIREMENTS.md"\n'
+            )
+        else:
+            acceptance_stanza = (
+                '[acceptance]\n'
+                'class = "authority"\n'
+                'path = "requirements/REQUIREMENTS.md"\n'
+                f'commit = "{acceptance_commit}"\n'
+                f'blob = "{acceptance_blob}"\n'
+            )
         return (
             'workstream_id = "sample-workstream"\n'
             'plan_revision = "P1"\n'
@@ -773,9 +808,7 @@ class CoEditedKeyTests(unittest.TestCase):
             f'commit = "{commit}"\n'
             'path = "planning/MASTER_PLAN.md"\n'
             f'blob = "{blob}"\n'
-            '[acceptance]\n'
-            'class = "authority"\n'
-            'path = "requirements/REQUIREMENTS.md"\n'
+            f'{acceptance_stanza}'
             '[independence]\n'
             'materially_produced_or_repaired_subject = false\n'
             'basis = "Fresh semantic review context."\n'

@@ -514,26 +514,80 @@ class RouterTests(unittest.TestCase):
         except (OSError, ValueError):
             return
         subject = data.get("subject")
-        if not isinstance(subject, dict):
-            return
-        if subject.get("commit") != "a" * 40 or subject.get("blob") != "b" * 40:
-            return
-        planning_path = project / "implementation/workstreams/sample-workstream/PLANNING.toml"
+        if isinstance(subject, dict):
+            if subject.get("commit") == "a" * 40 and subject.get("blob") == "b" * 40:
+                planning_path = project / "implementation/workstreams/sample-workstream/PLANNING.toml"
+                try:
+                    planning = tomllib.loads(planning_path.read_bytes().decode("utf-8"))
+                except (OSError, ValueError):
+                    planning = None
+                if planning is not None and planning.get("review_mode") != "editorial_exempt":
+                    planned = planning.get("subject")
+                    if isinstance(planned, dict):
+                        text = path.read_text()
+                        text = text.replace('repository = "owner/repo"',
+                                            f'repository = "{planned.get("repository", RF012_REPOSITORY)}"', 1)
+                        text = text.replace(f'commit = "{"a" * 40}"', f'commit = "{planned.get("commit", "")}"', 1)
+                        text = text.replace(f'blob = "{"b" * 40}"', f'blob = "{planned.get("blob", "")}"', 1)
+                        path.write_text(text)
+        self._fixup_review_acceptance_identity(project)
+
+    def _fixup_review_acceptance_identity(self, project: Path) -> None:
+        """Bind default keyed fixture acceptance to its exact Git identity.
+
+        H006: explicit-key Plan Review attempts require exact commit + blob
+        acceptance identity. Only the default path-only requirements
+        acceptance is bound to the real snapshot identity; custom paths,
+        pre-declared identity (positive/negative controls) and keyless
+        legacy attempts pass through untouched.
+        """
+        path = project / "implementation/workstreams/sample-workstream/PLAN_REVIEW.toml"
         try:
-            planning = tomllib.loads(planning_path.read_bytes().decode("utf-8"))
+            data = tomllib.loads(path.read_bytes().decode("utf-8"))
         except (OSError, ValueError):
             return
-        if planning.get("review_mode") == "editorial_exempt":
+        key = data.get("definition_authority_key", "")
+        if not (isinstance(key, str) and key):
             return
-        planned = planning.get("subject")
-        if not isinstance(planned, dict):
+        acceptance = data.get("acceptance")
+        if not isinstance(acceptance, dict):
             return
-        text = path.read_text()
-        text = text.replace('repository = "owner/repo"',
-                            f'repository = "{planned.get("repository", RF012_REPOSITORY)}"', 1)
-        text = text.replace(f'commit = "{"a" * 40}"', f'commit = "{planned.get("commit", "")}"', 1)
-        text = text.replace(f'blob = "{"b" * 40}"', f'blob = "{planned.get("blob", "")}"', 1)
-        path.write_text(text)
+        if acceptance.get("class") != "authority" or acceptance.get("path") != RF012_REQ_PATH:
+            return
+        if "commit" in acceptance or "blob" in acceptance:
+            return
+        try:
+            commit = subprocess.run(
+                ["git", "-C", str(project), "rev-parse", "HEAD"],
+                capture_output=True, text=True, check=False, timeout=5,
+            )
+            blob = subprocess.run(
+                ["git", "-C", str(project), "rev-parse", f"HEAD:{RF012_REQ_PATH}"],
+                capture_output=True, text=True, check=False, timeout=5,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return
+        if commit.returncode != 0 or blob.returncode != 0:
+            return
+        commit_sha, blob_sha = commit.stdout.strip(), blob.stdout.strip()
+        if re.fullmatch(r"[0-9a-f]{40}", commit_sha) is None:
+            return
+        if re.fullmatch(r"[0-9a-f]{40}", blob_sha) is None:
+            return
+        try:
+            text = path.read_text()
+        except OSError:
+            return
+        anchor = '[acceptance]\nclass = "authority"\npath = "requirements/REQUIREMENTS.md"\n'
+        if anchor not in text:
+            return
+        path.write_text(
+            text.replace(
+                anchor,
+                anchor + f'commit = "{commit_sha}"\nblob = "{blob_sha}"\n',
+                1,
+            )
+        )
 
 
     def install_green_definition(self, project: Path) -> None:
@@ -1862,6 +1916,7 @@ class RouterTests(unittest.TestCase):
             )
             self._fixup_planning_snapshot(project)
             review_path.write_text(self.plan_review_content("green", cycle=2, revision="P2"))
+            self._fixup_review_snapshot(project)
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             # Valid editorial exemption still dispatches the co-bound live Board.
             self.assertNotEqual(routed.disposition, "recovery", routed.reason)
@@ -3246,6 +3301,272 @@ class RouterTests(unittest.TestCase):
                 (routed.disposition, routed.obligation),
                 ("route", "post_review_finalization"),
             )
+        finally:
+            temp.cleanup()
+
+    def install_h006_approved(self, project: Path) -> None:
+        """Approved plan + GREEN review with fixup-bound exact acceptance."""
+        self.install_green_definition(project)
+        self.install_state_record(
+            project, "planning", "planning", "PLANNING.toml",
+            self.planning_content(
+                state="approved", premium_b="satisfied", premium_c="satisfied"
+            ),
+        )
+        self.install_state_record(
+            project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+            self.plan_review_content("green"),
+        )
+
+    @staticmethod
+    def plan_acceptance_identity(project: Path, relpath: str) -> tuple[str, str]:
+        commit = subprocess.run(
+            ["git", "-C", str(project), "rev-parse", "HEAD"],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        blob = subprocess.run(
+            ["git", "-C", str(project), "rev-parse", f"HEAD:{relpath}"],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        return commit, blob
+
+    @staticmethod
+    def rewrite_plan_review_acceptance(
+        project: Path, *, path: str,
+        commit: str | None = None, blob: str | None = None,
+    ) -> None:
+        review_path = project / "implementation/workstreams/sample-workstream/PLAN_REVIEW.toml"
+        text = review_path.read_text()
+        head, sep, tail = text.partition("[acceptance]\n")
+        assert sep, "plan review fixture must carry an [acceptance] stanza"
+        _, sep2, rest = tail.partition("[independence]\n")
+        assert sep2, "plan review fixture must carry [independence] after [acceptance]"
+        stanza = f'[acceptance]\nclass = "authority"\npath = "{path}"\n'
+        if commit is not None or blob is not None:
+            assert commit is not None and blob is not None
+            stanza += f'commit = "{commit}"\nblob = "{blob}"\n'
+        review_path.write_text(head + stanza + "[independence]\n" + rest)
+
+    def test_h006_unrelated_router_acceptance_green_cannot_consume(self) -> None:
+        # Headline RED-before/GREEN-after: unrelated workflow/ROUTER.md GREEN
+        # consumed identically to the Definition baseline before H006.
+        temp, project = self.copy_fixture()
+        try:
+            self.install_h006_approved(project)
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution"))
+            self.assertIn("project-git:", "\n".join(routed.read_set))
+            self.rewrite_plan_review_acceptance(project, path="workflow/ROUTER.md")
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("unrelated", routed.reason)
+            self.assertIn("exact current Definition authority", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_h006_exact_requirements_and_decisions_green_consume(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_h006_approved(project)
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution"))
+            commit, blob = self.plan_acceptance_identity(project, RF012_DEC_PATH)
+            self.rewrite_plan_review_acceptance(
+                project, path=RF012_DEC_PATH, commit=commit, blob=blob
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution"))
+            self.assertIn("project-git:", "\n".join(routed.read_set))
+        finally:
+            temp.cleanup()
+
+    def test_h006_sibling_acceptance_with_valid_identity_fails_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_h006_approved(project)
+            sibling = "decisions/ADR-002.md"
+            (project / sibling).write_text("# Sibling decision\n")
+            subprocess.run(["git", "-C", str(project), "add", sibling], check=True)
+            subprocess.run(
+                ["git", "-C", str(project), "commit", "-q", "-m", "h006 sibling"],
+                check=True,
+            )
+            commit, blob = self.plan_acceptance_identity(project, sibling)
+            self.rewrite_plan_review_acceptance(
+                project, path=sibling, commit=commit, blob=blob
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("unrelated", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_h006_missing_identity_for_explicit_key_fails_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_h006_approved(project)
+            self.rewrite_plan_review_acceptance(project, path=RF012_REQ_PATH)
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("exact commit + blob", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_h006_mismatched_identity_fails_closed(self) -> None:
+        for name, kwargs, reason in (
+            ("blob_mismatch", {"blob": "f" * 40}, "proof failed"),
+            ("dangling", {"commit": "0" * 40}, "proof failed"),
+        ):
+            temp, project = self.copy_fixture()
+            try:
+                with self.subTest(case=name):
+                    self.install_h006_approved(project)
+                    commit, blob = self.plan_acceptance_identity(project, RF012_REQ_PATH)
+                    if "commit" in kwargs:
+                        commit = kwargs["commit"]  # type: ignore[typeddict-item]
+                    if "blob" in kwargs:
+                        blob = kwargs["blob"]  # type: ignore[typeddict-item]
+                    self.rewrite_plan_review_acceptance(
+                        project, path=RF012_REQ_PATH, commit=commit, blob=blob
+                    )
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertEqual(
+                        (routed.disposition, routed.obligation),
+                        ("recovery", "recovery_boundary"),
+                    )
+                    self.assertIn(reason, routed.reason)
+            finally:
+                temp.cleanup()
+
+    def test_h006_off_head_acceptance_with_identical_bytes_fails_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_h006_approved(project)
+            _, req_blob = self.plan_acceptance_identity(project, RF012_REQ_PATH)
+            subprocess.run(
+                ["git", "-C", str(project), "checkout", "-q", "-b", "h006-alt-accept"],
+                check=True,
+            )
+            (project / "unrelated-alt.txt").write_text("alt\n")
+            subprocess.run(["git", "-C", str(project), "add", "unrelated-alt.txt"], check=True)
+            subprocess.run(
+                ["git", "-C", str(project), "commit", "-q", "-m", "h006 alt"],
+                check=True,
+            )
+            alt_commit = subprocess.run(
+                ["git", "-C", str(project), "rev-parse", "HEAD"],
+                check=True, capture_output=True, text=True,
+            ).stdout.strip()
+            alt_blob = subprocess.run(
+                ["git", "-C", str(project), "rev-parse", f"{alt_commit}:{RF012_REQ_PATH}"],
+                check=True, capture_output=True, text=True,
+            ).stdout.strip()
+            self.assertEqual(alt_blob, req_blob)
+            subprocess.run(["git", "-C", str(project), "checkout", "-q", "-"], check=True)
+            ancestry = subprocess.run(
+                ["git", "-C", str(project), "merge-base", "--is-ancestor", alt_commit, "HEAD"],
+                capture_output=True, check=False,
+            )
+            self.assertNotEqual(ancestry.returncode, 0)
+            self.rewrite_plan_review_acceptance(
+                project, path=RF012_REQ_PATH, commit=alt_commit, blob=alt_blob
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("HEAD ancestry", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_h006_stale_and_changed_authority_fail_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_h006_approved(project)
+            (project / RF012_REQ_PATH).write_text("# Mutated requirements bytes\n")
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("stale", routed.reason)
+        finally:
+            temp.cleanup()
+
+        temp, project = self.copy_fixture()
+        try:
+            self.install_h006_approved(project)
+            definition_path = project / "implementation/workstreams/sample-workstream/DEFINITION.toml"
+            definition_path.write_text(
+                definition_path.read_text().replace('revision = "R1"', 'revision = "R2"')
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("stale", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_h006_pending_unrelated_acceptance_fails_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(state="frozen", premium_b="satisfied"),
+            )
+            self.install_state_record(
+                project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                self.plan_review_content("pending"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "plan_review"))
+            self.rewrite_plan_review_acceptance(project, path="workflow/ROUTER.md")
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("unrelated", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_h006_keyless_legacy_exact_valid_but_unrelated_fails(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(
+                    state="approved", premium_b="satisfied", premium_c="satisfied",
+                    include_authority_key=False,
+                ),
+            )
+            self.install_state_record(
+                project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                self.plan_review_content("green", include_authority_key=False),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution"))
+            self.rewrite_plan_review_acceptance(project, path="workflow/ROUTER.md")
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("unrelated", routed.reason)
         finally:
             temp.cleanup()
 

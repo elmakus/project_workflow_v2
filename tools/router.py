@@ -727,7 +727,9 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             plan_review = None
             if "plan_review" in workstream:
                 plan_review = read_toml(reads.project(workstream["plan_review"]["path"]))
-                validate_plan_review(plan_review, workstream["workstream_id"], planning)
+                validate_plan_review(
+                    plan_review, workstream["workstream_id"], planning, definition
+                )
 
             try:
                 authority_reads = verify_planning_authority_freshness(
@@ -741,6 +743,79 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             except DefinitionAuthorityError as exc:
                 raise ValidationError(f"planning authority freshness failed: {exc}") from exc
             reads.items.extend(authority_reads)
+
+            if plan_review is not None:
+                # H006: Plan Review acceptance binding — the reviewed
+                # acceptance must name an exact current Definition authority
+                # member with exact content identity. Membership is proved by
+                # state validation above; explicit-key attempts additionally
+                # prove the declared (commit, blob) in Git with HEAD ancestry
+                # and worktree freshness, mirroring H005 Card acceptance.
+                # Keyless legacy attempts prove claimed identity when present
+                # and stay valid path-only otherwise.
+                reviewed_acceptance = plan_review.get("acceptance")
+                if not isinstance(reviewed_acceptance, dict):
+                    raise ValidationError(
+                        "plan review acceptance must bind exact Definition authority"
+                    )
+                reviewed_path = reviewed_acceptance.get("path")
+                if reviewed_acceptance.get("class") != "authority" or not isinstance(
+                    reviewed_path, str
+                ):
+                    raise ValidationError(
+                        "plan review acceptance must bind exact Definition authority"
+                    )
+                acceptance_commit = reviewed_acceptance.get("commit")
+                acceptance_blob = reviewed_acceptance.get("blob")
+                planning_key = planning.get("definition_authority_key", "")
+                planning_has_key = isinstance(planning_key, str) and planning_key != ""
+                if planning_has_key and (
+                    not isinstance(acceptance_commit, str)
+                    or not isinstance(acceptance_blob, str)
+                ):
+                    raise ValidationError(
+                        "plan review acceptance requires exact commit + blob "
+                        "Definition-authority identity; path-only acceptance "
+                        "cannot prove exact content"
+                    )
+                if isinstance(acceptance_commit, str) and isinstance(acceptance_blob, str):
+                    try:
+                        verified_acceptance = verify_exact_git_locator(
+                            project_root=reads.project_root,
+                            repository=project["repository"],
+                            expected_repository=project["repository"],
+                            commit=acceptance_commit,
+                            path=reviewed_path,
+                            blob=acceptance_blob,
+                            label="plan review acceptance",
+                        )
+                        verify_worktree_freshness(
+                            project_root=reads.project_root,
+                            path=reviewed_path,
+                            blob=acceptance_blob,
+                            label="plan review acceptance",
+                        )
+                    except ExactLocatorError as exc:
+                        if exc.kind == "mutated":
+                            raise ValidationError(
+                                "plan review acceptance is stale for the exact current "
+                                f"Definition authority: {exc}"
+                            ) from exc
+                        raise ValidationError(
+                            f"plan review acceptance exact Definition-authority proof failed: {exc}"
+                        ) from exc
+                    try:
+                        require_commit_in_head_ancestry(
+                            project_root=reads.project_root,
+                            commit=acceptance_commit,
+                            label="plan review acceptance",
+                        )
+                    except ReviewAttemptProvenanceError as exc:
+                        raise ValidationError(
+                            f"plan review acceptance HEAD ancestry failed: {exc}"
+                        ) from exc
+                    reads.items.append(f"project-git:{verified_acceptance.key}")
+                    reads.project(reviewed_path)
 
             subject_key = (
                 f"{planning['subject']['repository']}@{planning['subject']['commit']}:"

@@ -314,6 +314,12 @@ def validate_locator(
     elif expected_class == "authority":
         allowed = ("requirements/", "decisions/", "planning/", "workflow/")
         _require(path.startswith(allowed), f"{label}: authority path is outside accepted authority roots")
+        if "commit" in ref or "blob" in ref:
+            _require(
+                isinstance(ref.get("commit"), str) and SHA40.fullmatch(ref["commit"]) is not None
+                and isinstance(ref.get("blob"), str) and SHA40.fullmatch(ref["blob"]) is not None,
+                f"{label}: exact authority identity requires commit + blob 40-hex",
+            )
     else:
         raise ValidationError(f"{label}: unsupported locator class {expected_class!r}")
     return path
@@ -695,8 +701,22 @@ def validate_planning(data: dict[str, Any], workstream_id: str) -> None:
                  "planning: approved plan requires exact premium C gate subject")
 
 
-def validate_plan_review(data: dict[str, Any], workstream_id: str, planning: dict[str, Any]) -> None:
+def validate_plan_review(
+    data: dict[str, Any],
+    workstream_id: str,
+    planning: dict[str, Any],
+    # H006: callers must pass the exact current Definition; an omitted or
+    # ambiguous Definition fails closed and can never authorize acceptance.
+    definition: dict[str, Any] | None = None,
+) -> None:
     validate_review(data)
+    # H006: Plan Review judges the frozen plan against accepted Definition
+    # authority, never an unrelated authority-rooted file or a Task Card.
+    acceptance = data.get("acceptance")
+    _require(
+        isinstance(acceptance, dict) and acceptance.get("class") == "authority",
+        "plan_review: acceptance must bind exact Definition authority",
+    )
     _require(data.get("verdict") in {"pending", "green", "red"},
              "plan_review: verdict must be pending, green or red")
     _require(data.get("workstream_id") == workstream_id, "plan_review: wrong workstream_id")
@@ -764,6 +784,46 @@ def validate_plan_review(data: dict[str, Any], workstream_id: str, planning: dic
             planning_raw == review_raw,
             "plan_review: Planning and Plan Review authority keys do not match",
         )
+
+    # H006: the reviewed acceptance must name exactly one member of the
+    # current Definition authority set (requirements or a listed decision).
+    # Root-shaped-only acceptance cannot authorize GREEN, and an omitted
+    # Definition can never implicitly succeed.
+    if definition is None:
+        raise ValidationError(
+            "plan_review: missing Definition authority binding; exact current "
+            "Definition is required to prove acceptance membership"
+        )
+    _require(isinstance(definition, dict), "plan_review: Definition binding is ambiguous")
+    try:
+        requirements = definition["requirements"]
+        decisions = definition["decisions"]
+    except (KeyError, TypeError) as exc:
+        raise ValidationError(
+            f"plan_review: Definition authority set is ambiguous: {exc}"
+        ) from exc
+    _require(
+        isinstance(requirements, dict) and isinstance(decisions, list),
+        "plan_review: Definition authority set is ambiguous",
+    )
+    members: set[str] = set()
+    try:
+        members.add(_safe_relative_path(requirements.get("path"), "plan_review.definition.requirements"))
+        for index, decision in enumerate(decisions):
+            _require(isinstance(decision, dict), "plan_review: Definition authority set is ambiguous")
+            members.add(
+                _safe_relative_path(
+                    decision.get("path"), f"plan_review.definition.decisions[{index}]"
+                )
+            )
+    except ValidationError as exc:
+        raise ValidationError(f"plan_review: Definition authority set is ambiguous: {exc}") from exc
+    reviewed_path = acceptance.get("path")
+    _require(
+        isinstance(reviewed_path, str) and reviewed_path in members,
+        f"plan_review: acceptance {reviewed_path!r} is unrelated to the exact current "
+        "Definition authority {requirements,decisions}",
+    )
 
 
 def validate_tracker(data: dict[str, Any], workstream_id: str) -> None:
@@ -1177,6 +1237,11 @@ def validate_review(data: dict[str, Any], *, expected_review_scope: str | None =
     acceptance_class = acceptance.get("class")
     if acceptance_class == "authority":
         validate_locator(acceptance, "authority", "review.acceptance")
+        unknown_authority = sorted(set(acceptance) - {"class", "path", "commit", "blob"})
+        _require(
+            not unknown_authority,
+            f"review.acceptance: unknown field(s): {', '.join(unknown_authority)}",
+        )
     elif acceptance_class == "task_card":
         workstream_id = data.get("workstream_id")
         _require(isinstance(workstream_id, str) and workstream_id,
