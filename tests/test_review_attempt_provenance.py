@@ -20,6 +20,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -30,6 +31,7 @@ from tools.review_attempt_provenance import (
     verify_history_append_only,
     verify_legacy_migration,
     verify_review_attempt_locator,
+    verify_terminal_append_only_from_git,
 )
 from tools.router import select_route
 from tools.state_contract import (
@@ -1241,6 +1243,102 @@ class RouterProvenanceTests(unittest.TestCase):
                 )
         finally:
             temp.cleanup()
+
+
+class TerminalFreezeMergeTests(unittest.TestCase):
+    WORKSTREAM = "sample-workstream"
+    CARD = "M01-T04"
+    REVIEW = "implementation/workstreams/sample-workstream/reviews/M01-T04-R01.toml"
+
+    def _init_repo(self, project: Path) -> None:
+        subprocess.run(["git", "init", "-q", str(project)], check=True)
+        subprocess.run(
+            ["git", "-C", str(project), "config", "user.email", "fixture@example.invalid"],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(project), "config", "user.name", "Fixture"],
+            check=True,
+        )
+        subprocess.run(["git", "-C", str(project), "branch", "-M", "main"], check=True)
+
+    def _commit(self, project: Path, relpath: str, message: str) -> None:
+        subprocess.run(["git", "-C", str(project), "add", relpath], check=True)
+        subprocess.run(
+            ["git", "-C", str(project), "commit", "-q", "-m", message], check=True
+        )
+
+    def _write_attempt(self, project: Path, verdict: str) -> dict:
+        path = project / self.REVIEW
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            f'workstream_id = "{self.WORKSTREAM}"\n'
+            f'card_id = "{self.CARD}"\n'
+            'attempt = "R01"\n'
+            f'verdict = "{verdict}"\n'
+            'evidence_path = "implementation/workstreams/sample-workstream/evidence/review-R01.md"\n'
+            '[subject]\n'
+            'class = "git_blob"\n'
+            'repository = "owner/fixture"\n'
+            f'commit = "{"a" * 40}"\n'
+            'path = "implementation/workstreams/sample-workstream/results/M01-T04.md"\n'
+            f'blob = "{"b" * 40}"\n',
+            encoding="utf-8",
+        )
+        with path.open("rb") as handle:
+            return tomllib.load(handle)
+
+    def _merge_fixture(self, project: Path, side_verdict: str) -> dict:
+        self._init_repo(project)
+        (project / "base.txt").write_text("base\n", encoding="utf-8")
+        self._commit(project, "base.txt", "base")
+        subprocess.run(
+            ["git", "-C", str(project), "checkout", "-qb", "side"], check=True
+        )
+        self._write_attempt(project, side_verdict)
+        self._commit(project, self.REVIEW, f"side {side_verdict}")
+        subprocess.run(
+            ["git", "-C", str(project), "checkout", "-q", "main"], check=True
+        )
+        self._write_attempt(project, "green")
+        self._commit(project, self.REVIEW, "main green")
+        subprocess.run(
+            ["git", "-C", str(project), "merge", "--no-commit", "side"],
+            check=False,
+        )
+        current = self._write_attempt(project, "green")
+        subprocess.run(["git", "-C", str(project), "add", "-A"], check=True)
+        subprocess.run(
+            ["git", "-C", str(project), "commit", "-q", "-m", "merge resolving green"],
+            check=True,
+        )
+        return current
+
+    def test_merge_side_branch_terminal_red_is_visited(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            current = self._merge_fixture(project, "red")
+            with self.assertRaisesRegex(
+                ReviewAttemptProvenanceError, "silently rewritten"
+            ):
+                verify_terminal_append_only_from_git(
+                    project_root=project,
+                    workstream_id=self.WORKSTREAM,
+                    card_id=self.CARD,
+                    attempts=[current],
+                )
+
+    def test_merge_side_branch_pending_still_finalizes(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            current = self._merge_fixture(project, "pending")
+            reads = verify_terminal_append_only_from_git(
+                project_root=project,
+                workstream_id=self.WORKSTREAM,
+                card_id=self.CARD,
+                attempts=[current],
+            )
+            self.assertEqual(reads, [f"project-git-log:{self.REVIEW}"])
 
 
 if __name__ == "__main__":

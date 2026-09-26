@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -747,13 +748,15 @@ class BoardBoundFinalGateTests(unittest.TestCase):
             review = _write_attempt_toml(
                 project, "R01", observations=_observation_table("O1", "R01")
             )
-            _write_board_toml(project, [review])
+            commit, blob = _git_identity_for(project, review)
+            _write_board_toml_exact(project, [(review, commit, blob)])
             with self.assertRaisesRegex(CloseContractError, "omit.*O1"):
                 verify_final_observation_reconciliation_from_board(
                     project_root=project,
                     board_path=BOARD_PATH,
                     card_id=BOARD_CARD,
                     observations=[],
+                    project_repository="owner/fixture",
                 )
 
     def test_board_gate_reads_full_history_not_just_first_attempt(self) -> None:
@@ -779,13 +782,21 @@ class BoardBoundFinalGateTests(unittest.TestCase):
                 'disposition = "tracked"\n'
                 'basis = "Exported as follow-up."\n',
             )
-            _write_board_toml(project, [first, second, third])
+            first_commit, first_blob = _git_identity_for(project, first)
+            second_commit, second_blob = _git_identity_for(project, second)
+            third_commit, third_blob = _git_identity_for(project, third)
+            _write_board_toml_exact(project, [
+                (first, first_commit, first_blob),
+                (second, second_commit, second_blob),
+                (third, third_commit, third_blob),
+            ])
             with self.assertRaisesRegex(CloseContractError, "omit.*O2"):
                 verify_final_observation_reconciliation_from_board(
                     project_root=project,
                     board_path=BOARD_PATH,
                     card_id=BOARD_CARD,
                     observations=[{"id": "O1", "disposition": "resolved"}],
+                    project_repository="owner/fixture",
                 )
             self.assertEqual(
                 verify_final_observation_reconciliation_from_board(
@@ -796,6 +807,7 @@ class BoardBoundFinalGateTests(unittest.TestCase):
                         {"id": "O1", "disposition": "resolved"},
                         {"id": "O2", "disposition": "tracked"},
                     ],
+                    project_repository="owner/fixture",
                 ),
                 "final_observation_reconciliation_complete",
             )
@@ -806,13 +818,15 @@ class BoardBoundFinalGateTests(unittest.TestCase):
             review = _write_attempt_toml(
                 project, "R01", observations=_observation_table("O1", "R01")
             )
-            _write_board_toml(project, [review])
+            commit, blob = _git_identity_for(project, review)
+            _write_board_toml_exact(project, [(review, commit, blob)])
             with self.assertRaisesRegex(CloseContractError, "derived disposition"):
                 verify_final_observation_reconciliation_from_board(
                     project_root=project,
                     board_path=BOARD_PATH,
                     card_id=BOARD_CARD,
                     observations=[{"id": "O1", "disposition": "resolved"}],
+                    project_repository="owner/fixture",
                 )
 
     def test_board_gate_fails_closed_on_dangling_attempt_locator(self) -> None:
@@ -821,22 +835,28 @@ class BoardBoundFinalGateTests(unittest.TestCase):
             review = _write_attempt_toml(
                 project, "R01", observations=_observation_table("O1", "R01")
             )
+            commit, blob = _git_identity_for(project, review)
             missing = (
                 f"implementation/workstreams/{BOARD_WORKSTREAM}/reviews/{BOARD_CARD}-R09.toml"
             )
-            _write_board_toml(project, [review, missing])
+            _write_board_toml_exact(project, [
+                (review, commit, blob),
+                (missing, commit, "f" * 40),
+            ])
             with self.assertRaisesRegex(CloseContractError, "review attempt"):
                 verify_final_observation_reconciliation_from_board(
                     project_root=project,
                     board_path=BOARD_PATH,
                     card_id=BOARD_CARD,
                     observations=[{"id": "O1", "disposition": "resolved"}],
+                    project_repository="owner/fixture",
                 )
 
     def test_board_gate_accepts_proven_empty_history_and_reviewed_cleanup(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             project = Path(raw)
             _write_board_toml(project, [])
+            _git_identity_for(project, BOARD_PATH)
             self.assertEqual(
                 verify_final_observation_reconciliation_from_board(
                     project_root=project,
@@ -859,7 +879,8 @@ class BoardBoundFinalGateTests(unittest.TestCase):
                 'disposition = "cleanup_candidate"\n'
                 'disposition_basis = "Safe bounded cleanup."\n',
             )
-            _write_board_toml(project, [review])
+            commit, blob = _git_identity_for(project, review)
+            _write_board_toml_exact(project, [(review, commit, blob)])
             self.assertEqual(
                 verify_final_observation_reconciliation_from_board(
                     project_root=project,
@@ -867,9 +888,413 @@ class BoardBoundFinalGateTests(unittest.TestCase):
                     card_id=BOARD_CARD,
                     observations=[{"id": "O2", "disposition": "cleanup_candidate"}],
                     cleanup_works=[_reviewed_cleanup_work()],
+                    project_repository="owner/fixture",
                 ),
                 "final_observation_reconciliation_complete",
             )
+
+
+def _write_board_toml_exact(
+    project: Path, entries: list[tuple[str, str, str]]
+) -> None:
+    locators = ", ".join(
+        f'{{ class = "review_attempt", path = "{path}", '
+        f'commit = "{commit}", blob = "{blob}" }}'
+        for path, commit, blob in entries
+    )
+    path = project / BOARD_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        f'workstream_id = "{BOARD_WORKSTREAM}"\n'
+        "revision = 1\n"
+        "[execution_ref]\n"
+        'branch = "work/pwv21-policy-kernel"\n'
+        "[[cards]]\n"
+        f'id = "{BOARD_CARD}"\n'
+        'status = "in_progress"\n'
+        f'contract = {{ class = "task_card", path = "implementation/workstreams/{BOARD_WORKSTREAM}/cards/{BOARD_CARD}.md" }}\n'
+        f"review_attempts = [{locators}]\n",
+        encoding="utf-8",
+    )
+
+
+def _git_identity_for(project: Path, relpath: str) -> tuple[str, str]:
+    if not (project / ".git").exists():
+        subprocess.run(["git", "init", "-q", str(project)], check=True)
+        subprocess.run(
+            ["git", "-C", str(project), "config", "user.email", "fixture@example.invalid"],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(project), "config", "user.name", "Fixture"],
+            check=True,
+        )
+    subprocess.run(["git", "-C", str(project), "add", relpath], check=True)
+    subprocess.run(
+        ["git", "-C", str(project), "commit", "-q", "-m", f"fixture {relpath}"],
+        check=True,
+    )
+    commit = subprocess.run(
+        ["git", "-C", str(project), "rev-parse", "HEAD"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    blob = subprocess.run(
+        ["git", "-C", str(project), "rev-parse", f"HEAD:{relpath}"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    return commit, blob
+
+
+class H018CompleteHistoryTests(unittest.TestCase):
+    def test_truncated_board_with_durable_attempt_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            review = _write_attempt_toml(
+                project, "R01", observations=_observation_table("O1", "R01")
+            )
+            _git_identity_for(project, review)
+            _write_board_toml(project, [])
+            with self.assertRaisesRegex(CloseContractError, "omits durable"):
+                verify_final_observation_reconciliation_from_board(
+                    project_root=project,
+                    board_path=BOARD_PATH,
+                    card_id=BOARD_CARD,
+                    observations=[],
+                )
+
+    def test_listed_board_cannot_omit_known_observation(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            review = _write_attempt_toml(
+                project, "R01", observations=_observation_table("O1", "R01")
+            )
+            commit, blob = _git_identity_for(project, review)
+            _write_board_toml_exact(project, [(review, commit, blob)])
+            with self.assertRaisesRegex(CloseContractError, "omit.*O1"):
+                verify_final_observation_reconciliation_from_board(
+                    project_root=project,
+                    board_path=BOARD_PATH,
+                    card_id=BOARD_CARD,
+                    observations=[],
+                    project_repository="owner/fixture",
+                )
+
+    def test_orphan_durable_attempt_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            first = _write_attempt_toml(
+                project, "R01", observations=_observation_table("O1", "R01")
+            )
+            second = _write_attempt_toml(
+                project, "R02", observations=_observation_table("O2", "R02")
+            )
+            first_commit, first_blob = _git_identity_for(project, first)
+            _git_identity_for(project, second)
+            _write_board_toml_exact(project, [(first, first_commit, first_blob)])
+            with self.assertRaisesRegex(CloseContractError, "omits durable.*R02"):
+                verify_final_observation_reconciliation_from_board(
+                    project_root=project,
+                    board_path=BOARD_PATH,
+                    card_id=BOARD_CARD,
+                    observations=[],
+                    project_repository="owner/fixture",
+                )
+
+    def test_duplicate_board_locator_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            review = _write_attempt_toml(
+                project, "R01", observations=_observation_table("O1", "R01")
+            )
+            commit, blob = _git_identity_for(project, review)
+            _write_board_toml_exact(project, [
+                (review, commit, blob),
+                (review, commit, blob),
+            ])
+            with self.assertRaisesRegex(CloseContractError, "duplicate.*locator"):
+                verify_final_observation_reconciliation_from_board(
+                    project_root=project,
+                    board_path=BOARD_PATH,
+                    card_id=BOARD_CARD,
+                    observations=[{"id": "O1", "disposition": "resolved"}],
+                    project_repository="owner/fixture",
+                )
+
+    def test_sibling_filename_attempt_mismatch_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            review_path = (
+                f"implementation/workstreams/{BOARD_WORKSTREAM}/reviews/{BOARD_CARD}-R01.toml"
+            )
+            path = project / review_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            evidence = f"implementation/workstreams/{BOARD_WORKSTREAM}/evidence/review-R02.md"
+            path.write_text(
+                f'workstream_id = "{BOARD_WORKSTREAM}"\n'
+                f'card_id = "{BOARD_CARD}"\n'
+                'attempt = "R02"\n'
+                'verdict = "green"\n'
+                f'evidence_path = "{evidence}"\n'
+                'review_kind = "discovery"\n'
+                'source_discovery_attempt = ""\n'
+                "discovery_complete = true\n"
+                "material_finding_ids = []\n"
+                "[subject]\n"
+                'class = "git_blob"\n'
+                'repository = "owner/fixture"\n'
+                f'commit = "{"a" * 40}"\n'
+                f'path = "implementation/workstreams/{BOARD_WORKSTREAM}/results/{BOARD_CARD}.md"\n'
+                f'blob = "{"b" * 40}"\n'
+                "[acceptance]\n"
+                'class = "authority"\n'
+                'path = "requirements/PROJECT_WORKFLOW_V2.md"\n'
+                "[independence]\n"
+                "materially_produced_or_repaired_subject = false\n"
+                'basis = "Fresh semantic reviewer context."\n',
+                encoding="utf-8",
+            )
+            commit, blob = _git_identity_for(project, review_path)
+            _write_board_toml_exact(project, [(review_path, commit, blob)])
+            with self.assertRaisesRegex(CloseContractError, "identity"):
+                verify_final_observation_reconciliation_from_board(
+                    project_root=project,
+                    board_path=BOARD_PATH,
+                    card_id=BOARD_CARD,
+                    observations=[],
+                    project_repository="owner/fixture",
+                )
+
+    def test_genuinely_empty_inventory_completes(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _write_board_toml(project, [])
+            reviews_dir = project / f"implementation/workstreams/{BOARD_WORKSTREAM}/reviews"
+            reviews_dir.mkdir(parents=True, exist_ok=True)
+            _git_identity_for(project, BOARD_PATH)
+            self.assertEqual(
+                verify_final_observation_reconciliation_from_board(
+                    project_root=project,
+                    board_path=BOARD_PATH,
+                    card_id=BOARD_CARD,
+                    observations=[],
+                ),
+                "final_observation_reconciliation_complete",
+            )
+
+    def test_git_unavailable_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _write_board_toml(project, [])
+            with self.assertRaisesRegex(CloseContractError, "cannot read durable Git"):
+                verify_final_observation_reconciliation_from_board(
+                    project_root=project,
+                    board_path=BOARD_PATH,
+                    card_id=BOARD_CARD,
+                    observations=[],
+                )
+
+    def test_path_only_explicit_attempt_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            review = _write_attempt_toml(
+                project, "R01", observations=_observation_table("O1", "R01")
+            )
+            _git_identity_for(project, review)
+            _write_board_toml(project, [review])
+            with self.assertRaisesRegex(CloseContractError, "identity|path-only|commit"):
+                verify_final_observation_reconciliation_from_board(
+                    project_root=project,
+                    board_path=BOARD_PATH,
+                    card_id=BOARD_CARD,
+                    observations=[],
+                    project_repository="owner/fixture",
+                )
+
+    def test_fully_reconciled_positive_continues(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            first = _write_attempt_toml(
+                project, "R01", observations=_observation_table("O1", "R01")
+            )
+            second = _write_attempt_toml(
+                project,
+                "R02",
+                observation_updates="[[observation_updates]]\n"
+                'id = "O1"\n'
+                'disposition = "resolved"\n'
+                'basis = "Fixed in R02."\n',
+            )
+            first_commit, first_blob = _git_identity_for(project, first)
+            second_commit, second_blob = _git_identity_for(project, second)
+            _write_board_toml_exact(project, [
+                (first, first_commit, first_blob),
+                (second, second_commit, second_blob),
+            ])
+            self.assertEqual(
+                verify_final_observation_reconciliation_from_board(
+                    project_root=project,
+                    board_path=BOARD_PATH,
+                    card_id=BOARD_CARD,
+                    observations=[{"id": "O1", "disposition": "resolved"}],
+                    project_repository="owner/fixture",
+                ),
+                "final_observation_reconciliation_complete",
+            )
+
+    def test_git_head_inventory_catches_worktree_deleted_attempt(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            review = _write_attempt_toml(
+                project, "R01", observations=_observation_table("O1", "R01")
+            )
+            _git_identity_for(project, review)
+            (project / review).unlink()
+            _write_board_toml(project, [])
+            with self.assertRaisesRegex(CloseContractError, "omits durable.*R01"):
+                verify_final_observation_reconciliation_from_board(
+                    project_root=project,
+                    board_path=BOARD_PATH,
+                    card_id=BOARD_CARD,
+                    observations=[],
+                )
+
+    def test_git_exact_locator_positive_continues(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            review = _write_attempt_toml(
+                project,
+                "R01",
+                observations=_observation_table("O1", "R01", disposition="resolved"),
+            )
+            commit, blob = _git_identity_for(project, review)
+            _write_board_toml_exact(project, [(review, commit, blob)])
+            self.assertEqual(
+                verify_final_observation_reconciliation_from_board(
+                    project_root=project,
+                    board_path=BOARD_PATH,
+                    card_id=BOARD_CARD,
+                    observations=[{"id": "O1", "disposition": "resolved"}],
+                    project_repository="owner/fixture",
+                ),
+                "final_observation_reconciliation_complete",
+            )
+
+    def test_git_stale_locator_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            review = _write_attempt_toml(
+                project,
+                "R01",
+                observations=_observation_table("O1", "R01", disposition="resolved"),
+            )
+            commit, blob = _git_identity_for(project, review)
+            (project / review).write_text(
+                (project / review).read_text(encoding="utf-8") + "\n# stale mutation\n",
+                encoding="utf-8",
+            )
+            _write_board_toml_exact(project, [(review, commit, blob)])
+            with self.assertRaisesRegex(CloseContractError, "identity|mutated|stale"):
+                verify_final_observation_reconciliation_from_board(
+                    project_root=project,
+                    board_path=BOARD_PATH,
+                    card_id=BOARD_CARD,
+                    observations=[{"id": "O1", "disposition": "resolved"}],
+                    project_repository="owner/fixture",
+                )
+
+    def test_git_history_inventory_catches_deleted_committed_attempt(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            review = _write_attempt_toml(
+                project, "R01", observations=_observation_table("O1", "R01")
+            )
+            _git_identity_for(project, review)
+            (project / review).unlink()
+            subprocess.run(
+                ["git", "-C", str(project), "add", "-u", review], check=True
+            )
+            subprocess.run(
+                ["git", "-C", str(project), "commit", "-q", "-m", "delete attempt"],
+                check=True,
+            )
+            _write_board_toml(project, [])
+            with self.assertRaisesRegex(CloseContractError, "omits durable.*R01"):
+                verify_final_observation_reconciliation_from_board(
+                    project_root=project,
+                    board_path=BOARD_PATH,
+                    card_id=BOARD_CARD,
+                    observations=[],
+                )
+
+    def test_git_terminal_rewrite_with_rebound_locator_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            review = _write_attempt_toml(
+                project, "R01", observations=_observation_table("O1", "R01")
+            )
+            _git_identity_for(project, review)
+            _write_attempt_toml(
+                project,
+                "R01",
+                observations=_observation_table("O1", "R01", disposition="resolved"),
+            )
+            commit, blob = _git_identity_for(project, review)
+            _write_board_toml_exact(project, [(review, commit, blob)])
+            with self.assertRaisesRegex(CloseContractError, "append-only|rewritten"):
+                verify_final_observation_reconciliation_from_board(
+                    project_root=project,
+                    board_path=BOARD_PATH,
+                    card_id=BOARD_CARD,
+                    observations=[{"id": "O1", "disposition": "resolved"}],
+                    project_repository="owner/fixture",
+                )
+
+    def test_git_merge_side_branch_addition_cannot_disappear(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _write_board_toml(project, [])
+            _git_identity_for(project, BOARD_PATH)
+            subprocess.run(
+                ["git", "-C", str(project), "branch", "-M", "main"], check=True
+            )
+            subprocess.run(
+                ["git", "-C", str(project), "checkout", "-qb", "side"], check=True
+            )
+            review = _write_attempt_toml(
+                project, "R09", observations=_observation_table("O9", "R09")
+            )
+            subprocess.run(["git", "-C", str(project), "add", review], check=True)
+            subprocess.run(
+                ["git", "-C", str(project), "commit", "-q", "-m", "side add R09"],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(project), "checkout", "-q", "main"], check=True
+            )
+            other = project / "other.txt"
+            other.write_text("main advance\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(project), "add", "other.txt"], check=True)
+            subprocess.run(
+                ["git", "-C", str(project), "commit", "-q", "-m", "main advance"],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(project), "merge", "--no-commit", "side"],
+                check=True,
+            )
+            (project / review).unlink()
+            subprocess.run(["git", "-C", str(project), "add", "-A"], check=True)
+            subprocess.run(
+                ["git", "-C", str(project), "commit", "-q", "-m", "merge dropping R09"],
+                check=True,
+            )
+            with self.assertRaisesRegex(CloseContractError, "omits durable.*R09"):
+                verify_final_observation_reconciliation_from_board(
+                    project_root=project,
+                    board_path=BOARD_PATH,
+                    card_id=BOARD_CARD,
+                    observations=[],
+                )
 
 
 if __name__ == "__main__":

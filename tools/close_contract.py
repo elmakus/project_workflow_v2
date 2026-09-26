@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 import tomllib
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
@@ -17,10 +18,18 @@ try:
     )
     from tools.state_contract import (
         ValidationError,
+        read_project,
         validate_locator,
+        validate_project,
         validate_review_history,
     )
     from tools.exact_locator import ExactLocatorError, normalize_locator_path
+    from tools.review_attempt_provenance import (
+        ReviewAttemptProvenanceError,
+        verify_legacy_migration,
+        verify_review_attempt_locator,
+        verify_terminal_append_only_from_git,
+    )
 except ModuleNotFoundError:  # direct script execution from tools/
     from review_contract import (
         OBSERVATION_DISPOSITIONS,
@@ -29,10 +38,18 @@ except ModuleNotFoundError:  # direct script execution from tools/
     )
     from state_contract import (
         ValidationError,
+        read_project,
         validate_locator,
+        validate_project,
         validate_review_history,
     )
     from exact_locator import ExactLocatorError, normalize_locator_path
+    from review_attempt_provenance import (
+        ReviewAttemptProvenanceError,
+        verify_legacy_migration,
+        verify_review_attempt_locator,
+        verify_terminal_append_only_from_git,
+    )
 
 
 class CloseContractError(ValueError):
@@ -515,6 +532,128 @@ def _read_project_toml(root: Path, raw_path: str, label: str) -> dict:
     return data
 
 
+_GIT_TIMEOUT_SECONDS = 5
+
+
+def _derive_durable_review_inventory(
+    root: Path, workstream_id: str, card_id: str
+) -> list[str]:
+    """Derive the complete durable review-attempt inventory for one Card.
+
+    Unions the worktree reviews directory with required Git HEAD and
+    HEAD-history listings for the Card prefix, so a Board that omits a
+    durable attempt cannot reconcile vacuously. Both Git reads must
+    succeed; an unavailable repository, missing HEAD, command failure or
+    timeout fails closed. A verifiably empty inventory needs actual Git
+    evidence, never worktree absence alone.
+    """
+    for label, value in (("workstream", workstream_id), ("card", card_id)):
+        if (
+            not isinstance(value, str)
+            or not value.strip()
+            or value != value.strip()
+            or "/" in value
+            or "\\" in value
+            or ".." in value
+            or value in {".", ".."}
+            or "\x00" in value
+            or "\n" in value
+            or "\r" in value
+        ):
+            raise CloseContractError(f"Final gate {label} id is unsafe: {value!r}")
+    reviews_dir_rel = f"implementation/workstreams/{workstream_id}/reviews"
+    prefix = f"{reviews_dir_rel}/{card_id}-"
+    inventory: set[str] = set()
+
+    reviews_dir = root / "implementation" / "workstreams" / workstream_id / "reviews"
+    try:
+        resolved_dir = reviews_dir.resolve()
+        resolved_dir.relative_to(root)
+    except ValueError as exc:
+        raise CloseContractError(
+            "Final gate reviews directory escapes the project worktree"
+        ) from exc
+    if resolved_dir.is_dir():
+        try:
+            entries = list(resolved_dir.iterdir())
+        except OSError as exc:
+            raise CloseContractError(
+                f"Final gate cannot enumerate durable review inventory: {exc}"
+            ) from exc
+        for entry in entries:
+            name = entry.name
+            if not (name.startswith(f"{card_id}-") and name.endswith(".toml")):
+                continue
+            try:
+                is_candidate = entry.is_symlink() or entry.is_file()
+            except OSError:
+                is_candidate = True
+            if is_candidate:
+                inventory.add(f"{reviews_dir_rel}/{name}")
+
+    git_sources = (
+        ("HEAD", ["ls-tree", "-r", "--name-only", "HEAD", "--", reviews_dir_rel]),
+        (
+            "history",
+            [
+                "log",
+                "--full-history",
+                "--format=",
+                "--name-only",
+                "--diff-filter=ACMR",
+                "HEAD",
+                "--",
+                reviews_dir_rel,
+            ],
+        ),
+    )
+    for source, args in git_sources:
+        try:
+            completed = subprocess.run(
+                ["git", "-C", str(root), *args],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=_GIT_TIMEOUT_SECONDS,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise CloseContractError(
+                f"Final gate cannot read durable Git {source} inventory: {exc}"
+            ) from exc
+        if completed.returncode != 0:
+            detail = (completed.stderr or "").strip().splitlines()
+            reason = detail[0][:200] if detail and detail[0] else f"exit {completed.returncode}"
+            raise CloseContractError(
+                f"Final gate cannot read durable Git {source} inventory: {reason}"
+            )
+        for line in completed.stdout.splitlines():
+            candidate = line.strip()
+            if candidate.startswith(prefix) and candidate.endswith(".toml"):
+                inventory.add(candidate)
+    return sorted(inventory)
+
+
+def _resolve_project_repository(
+    root: Path, explicit: str | None
+) -> str | None:
+    if explicit is not None:
+        if not isinstance(explicit, str) or not explicit.strip():
+            raise CloseContractError("Final gate project repository must be non-empty")
+        return explicit
+    candidate = root / "PROJECT.md"
+    if not candidate.is_file():
+        return None
+    try:
+        project = read_project(candidate)
+        validate_project(project)
+    except (OSError, ValidationError):
+        return None
+    repository = project.get("repository")
+    if not isinstance(repository, str) or not repository.strip():
+        return None
+    return repository
+
+
 def verify_final_observation_reconciliation_from_board(
     *,
     project_root: Path | str,
@@ -525,18 +664,24 @@ def verify_final_observation_reconciliation_from_board(
     accepted_authority_paths: set[str] | None = None,
     exact_blob_reader: Callable[[str, str, str], str | None] | None = None,
     expected_review_scope: str | None = None,
+    project_repository: str | None = None,
     further_advisory_improvement_conceivable: bool = False,
 ) -> str:
-    """Authoritatively gate Final Integration on durable board-bound review history.
+    """Authoritatively gate Final Integration on complete durable review history.
 
-    This is the truncation-proof entry point: it enumerates the Card's review
-    attempts from the durable Task Board locators, reads each attempt file,
-    validates the full history and derives the canonical observation set
-    itself. Omitting a known open observation from the proposal, or pointing
-    the proposal at a forged disposition, fails against durable truth. Only a
-    board that genuinely lists no review attempts may reconcile vacuously.
-    Callers must not substitute in-memory caller-supplied histories when
-    durable state is available.
+    This is the truncation-proof entry point: it derives the complete
+    review-attempt inventory from durable Git/workstream state (worktree
+    reviews directory plus required HEAD and history reads), requires
+    the Board to list every durable attempt, proves every listed
+    locator through exact RF007/T11 Git identity and legacy provenance,
+    validates the full history, freezes terminal bytes against Git
+    history, and derives the canonical observation set itself. A
+    missing Git inventory, a path-only relied-upon locator, an omitted
+    durable attempt, an omitted known observation, or a forged
+    disposition fails against durable truth. Only a workstream with a
+    Git-verified empty durable inventory may reconcile vacuously.
+    Callers must not substitute in-memory caller-supplied histories
+    when durable state is available.
     """
     root = Path(project_root).resolve()
     try:
@@ -569,21 +714,78 @@ def verify_final_observation_reconciliation_from_board(
     if not isinstance(refs, list):
         raise CloseContractError(f"Final gate Card {card_id!r} has no review_attempts array")
 
-    attempts: list[dict] = []
+    listed_paths: list[str] = []
     for index, ref in enumerate(refs):
         label = f"final gate review_attempts[{index}]"
         try:
-            attempt_path = validate_locator(
-                ref, "review_attempt", label, workstream_id
+            listed_paths.append(
+                validate_locator(ref, "review_attempt", label, workstream_id)
             )
         except ValidationError as exc:
-            raise CloseContractError(f"Final gate review attempt locator invalid: {exc}") from exc
-        try:
-            attempts.append(_read_project_toml(root, attempt_path, "review attempt"))
-        except CloseContractError as exc:
             raise CloseContractError(
-                f"Final gate cannot read durable review attempt {attempt_path!r}: {exc}"
+                f"Final gate review attempt locator invalid: {exc}"
             ) from exc
+    if len(set(listed_paths)) != len(listed_paths):
+        dupes = sorted({path for path in listed_paths if listed_paths.count(path) > 1})
+        raise CloseContractError(
+            "Final gate Board lists duplicate review attempt locator(s): "
+            + ", ".join(dupes)
+        )
+
+    durable = _derive_durable_review_inventory(root, workstream_id, card_id)
+    omitted = sorted(set(durable) - set(listed_paths))
+    if omitted:
+        raise CloseContractError(
+            "Final gate Board omits durable review attempt(s): "
+            + ", ".join(omitted)
+            + "; review history is append-only and Board locators must cover "
+            "the complete durable inventory derived from worktree and Git state"
+        )
+
+    repository: str | None = None
+    if refs:
+        repository = _resolve_project_repository(root, project_repository)
+        if repository is None:
+            raise CloseContractError(
+                "Final gate exact review attempt identity requires project "
+                "repository; pass project_repository or provide a valid PROJECT.md"
+            )
+
+    attempts: list[dict] = []
+    for index, ref in enumerate(refs):
+        label = f"final gate review_attempts[{index}]"
+        assert repository is not None
+        try:
+            attempt, _, _ = verify_review_attempt_locator(
+                project_root=root,
+                project_repository=repository,
+                workstream_id=workstream_id,
+                card_id=card_id,
+                ref=ref,
+                label=label,
+            )
+        except ReviewAttemptProvenanceError as exc:
+            raise CloseContractError(
+                f"Final gate review attempt identity failed: {exc}"
+            ) from exc
+        if "review_kind" not in attempt and attempt.get("verdict") in {
+            "green",
+            "red",
+        }:
+            try:
+                verify_legacy_migration(
+                    project_root=root,
+                    project_repository=repository,
+                    workstream_id=workstream_id,
+                    card_id=card_id,
+                    attempt=attempt,
+                    label=label,
+                )
+            except ReviewAttemptProvenanceError as exc:
+                raise CloseContractError(
+                    f"Final gate legacy review attempt provenance failed: {exc}"
+                ) from exc
+        attempts.append(attempt)
 
     if attempts:
         try:
@@ -598,6 +800,18 @@ def verify_final_observation_reconciliation_from_board(
         except ValidationError as exc:
             raise CloseContractError(
                 f"Final gate durable review history invalid: {exc}"
+            ) from exc
+        try:
+            verify_terminal_append_only_from_git(
+                project_root=root,
+                workstream_id=workstream_id,
+                card_id=card_id,
+                attempts=attempts,
+                label="final gate review history",
+            )
+        except ReviewAttemptProvenanceError as exc:
+            raise CloseContractError(
+                f"Final gate durable review history is not append-only: {exc}"
             ) from exc
 
     return verify_final_observation_reconciliation(

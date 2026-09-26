@@ -588,7 +588,7 @@ def _history_commits_for_path(
 ) -> list[str]:
     try:
         completed = subprocess.run(
-            ["git", "-C", str(project_root), "log", "--format=%H", "HEAD", "--", path],
+            ["git", "-C", str(project_root), "log", "--full-history", "--format=%H", "HEAD", "--", path],
             capture_output=True,
             text=True,
             check=False,
@@ -623,10 +623,11 @@ def verify_terminal_append_only_from_git(
 ) -> list[str]:
     """Freeze terminal attempt bytes against actual durable Git history.
 
-    For every current attempt, walk the attempt path's ``HEAD`` history and
-    require each historical terminal (green/red) version to match the current
-    attempt's durable content (legacy provenance itself excluded, because
-    migration only adds it). A same-ID RED-to-GREEN flip — or any other silent
+    For every current attempt, walk the attempt path's ``HEAD`` history with
+    full history (merged side-branch versions included) and require each
+    historical terminal (green/red) version to match the current attempt's
+    durable content (legacy provenance itself excluded, because migration
+    only adds it). A same-ID RED-to-GREEN flip — or any other silent
     terminal mutation — fails closed even when the Board locator was rebound
     to the rewritten commit/blob. Historical pending/in_progress versions
     impose no constraint, so the legitimate pending/in_progress-to-terminal
