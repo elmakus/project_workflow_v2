@@ -20,6 +20,10 @@ A clean textual merge is never sufficient semantic-compatibility proof.
 
 Production deterministic helper: tools/close_contract.py.
 
+## Returned handoff terminals
+
+A `returned` Card is a non-GREEN late-oversize handoff disposition, never accepted completion. When the board is all-terminal with at least one `returned` Card, the router walks every bound residual outcome through anchor sizing-audit allocations, JIT-trigger resolutions, and chained handoffs: Close is reached only when each outcome terminates in an accepted (`done`) downstream Card. Any gap — uncovered or changed outcome, unmaterialized or unbound trigger, dropped chained scope, or circular handoff — routes back to a concrete Execution Prep obligation instead. A `returned` Card alone, or beside one arbitrary `done` Card, never completes approved scope.
+
 ## Stacked workstreams
 
 Stacking exists only for a genuine unmerged parent-only dependency.
@@ -63,6 +67,14 @@ If a source ref survives and later cleanup is needed, use the minimal `safe_to_d
 A terminal unmerged/superseded workstream must preserve its recovery/history package independently of the source ref before cleanup, but rejected implementation content must not be imported into the integration target merely to preserve metadata.
 
 Production deterministic helpers in `tools/close_contract.py` verify target-package completeness and exact merge identity, safe-delete head freshness/absence readback, and terminal-unmerged history separation.
+
+## Pre-Final observation reconciliation and bounded cleanup
+
+Before Final Integration may complete, every still-open non-load-bearing observation must be reconciled to exactly one terminal disposition: `resolved`, `cleanup_candidate`, `deferred`, `promoted` or `tracked`. The authoritative gate derives the complete review-attempt inventory from durable Git/workstream state (worktree reviews directory plus required HEAD and history reads), requires the Board to list every durable attempt, proves every listed locator through exact RF007/T11 Git identity and legacy provenance, reads and validates each attempt file, freezes terminal bytes against Git history, and derives the canonical observation set itself: an unreadable Git inventory, a path-only relied-upon locator, an omitted durable attempt, a duplicated locator, an omitted known observation, a fabricated unknown one, a relabeled derived disposition, or a dangling or stale attempt locator all fail against durable truth. Only a workstream with a Git-verified empty durable inventory may reconcile vacuously; a Board that lists no attempts while durable state holds an attempt fails as truncated. A separate relative-consistency helper checks a proposed set against caller-supplied history or a snapshot, but proves nothing about the completeness of its own inputs and must not substitute for the board-bound gate where durable state is available. GitHub Issues/trackers may receive intentionally exported follow-up work but remain optional bookkeeping and never become the primary canonical observation store or workflow authority.
+
+Concrete bounded safe in-scope cleanup candidates are grouped into the smallest meaningful cleanup work with its own exact subject, tests/evidence and independent review. Each cleanup candidate must be covered by a completed independently GREEN-reviewed cleanup work before Final Integration evaluates the final codebase, and the Final gate itself validates each covering work's exact subject, tests/evidence, bounded scope and GREEN independent review; bare boolean claims, speculative redesign and new product scope cannot pass. Cleanup admits no speculative redesign or new product scope, and it does not recursively stay open merely because further advisory improvement is conceivable: once the bounded work is complete and reviewed, reconciliation terminates.
+
+Production deterministic helpers: `tools/close_contract.py` (`verify_final_observation_reconciliation_from_board`, `verify_final_observation_reconciliation`, `validate_cleanup_work`).
 
 ## Trigger-only downstream fork publication
 

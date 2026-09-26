@@ -11,3 +11,12 @@ response_observed = false
 alignment_state = "pending"
 alignment_subject = ""
 micro_fix_candidate = false
+# When a diagnosis prior-art binding is persisted, also record its exact
+# consumed-Research proof locator (RF007 Git identity of the consumed
+# RESEARCH.toml blob); omit the table while no binding is persisted.
+# [diagnosis_prior_art_proof]
+# class = "research"
+# repository = "owner/repo"
+# commit = "<40-hex>"
+# path = "implementation/workstreams/example-workstream/RESEARCH.toml"
+# blob = "<40-hex>"

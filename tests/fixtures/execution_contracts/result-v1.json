@@ -1,0 +1,37 @@
+{
+  "kind": "pwv2_execution_result",
+  "schema_version": 1,
+  "obligation_id": "sha256:5ba6a5fbe7c5dc2a5740ab698641d800e7f9b3546aeee648fbe59518f4505481",
+  "freshness_fingerprint": "sha256:8065e976982799ab7fec91036d479e31053ae8811c5ca8a3f40e319ea564ca36",
+  "status": "success",
+  "subject": {
+    "repository": "owner/project",
+    "commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "path": "implementation/cards/M02-T01.md",
+    "blob": "cccccccccccccccccccccccccccccccccccccccc"
+  },
+  "result_subject": {
+    "repository": "owner/project",
+    "commit": "dddddddddddddddddddddddddddddddddddddddd"
+  },
+  "changed_artifacts": [],
+  "tests": [
+    {
+      "name": "contract suite",
+      "status": "green",
+      "evidence": "evidence/M02.md"
+    }
+  ],
+  "evidence": [
+    "evidence/M02.md"
+  ],
+  "readback": [
+    {
+      "target": "Task Board",
+      "status": "verified",
+      "observation": "exact postcondition present"
+    }
+  ],
+  "blocker": null,
+  "semantic_outcome": "M02 contract complete"
+}

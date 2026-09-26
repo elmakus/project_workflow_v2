@@ -573,6 +573,35 @@ def _normalized_review_attempts(
                 "basis": basis,
             },
         }
+        if verdict in {"pending", "in_progress"}:
+            # A migrated active attempt is newly materialized V2 state, not historical
+            # terminal review history, so bind it to the explicit PWv2.1 discovery
+            # contract rather than relying on the legacy compatibility projection.
+            attempt.update({
+                "review_kind": "discovery",
+                "source_discovery_attempt": "",
+                "discovery_complete": False,
+                "material_finding_ids": [],
+                "review_scope": "card",
+                "review_epoch": "E01",
+                "epoch_reset_basis": "",
+                "material_defect_class_ids": [],
+                "failed_material_defect_class_ids": [],
+                "post_convergence_validation": False,
+                "convergence_basis": "",
+            })
+        else:
+            # RF006: dry-run cannot prove the immutable source attempt behind
+            # V1 terminal history (no Git readback here, and no source TOML
+            # exists in the V1 YAML source), so it must not manufacture source
+            # Git identities. Fail closed: the Card blocks until exact legacy
+            # migration proof is established at materialization time.
+            return [], [], (
+                f"review proof {attempt_id}: V1 terminal verdict {verdict!r} "
+                "cannot be reused without exact legacy migration proof bound "
+                "to the immutable source attempt; dry-run manufactures no "
+                "Git provenance"
+            )
         attempts.append(attempt)
         refs.append({
             "class": "review_attempt",

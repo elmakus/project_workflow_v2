@@ -31,6 +31,34 @@ VALID = ROOT / "tests" / "fixtures" / "state" / "valid"
 INVALID = ROOT / "tests" / "fixtures" / "state" / "invalid"
 
 
+def _severity(*finding_ids: str) -> list[dict[str, str]]:
+    return [
+        {"id": finding_id, "surface": "correctness", "evidence": f"evidence/review-R01.md#{finding_id}"}
+        for finding_id in finding_ids
+    ]
+
+
+def _legacy_provenance(
+    workstream_id: str, card_id: str, attempt_id: str
+) -> dict[str, str]:
+    """Return shape-valid legacy migration provenance for history tests.
+
+    Shape-only validation never touches Git; serving-boundary tests prove the
+    exact source through the shared RF007 resolver separately.
+    """
+    return {
+        "source_repository": "owner/fixture-project",
+        "source_commit": "a" * 40,
+        "source_path": (
+            f"implementation/workstreams/{workstream_id}/reviews/{card_id}-{attempt_id}.toml"
+        ),
+        "source_blob": "b" * 40,
+        "source_workstream": workstream_id,
+        "source_card": card_id,
+        "source_attempt": attempt_id,
+    }
+
+
 class StateEnvelopeTests(unittest.TestCase):
     def setUp(self) -> None:
         self.workstream = read_toml(VALID / "WORKSTREAM.toml")
@@ -153,11 +181,28 @@ class StateEnvelopeTests(unittest.TestCase):
     def test_review_terminal_evidence_and_append_only_history(self) -> None:
         base = read_toml(VALID / "REVIEW_ATTEMPT.toml")
         validate_review(base)
+        base.update({
+            "workstream_id": "sample-workstream",
+            "card_id": "M01-T01",
+            "legacy_migration": _legacy_provenance("sample-workstream", "M01-T01", "R01"),
+        })
+        validate_review(base)
 
         pending = copy.deepcopy(base)
+        pending.pop("legacy_migration", None)
         pending["attempt"] = "R02"
         pending["verdict"] = "pending"
         pending["evidence_path"] = ""
+        pending["review_kind"] = "discovery"
+        pending["source_discovery_attempt"] = ""
+        pending["discovery_complete"] = False
+        pending["material_finding_ids"] = []
+        pending["review_scope"] = "card"
+        pending["review_epoch"] = "E01"
+        pending["epoch_reset_basis"] = ""
+        pending["material_defect_class_ids"] = []
+        pending["post_convergence_validation"] = False
+        pending["convergence_basis"] = ""
         pending["subject"]["blob"] = "4" * 40
         validate_review_history([base, pending])
 
@@ -170,6 +215,586 @@ class StateEnvelopeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "terminal verdict"):
             validate_review(terminal_without_evidence)
 
+    def test_pw21_discovery_and_closure_history_is_explicit_and_bounded(self) -> None:
+        base = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        base.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": ["F1", "F2"],
+            "finding_severity": _severity("F1", "F2"),
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": ["class-a", "class-b"],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "verdict": "red",
+        })
+        validate_review(base)
+
+        closure = copy.deepcopy(base)
+        closure.update({
+            "attempt": "R02",
+            "review_kind": "closure_verification",
+            "source_discovery_attempt": "R01",
+            "discovery_complete": False,
+            "material_finding_ids": ["F1"],
+            "material_defect_class_ids": ["class-a"],
+            "verdict": "green",
+        })
+        closure.pop("finding_severity", None)
+        closure["subject"]["blob"] = "4" * 40
+        validate_review_history([base, closure])
+
+        premature_discovery = copy.deepcopy(base)
+        premature_discovery.update({
+            "attempt": "R03",
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": False,
+            "material_finding_ids": [],
+            "material_defect_class_ids": [],
+            "verdict": "pending",
+            "evidence_path": "",
+        })
+        premature_discovery.pop("finding_severity", None)
+        premature_discovery["subject"]["blob"] = "4" * 40
+        with self.assertRaisesRegex(ValidationError, "before all known material findings"):
+            validate_review_history([base, closure, premature_discovery])
+
+        closure_two = copy.deepcopy(closure)
+        closure_two.update({
+            "attempt": "R03",
+            "material_finding_ids": ["F2"],
+            "material_defect_class_ids": ["class-b"],
+        })
+        validate_review_history([base, closure, closure_two])
+
+        next_discovery = copy.deepcopy(premature_discovery)
+        next_discovery["attempt"] = "R04"
+        validate_review_history([base, closure, closure_two, next_discovery])
+
+        unknown_source = copy.deepcopy(closure)
+        unknown_source["source_discovery_attempt"] = "R99"
+        with self.assertRaisesRegex(ValidationError, "earlier attempt"):
+            validate_review_history([base, unknown_source])
+
+        foreign_finding = copy.deepcopy(closure)
+        foreign_finding["material_finding_ids"] = ["F3"]
+        with self.assertRaisesRegex(ValidationError, "only findings frozen"):
+            validate_review_history([base, foreign_finding])
+
+        incomplete_discovery = copy.deepcopy(base)
+        incomplete_discovery["discovery_complete"] = False
+        with self.assertRaisesRegex(ValidationError, "complete acceptance-surface"):
+            validate_review(incomplete_discovery)
+
+        green_with_blocker = copy.deepcopy(base)
+        green_with_blocker["verdict"] = "green"
+        with self.assertRaisesRegex(ValidationError, "cannot retain material blocking"):
+            validate_review(green_with_blocker)
+
+        legacy_active = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        legacy_active["verdict"] = "pending"
+        legacy_active["evidence_path"] = ""
+        with self.assertRaisesRegex(ValidationError, "explicit review_kind"):
+            validate_review_history([legacy_active])
+
+        historical = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        historical.update({
+            "workstream_id": "sample-workstream",
+            "card_id": "M01-T01",
+            "legacy_migration": _legacy_provenance("sample-workstream", "M01-T01", "R01"),
+        })
+        explicit_after_history = copy.deepcopy(historical)
+        explicit_after_history.pop("legacy_migration", None)
+        explicit_after_history.update({
+            "attempt": "R02",
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": False,
+            "material_finding_ids": [],
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": [],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "verdict": "pending",
+            "evidence_path": "",
+        })
+        validate_review_history([historical, explicit_after_history])
+
+        legacy_after_explicit = copy.deepcopy(historical)
+        legacy_after_explicit["attempt"] = "R03"
+        legacy_after_explicit["legacy_migration"] = _legacy_provenance(
+            "sample-workstream", "M01-T01", "R03"
+        )
+        explicit_terminal = copy.deepcopy(explicit_after_history)
+        explicit_terminal.update({
+            "verdict": "green",
+            "discovery_complete": True,
+            "evidence_path": historical["evidence_path"],
+        })
+        with self.assertRaisesRegex(ValidationError, "initial historical prefix"):
+            validate_review_history([historical, explicit_terminal, legacy_after_explicit])
+
+    def test_red_closure_records_only_the_classes_that_remained_blocking(self) -> None:
+        source = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        source.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": ["F1", "F2"],
+            "finding_severity": _severity("F1", "F2"),
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": ["class-a", "class-b"],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "verdict": "red",
+        })
+        closure = copy.deepcopy(source)
+        closure.update({
+            "attempt": "R02",
+            "review_kind": "closure_verification",
+            "source_discovery_attempt": "R01",
+            "discovery_complete": False,
+            "material_finding_ids": ["F1", "F2"],
+            "material_defect_class_ids": ["class-a", "class-b"],
+            "failed_material_defect_class_ids": ["class-b"],
+            "verdict": "red",
+        })
+        closure["subject"]["commit"] = "4" * 40
+        closure["subject"]["blob"] = "5" * 40
+        validate_review_history([source, closure])
+
+        missing = copy.deepcopy(closure)
+        missing.pop("failed_material_defect_class_ids")
+        with self.assertRaisesRegex(ValidationError, "failed_material_defect_class_ids"):
+            validate_review_history([source, missing])
+
+        foreign_class = copy.deepcopy(closure)
+        foreign_class["failed_material_defect_class_ids"] = ["class-c"]
+        with self.assertRaisesRegex(ValidationError, "subset"):
+            validate_review_history([source, foreign_class])
+
+    def test_review_epoch_reset_requires_material_accepted_redesign_basis(self) -> None:
+        base = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        base.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": ["F1"],
+            "finding_severity": _severity("F1"),
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": ["class-a"],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "verdict": "red",
+        })
+
+        reset = copy.deepcopy(base)
+        reset.update({
+            "attempt": "R02",
+            "review_epoch": "E02",
+            "material_finding_ids": [],
+            "material_defect_class_ids": [],
+            "discovery_complete": False,
+            "verdict": "pending",
+            "evidence_path": "",
+        })
+        reset.pop("finding_severity", None)
+        reset["subject"]["commit"] = "4" * 40
+        reset["subject"]["blob"] = "4" * 40
+        with self.assertRaisesRegex(ValidationError, "changed review_epoch requires"):
+            validate_review_history([base, reset])
+
+        reset["epoch_reset_basis"] = "repair convenience is not a redesign"
+        reset["epoch_reset_subject"] = {
+            "class": "accepted_redesign",
+            "repository": "owner/fixture-project",
+            "commit": "4" * 40,
+            "path": "implementation/workstreams/sample-workstream/results/M03-T03.md",
+            "blob": "5" * 40,
+        }
+        with self.assertRaisesRegex(ValidationError, "accepted authority or acceptance redesign"):
+            validate_review_history([base, reset])
+
+        reset["epoch_reset_basis"] = (
+            "Accepted authority/acceptance redesign revision R4 replaces the prior epoch."
+        )
+        reset["epoch_reset_subject"]["path"] = reset["acceptance"]["path"]
+
+        with self.assertRaisesRegex(ValidationError, "exact Git readback"):
+            validate_review_history(
+                [base, reset],
+                exact_blob_reader=lambda repository, commit, path: None,
+            )
+
+        acceptance_path = reset["acceptance"]["path"]
+        valid_blobs = {
+            ("owner/fixture-project", "4" * 40, acceptance_path): "5" * 40,
+            ("owner/fixture-project", "2" * 40, acceptance_path): "6" * 40,
+        }
+        reader = lambda repository, commit, path: valid_blobs.get((repository, commit, path))
+        validate_review_history([base, reset], exact_blob_reader=reader)
+
+        unchanged_blobs = dict(valid_blobs)
+        unchanged_blobs[("owner/fixture-project", "2" * 40, acceptance_path)] = "5" * 40
+        with self.assertRaisesRegex(ValidationError, "material accepted redesign"):
+            validate_review_history(
+                [base, reset],
+                exact_blob_reader=lambda repository, commit, path: unchanged_blobs.get(
+                    (repository, commit, path)
+                ),
+            )
+
+        foreign_repository = copy.deepcopy(reset)
+        foreign_repository["epoch_reset_subject"]["repository"] = "other/repository"
+        with self.assertRaisesRegex(ValidationError, "reviewed project repository"):
+            validate_review_history([base, foreign_repository], exact_blob_reader=reader)
+
+        arbitrary_authority_root = copy.deepcopy(reset)
+        arbitrary_authority_root["epoch_reset_subject"]["path"] = "requirements/UNACCEPTED_DRAFT.md"
+        with self.assertRaisesRegex(ValidationError, "exact accepted authority"):
+            validate_review_history([base, arbitrary_authority_root], exact_blob_reader=reader)
+
+        accepted_authority = copy.deepcopy(arbitrary_authority_root)
+        accepted_authority["epoch_reset_subject"]["path"] = "requirements/ACCEPTED.md"
+        authority_path = accepted_authority["epoch_reset_subject"]["path"]
+        authority_blobs = {
+            ("owner/fixture-project", "4" * 40, authority_path): "5" * 40,
+            ("owner/fixture-project", "2" * 40, authority_path): "6" * 40,
+        }
+        validate_review_history(
+            [base, accepted_authority],
+            accepted_authority_paths={authority_path},
+            exact_blob_reader=lambda repository, commit, path: authority_blobs.get(
+                (repository, commit, path)
+            ),
+        )
+
+        same_epoch_claim = copy.deepcopy(base)
+        same_epoch_claim.update({
+            "attempt": "R02",
+            "epoch_reset_basis": "repair convenience is not a redesign",
+            "epoch_reset_subject": copy.deepcopy(reset["epoch_reset_subject"]),
+            "material_finding_ids": [],
+            "material_defect_class_ids": [],
+            "discovery_complete": False,
+            "verdict": "pending",
+            "evidence_path": "",
+        })
+        same_epoch_claim.pop("finding_severity", None)
+        same_epoch_claim["subject"]["blob"] = "4" * 40
+        with self.assertRaisesRegex(ValidationError, "unchanged review_epoch"):
+            validate_review_history([base, same_epoch_claim])
+
+    def test_post_convergence_validation_requires_threshold_and_is_single(self) -> None:
+        attempts = []
+        for index in range(5):
+            discovery = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+            discovery.update({
+                "attempt": f"R{index * 2 + 1:02d}",
+                "review_kind": "discovery",
+                "source_discovery_attempt": "",
+                "discovery_complete": True,
+                "material_finding_ids": [f"F{index}"],
+                "finding_severity": _severity(f"F{index}"),
+                "review_scope": "card",
+                "review_epoch": "E01",
+                "epoch_reset_basis": "",
+                "material_defect_class_ids": [f"class-{index}"],
+                "post_convergence_validation": False,
+                "convergence_basis": "",
+                "verdict": "red",
+            })
+            discovery["subject"]["blob"] = chr(ord("4") + index) * 40
+            attempts.append(discovery)
+            closure = copy.deepcopy(discovery)
+            closure.update({
+                "attempt": f"R{index * 2 + 2:02d}",
+                "review_kind": "closure_verification",
+                "source_discovery_attempt": discovery["attempt"],
+                "discovery_complete": False,
+                "verdict": "green",
+            })
+            attempts.append(closure)
+
+        post = copy.deepcopy(attempts[-1])
+        post.update({
+            "attempt": "R11",
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": False,
+            "material_finding_ids": [],
+            "material_defect_class_ids": [],
+            "post_convergence_validation": True,
+            "convergence_basis": "Main convergence/root-cause analysis C01",
+            "verdict": "pending",
+            "evidence_path": "",
+        })
+        post.pop("finding_severity", None)
+        validate_review_history(attempts + [post])
+
+        terminal_post = copy.deepcopy(post)
+        terminal_post.update({
+            "verdict": "green",
+            "discovery_complete": True,
+            "evidence_path": attempts[0]["evidence_path"],
+        })
+        second = copy.deepcopy(post)
+        second["attempt"] = "R12"
+        with self.assertRaisesRegex(ValidationError, "terminal post-convergence|only one post-convergence"):
+            validate_review_history(attempts + [terminal_post, second])
+
+    def test_convergence_aware_closure_can_adapt_open_t01_discovery(self) -> None:
+        source = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        source.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": ["F1"],
+            "finding_severity": _severity("F1"),
+            "verdict": "red",
+        })
+        closure = copy.deepcopy(source)
+        closure.update({
+            "attempt": "R02",
+            "review_kind": "closure_verification",
+            "source_discovery_attempt": "R01",
+            "discovery_complete": False,
+            "material_finding_ids": ["F1"],
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": ["class-a"],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "verdict": "green",
+        })
+        closure["subject"]["blob"] = "4" * 40
+        validate_review_history([source, closure])
+
+    def test_preconvergence_closure_cannot_cross_later_epoch_reset(self) -> None:
+        source = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        source.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": ["F1"],
+            "finding_severity": _severity("F1"),
+            "verdict": "red",
+        })
+
+        initial_closure = copy.deepcopy(source)
+        initial_closure.update({
+            "attempt": "R02",
+            "review_kind": "closure_verification",
+            "source_discovery_attempt": "R01",
+            "discovery_complete": False,
+            "material_finding_ids": ["F1"],
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": ["class-a"],
+            "failed_material_defect_class_ids": [],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "verdict": "green",
+        })
+        initial_closure["subject"]["blob"] = "4" * 40
+
+        reset_closure = copy.deepcopy(initial_closure)
+        reset_closure.update({
+            "attempt": "R03",
+            "review_epoch": "E02",
+            "epoch_reset_basis": "Accepted authority redesign R2 establishes a new review epoch.",
+            "epoch_reset_subject": {
+                "class": "accepted_redesign",
+                "repository": "owner/fixture-project",
+                "commit": "5" * 40,
+                "path": source["acceptance"]["path"],
+                "blob": "7" * 40,
+            },
+            "failed_material_defect_class_ids": ["class-a"],
+            "verdict": "red",
+        })
+        reset_closure["subject"]["commit"] = "5" * 40
+        reset_closure["subject"]["blob"] = "6" * 40
+
+        reset_path = source["acceptance"]["path"]
+        reset_blobs = {
+            ("owner/fixture-project", "5" * 40, reset_path): "7" * 40,
+            ("owner/fixture-project", initial_closure["subject"]["commit"], reset_path): "8" * 40,
+        }
+        with self.assertRaisesRegex(
+            ValidationError,
+            "initial convergence-aware epoch",
+        ):
+            validate_review_history(
+                [source, initial_closure, reset_closure],
+                exact_blob_reader=lambda repository, commit, path: reset_blobs.get(
+                    (repository, commit, path)
+                ),
+            )
+
+    def test_terminal_post_convergence_red_forbids_same_epoch_review_continuation(self) -> None:
+        attempts = []
+        for index in range(5):
+            discovery = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+            discovery.update({
+                "attempt": f"R{index * 2 + 1:02d}",
+                "review_kind": "discovery",
+                "source_discovery_attempt": "",
+                "discovery_complete": True,
+                "material_finding_ids": [f"F{index}"],
+                "finding_severity": _severity(f"F{index}"),
+                "review_scope": "card",
+                "review_epoch": "E01",
+                "epoch_reset_basis": "",
+                "material_defect_class_ids": [f"class-{index}"],
+                "post_convergence_validation": False,
+                "convergence_basis": "",
+                "verdict": "red",
+            })
+            discovery["subject"]["blob"] = chr(ord("4") + index) * 40
+            attempts.append(discovery)
+            closure = copy.deepcopy(discovery)
+            closure.update({
+                "attempt": f"R{index * 2 + 2:02d}",
+                "review_kind": "closure_verification",
+                "source_discovery_attempt": discovery["attempt"],
+                "discovery_complete": False,
+                "verdict": "green",
+            })
+            attempts.append(closure)
+
+        post_red = copy.deepcopy(attempts[-1])
+        post_red.update({
+            "attempt": "R11",
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": ["F-post"],
+            "finding_severity": _severity("F-post"),
+            "material_defect_class_ids": ["class-post"],
+            "post_convergence_validation": True,
+            "convergence_basis": "Main convergence/root-cause analysis C01",
+            "verdict": "red",
+        })
+        attempts.append(post_red)
+        validate_review_history(attempts)
+
+        forbidden = copy.deepcopy(post_red)
+        forbidden.update({
+            "attempt": "R12",
+            "review_kind": "closure_verification",
+            "source_discovery_attempt": "R11",
+            "discovery_complete": False,
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "verdict": "green",
+        })
+        with self.assertRaisesRegex(ValidationError, "terminal post-convergence"):
+            validate_review_history(attempts + [forbidden])
+
+        new_epoch = copy.deepcopy(post_red)
+        new_epoch.pop("finding_severity", None)
+        new_epoch.update({
+            "attempt": "R12",
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": False,
+            "material_finding_ids": [],
+            "review_epoch": "E02",
+            "epoch_reset_basis": "Accepted structural redesign R5 establishes a new acceptance epoch.",
+            "epoch_reset_subject": {
+                "class": "accepted_redesign",
+                "repository": "owner/fixture-project",
+                "commit": "8" * 40,
+                "path": post_red["acceptance"]["path"],
+                "blob": "9" * 40,
+            },
+            "material_defect_class_ids": [],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "verdict": "pending",
+            "evidence_path": "",
+        })
+        new_epoch["subject"]["commit"] = "8" * 40
+        reset_path = new_epoch["epoch_reset_subject"]["path"]
+        reset_blobs = {
+            ("owner/fixture-project", "8" * 40, reset_path): "9" * 40,
+            ("owner/fixture-project", post_red["subject"]["commit"], reset_path): "7" * 40,
+        }
+        validate_review_history(
+            attempts + [new_epoch],
+            exact_blob_reader=lambda repository, commit, path: reset_blobs.get(
+                (repository, commit, path)
+            ),
+        )
+
+    def test_review_epoch_identity_cannot_be_reused_after_reset(self) -> None:
+        first = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        first.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": [],
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": [],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "verdict": "green",
+        })
+        second = copy.deepcopy(first)
+        second.update({
+            "attempt": "R02",
+            "review_epoch": "E02",
+            "epoch_reset_basis": "Accepted redesign R2",
+            "epoch_reset_subject": {
+                "class": "accepted_redesign",
+                "repository": "owner/fixture-project",
+                "commit": "6" * 40,
+                "path": first["acceptance"]["path"],
+                "blob": "7" * 40,
+            },
+        })
+        second["subject"]["commit"] = "6" * 40
+        reset_path = second["epoch_reset_subject"]["path"]
+        reset_blobs = {
+            ("owner/fixture-project", "6" * 40, reset_path): "7" * 40,
+            ("owner/fixture-project", "2" * 40, reset_path): "5" * 40,
+        }
+
+        third = copy.deepcopy(first)
+        third.update({
+            "attempt": "R03",
+            "epoch_reset_basis": "Accepted redesign R3",
+            "epoch_reset_subject": {
+                "class": "accepted_redesign",
+                "repository": "owner/fixture-project",
+                "commit": "8" * 40,
+                "path": first["acceptance"]["path"],
+                "blob": "9" * 40,
+            },
+        })
+        with self.assertRaisesRegex(ValidationError, "cannot be reused"):
+            validate_review_history(
+                [first, second, third],
+                exact_blob_reader=lambda repository, commit, path: reset_blobs.get(
+                    (repository, commit, path)
+                ),
+            )
+
     def test_task_card_review_acceptance_is_exact_and_semantic(self) -> None:
         review = {
             "workstream_id": "sample-workstream",
@@ -177,6 +802,16 @@ class StateEnvelopeTests(unittest.TestCase):
             "attempt": "R01",
             "verdict": "pending",
             "evidence_path": "",
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": False,
+            "material_finding_ids": [],
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": [],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
             "subject": {
                 "class": "git_blob",
                 "repository": "owner/repo",
@@ -205,6 +840,182 @@ class StateEnvelopeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "not semantically independent"):
             validate_review(self_review)
 
+    def test_h005_task_card_acceptance_shape_is_exact(self) -> None:
+        base = {
+            "workstream_id": "sample-workstream",
+            "card_id": "M03-T03",
+            "attempt": "R01",
+            "verdict": "pending",
+            "evidence_path": "",
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": False,
+            "material_finding_ids": [],
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": [],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "subject": {
+                "class": "git_blob",
+                "repository": "owner/repo",
+                "commit": "a" * 40,
+                "path": "workflow/STATE.md",
+                "blob": "b" * 40,
+            },
+            "acceptance": {
+                "class": "task_card",
+                "path": "implementation/workstreams/sample-workstream/cards/M03-T03.md",
+                "commit": "c" * 40,
+                "blob": "d" * 40,
+            },
+            "independence": {
+                "materially_produced_or_repaired_subject": False,
+                "basis": "Reviewer did not materially produce or repair the exact subject.",
+            },
+        }
+        validate_review(base)
+        validate_review_history(
+            [base],
+            expected_card_id="M03-T03",
+            workstream_id="sample-workstream",
+        )
+
+        # Path-only legacy shape stays shape-valid; the serving boundary
+        # requires exact identity separately.
+        legacy = copy.deepcopy(base)
+        del legacy["acceptance"]["commit"]
+        del legacy["acceptance"]["blob"]
+        validate_review(legacy)
+
+        for bad_path in (
+            "implementation/workstreams/sample-workstream/cards/archive/M03-T03.md",
+            "implementation/workstreams/sample-workstream/cards/M03-T99.md",
+        ):
+            with self.subTest(path=bad_path):
+                candidate = copy.deepcopy(base)
+                candidate["acceptance"]["path"] = bad_path
+                with self.assertRaisesRegex(ValidationError, "exact Card path"):
+                    validate_review(candidate)
+
+        unknown = copy.deepcopy(base)
+        unknown["acceptance"]["note"] = "bogus"
+        with self.assertRaisesRegex(ValidationError, "unknown field"):
+            validate_review(unknown)
+
+        half = copy.deepcopy(base)
+        del half["acceptance"]["blob"]
+        with self.assertRaisesRegex(ValidationError, "commit \\+ blob"):
+            validate_review(half)
+
+        malformed = copy.deepcopy(base)
+        malformed["acceptance"]["blob"] = "not-hex"
+        with self.assertRaisesRegex(ValidationError, "commit \\+ blob"):
+            validate_review(malformed)
+
+        authority = copy.deepcopy(base)
+        authority["acceptance"] = {"class": "authority", "path": "requirements/REQUIREMENTS.md"}
+        validate_review(authority)
+        with self.assertRaisesRegex(ValidationError, "must bind the exact selected Task Card"):
+            validate_review_history(
+                [authority],
+                expected_card_id="M03-T03",
+                workstream_id="sample-workstream",
+            )
+
+        board = read_toml(VALID / "TASK_BOARD.toml")
+        board["cards"][1]["contract"]["path"] = (
+            "implementation/workstreams/sample-workstream/cards/archive/M01-T02.md"
+        )
+        with self.assertRaisesRegex(ValidationError, "exact Card path"):
+            validate_board(board, self.workstream)
+
+    def test_card_owned_history_requires_card_review_scope(self) -> None:
+        review = {
+            "workstream_id": "sample-workstream",
+            "card_id": "M03-T03",
+            "attempt": "R01",
+            "verdict": "red",
+            "evidence_path": "evidence/review-R01.md",
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": ["F1"],
+            "finding_severity": _severity("F1"),
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": ["class-a"],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "subject": {
+                "class": "git_blob",
+                "repository": "owner/repo",
+                "commit": "a" * 40,
+                "path": "workflow/STATE.md",
+                "blob": "b" * 40,
+            },
+            "acceptance": {
+                "class": "task_card",
+                "path": "implementation/workstreams/sample-workstream/cards/M03-T03.md",
+            },
+            "independence": {
+                "materially_produced_or_repaired_subject": False,
+                "basis": "Reviewer did not materially produce or repair the exact subject.",
+            },
+        }
+        validate_review_history(
+            [review],
+            expected_card_id="M03-T03",
+            workstream_id="sample-workstream",
+        )
+        for wrong_scope in ("milestone", "final"):
+            with self.subTest(review_scope=wrong_scope):
+                wrong = copy.deepcopy(review)
+                wrong["review_scope"] = wrong_scope
+                with self.assertRaisesRegex(ValidationError, "does not match expected"):
+                    validate_review(wrong, expected_review_scope="card")
+                with self.assertRaisesRegex(ValidationError, "does not match expected"):
+                    validate_review_history(
+                        [wrong],
+                        expected_card_id="M03-T03",
+                        workstream_id="sample-workstream",
+                    )
+                with self.assertRaisesRegex(ValidationError, "does not match expected"):
+                    validate_review_history([wrong], expected_review_scope="card")
+
+    def test_expected_review_scope_seam_binds_milestone_and_final(self) -> None:
+        base = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        base.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": ["F1"],
+            "finding_severity": _severity("F1"),
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": ["class-a"],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "verdict": "red",
+        })
+        for scope in ("card", "milestone", "final"):
+            with self.subTest(scope=scope):
+                attempt = copy.deepcopy(base)
+                attempt["review_scope"] = scope
+                validate_review(attempt, expected_review_scope=scope)
+                validate_review_history([attempt], expected_review_scope=scope)
+                other = "final" if scope == "card" else "card"
+                mismatch = copy.deepcopy(base)
+                mismatch["review_scope"] = other
+                with self.assertRaisesRegex(ValidationError, "does not match expected"):
+                    validate_review(mismatch, expected_review_scope=scope)
+                with self.assertRaisesRegex(ValidationError, "does not match expected"):
+                    validate_review_history([mismatch], expected_review_scope=scope)
+        with self.assertRaisesRegex(ValidationError, "invalid expected_review_scope"):
+            validate_review_history([copy.deepcopy(base)], expected_review_scope="program")
+
     def test_issue_intake_alignment_is_exact_and_stale_subject_fails(self) -> None:
         intake = read_toml(VALID / "INTAKE.toml")
         validate_intake(intake, "sample-workstream")
@@ -217,6 +1028,7 @@ class StateEnvelopeTests(unittest.TestCase):
         missing_prior_art = copy.deepcopy(intake)
         missing_prior_art["diagnosis_prior_art_subject"] = ""
         missing_prior_art["diagnosis_prior_art_result"] = ""
+        missing_prior_art.pop("diagnosis_prior_art_proof")
         with self.assertRaisesRegex(ValidationError, "diagnosis prior-art"):
             validate_intake(missing_prior_art, "sample-workstream")
 
@@ -250,6 +1062,7 @@ class StateEnvelopeTests(unittest.TestCase):
             "alignment_subject": "",
             "micro_fix_candidate": False,
         })
+        intake.pop("diagnosis_prior_art_proof")
         validate_intake(intake, "sample-workstream")
         intake["alignment_state"] = "authorized"
         with self.assertRaisesRegex(ValidationError, "must not manufacture"):
@@ -481,19 +1294,198 @@ class StateEnvelopeTests(unittest.TestCase):
                 "basis": "Fresh semantic review context.",
             },
         }
-        validate_plan_review(review, "sample-workstream", planning)
+        definition = self.definition_record()
+        validate_plan_review(review, "sample-workstream", planning, definition)
 
         mismatch = copy.deepcopy(review)
         mismatch["subject"]["blob"] = "c" * 40
         with self.assertRaisesRegex(ValidationError, "does not match"):
-            validate_plan_review(mismatch, "sample-workstream", planning)
+            validate_plan_review(mismatch, "sample-workstream", planning, definition)
 
         green = copy.deepcopy(review)
         green["verdict"] = "green"
         with self.assertRaisesRegex(ValidationError, "evidence_path"):
-            validate_plan_review(green, "sample-workstream", planning)
+            validate_plan_review(green, "sample-workstream", planning, definition)
         green["evidence_path"] = "evidence/plan-review-R01.md"
-        validate_plan_review(green, "sample-workstream", planning)
+        validate_plan_review(green, "sample-workstream", planning, definition)
+
+    def test_plan_review_verdict_domain_is_pending_green_red_only(self) -> None:
+        # H007/RF005: Plan Review narrows the shared review verdict domain to
+        # pending/green/red; generic Card Review keeps in_progress separately.
+        planning = self.planning_record("frozen")
+        planning["premium_b"] = "satisfied"
+        review = {
+            "workstream_id": "sample-workstream",
+            "plan_revision": "P1",
+            "planning_cycle": 1,
+            "attempt": "R01",
+            "verdict": "pending",
+            "evidence_path": "",
+            "subject": {
+                "class": "git_blob",
+                "repository": "owner/repo",
+                "commit": "a" * 40,
+                "path": "planning/MASTER_PLAN.md",
+                "blob": "b" * 40,
+            },
+            "acceptance": {"class": "authority", "path": "requirements/REQUIREMENTS.md"},
+            "independence": {
+                "materially_produced_or_repaired_subject": False,
+                "basis": "Fresh semantic review context.",
+            },
+        }
+        definition = self.definition_record()
+        validate_plan_review(review, "sample-workstream", planning, definition)
+
+        for verdict in ("green", "red"):
+            terminal = copy.deepcopy(review)
+            terminal["verdict"] = verdict
+            terminal["evidence_path"] = "evidence/plan-review-R01.md"
+            validate_plan_review(terminal, "sample-workstream", planning, definition)
+
+        active = copy.deepcopy(review)
+        active["verdict"] = "in_progress"
+        with self.assertRaisesRegex(ValidationError, "plan_review: verdict"):
+            validate_plan_review(active, "sample-workstream", planning, definition)
+
+        unknown = copy.deepcopy(review)
+        unknown["verdict"] = "deferred"
+        with self.assertRaises(ValidationError):
+            validate_plan_review(unknown, "sample-workstream", planning, definition)
+
+        generic = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        generic["verdict"] = "in_progress"
+        generic["evidence_path"] = ""
+        validate_review(generic)
+
+    def definition_record(self) -> dict:
+        return {
+            "workstream_id": "sample-workstream",
+            "source_scope_subject": "scope-plan@1",
+            "revision": "R1",
+            "state": "green",
+            "completeness_audit": "green",
+            "premium_a": "satisfied",
+            "requirements": {"class": "authority", "path": "requirements/REQUIREMENTS.md"},
+            "decisions": [{"class": "authority", "path": "decisions/ADR-001.md"}],
+        }
+
+    def plan_review_record(self, acceptance: dict) -> tuple[dict, dict]:
+        planning = self.planning_record("frozen")
+        planning["premium_b"] = "satisfied"
+        review = {
+            "workstream_id": "sample-workstream",
+            "plan_revision": "P1",
+            "planning_cycle": 1,
+            "attempt": "R01",
+            "verdict": "green",
+            "evidence_path": "evidence/plan-review-R01.md",
+            "subject": {
+                "class": "git_blob",
+                "repository": "owner/repo",
+                "commit": "a" * 40,
+                "path": "planning/MASTER_PLAN.md",
+                "blob": "b" * 40,
+            },
+            "acceptance": acceptance,
+            "independence": {
+                "materially_produced_or_repaired_subject": False,
+                "basis": "Fresh semantic review context.",
+            },
+        }
+        return review, planning
+
+    def test_h006_plan_review_acceptance_must_be_definition_authority(self) -> None:
+        review, planning = self.plan_review_record(
+            {"class": "task_card",
+             "path": "implementation/workstreams/sample-workstream/cards/M01-T04.md"}
+        )
+        review["card_id"] = "M01-T04"
+        with self.assertRaisesRegex(
+            ValidationError, "acceptance must bind exact Definition authority"
+        ):
+            validate_plan_review(review, "sample-workstream", planning)
+        with self.assertRaisesRegex(
+            ValidationError, "acceptance must bind exact Definition authority"
+        ):
+            validate_plan_review(
+                review, "sample-workstream", planning, self.definition_record()
+            )
+
+    def test_h006_unrelated_sibling_acceptance_fails_closed(self) -> None:
+        definition = self.definition_record()
+        for unrelated in (
+            "workflow/ROUTER.md",
+            "decisions/ADR-002.md",
+            "requirements/archive/REQUIREMENTS.md",
+            "requirements/SWAPPED.md",
+            "planning/OTHER_PLAN.md",
+        ):
+            with self.subTest(path=unrelated):
+                review, planning = self.plan_review_record(
+                    {"class": "authority", "path": unrelated}
+                )
+                with self.assertRaisesRegex(
+                    ValidationError,
+                    "unrelated to the exact current Definition authority",
+                ):
+                    validate_plan_review(review, "sample-workstream", planning, definition)
+
+    def test_h006_exact_definition_members_pass(self) -> None:
+        definition = self.definition_record()
+        for member in ("requirements/REQUIREMENTS.md", "decisions/ADR-001.md"):
+            with self.subTest(path=member):
+                review, planning = self.plan_review_record(
+                    {"class": "authority", "path": member}
+                )
+                validate_plan_review(review, "sample-workstream", planning, definition)
+                exact = copy.deepcopy(review)
+                exact["acceptance"]["commit"] = "c" * 40
+                exact["acceptance"]["blob"] = "d" * 40
+                validate_plan_review(exact, "sample-workstream", planning, definition)
+
+    def test_h006_acceptance_identity_shape_is_exact(self) -> None:
+        definition = self.definition_record()
+        review, planning = self.plan_review_record(
+            {"class": "authority", "path": "requirements/REQUIREMENTS.md"}
+        )
+        half = copy.deepcopy(review)
+        half["acceptance"]["commit"] = "c" * 40
+        with self.assertRaisesRegex(ValidationError, "commit \\+ blob 40-hex"):
+            validate_plan_review(half, "sample-workstream", planning, definition)
+        malformed = copy.deepcopy(review)
+        malformed["acceptance"]["commit"] = "c" * 40
+        malformed["acceptance"]["blob"] = "not-hex"
+        with self.assertRaisesRegex(ValidationError, "commit \\+ blob 40-hex"):
+            validate_plan_review(malformed, "sample-workstream", planning, definition)
+        unknown = copy.deepcopy(review)
+        unknown["acceptance"]["note"] = "bogus"
+        with self.assertRaisesRegex(ValidationError, "unknown field"):
+            validate_plan_review(unknown, "sample-workstream", planning, definition)
+
+    def test_h006_omitted_definition_fails_closed(self) -> None:
+        # RED-before/GREEN-after direct-validator test: an omitted Definition
+        # can never authorize acceptance, even for an otherwise exact review.
+        review, planning = self.plan_review_record(
+            {"class": "authority", "path": "workflow/ROUTER.md"}
+        )
+        with self.assertRaisesRegex(ValidationError, "missing Definition authority"):
+            validate_plan_review(review, "sample-workstream", planning)
+        exact, _ = self.plan_review_record(
+            {"class": "authority", "path": "requirements/REQUIREMENTS.md"}
+        )
+        with self.assertRaisesRegex(ValidationError, "missing Definition authority"):
+            validate_plan_review(exact, "sample-workstream", planning)
+        validate_plan_review(
+            exact, "sample-workstream", planning, self.definition_record()
+        )
+        # Malformed shape still reports its specific defect first; the missing
+        # Definition never masks it and never silently succeeds.
+        malformed = copy.deepcopy(exact)
+        malformed["verdict"] = "in_progress"
+        malformed["evidence_path"] = ""
+        with self.assertRaisesRegex(ValidationError, "plan_review: verdict"):
+            validate_plan_review(malformed, "sample-workstream", planning)
 
     def test_editorial_plan_exemption_preserves_prior_green_subject(self) -> None:
         planning = self.planning_record("approved")
@@ -502,6 +1494,16 @@ class StateEnvelopeTests(unittest.TestCase):
         planning["review_mode"] = "editorial_exempt"
         planning["review_exemption_basis"] = "Wording only; no strategy, milestones, coverage or gates changed."
         planning["review_exemption_base_subject"] = prior
+        planning["review_exemption_classification"] = {
+            "class": "git_blob",
+            "repository": "owner/repo",
+            "commit": "d" * 40,
+            "path": (
+                "implementation/workstreams/sample-workstream/"
+                "planning_classifications/P1-E01.toml"
+            ),
+            "blob": "e" * 40,
+        }
         planning["premium_c"] = "satisfied"
         planning["premium_b_subject"] = prior
         planning["premium_c_subject"] = prior
@@ -527,12 +1529,24 @@ class StateEnvelopeTests(unittest.TestCase):
                 "basis": "Fresh semantic review context.",
             },
         }
-        validate_plan_review(review, "sample-workstream", planning)
+        validate_plan_review(review, "sample-workstream", planning, self.definition_record())
 
         bad = copy.deepcopy(planning)
         bad["review_exemption_basis"] = ""
         with self.assertRaisesRegex(ValidationError, "bounded semantic basis"):
             validate_planning(bad, "sample-workstream")
+
+        missing_proof = copy.deepcopy(planning)
+        missing_proof.pop("review_exemption_classification")
+        with self.assertRaisesRegex(ValidationError, "classification"):
+            validate_planning(missing_proof, "sample-workstream")
+
+        independent_with_proof = self.planning_record("approved")
+        independent_with_proof["review_exemption_classification"] = copy.deepcopy(
+            planning["review_exemption_classification"]
+        )
+        with self.assertRaisesRegex(ValidationError, "must not claim"):
+            validate_planning(independent_with_proof, "sample-workstream")
 
     def test_planning_and_plan_review_locators_are_exact(self) -> None:
         workstream = copy.deepcopy(self.workstream)
@@ -629,6 +1643,288 @@ class StateEnvelopeTests(unittest.TestCase):
         project = read_project(VALID / "PROJECT.md")
         validate_project(project)
         reject_prohibited_keys(project)
+
+
+class ReviewObservationStateTests(unittest.TestCase):
+    def _aware_red_discovery(self) -> dict:
+        base = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        base.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": ["F1"],
+            "verdict": "red",
+            "finding_severity": [
+                {"id": "F1", "surface": "correctness", "evidence": "evidence/review-R01.md#F1"},
+            ],
+        })
+        return base
+
+    def test_aware_red_discovery_requires_load_bearing_surface_and_evidence(self) -> None:
+        validate_review(self._aware_red_discovery())
+
+        missing = self._aware_red_discovery()
+        missing["finding_severity"] = []
+        missing["observations"] = [{
+            "id": "O1",
+            "category": "stylistic",
+            "evidence": "evidence/review-R01.md#O1",
+            "disposition": "open",
+            "disposition_basis": "",
+        }]
+        with self.assertRaisesRegex(ValidationError, "load-bearing evidence"):
+            validate_review(missing)
+
+        bad_surface = self._aware_red_discovery()
+        bad_surface["finding_severity"][0]["surface"] = "taste"
+        with self.assertRaisesRegex(ValidationError, "unknown load-bearing surface"):
+            validate_review(bad_surface)
+
+        empty_evidence = self._aware_red_discovery()
+        empty_evidence["finding_severity"][0]["evidence"] = ""
+        with self.assertRaisesRegex(ValidationError, "concrete load-bearing evidence"):
+            validate_review(empty_evidence)
+
+        foreign_id = self._aware_red_discovery()
+        foreign_id["finding_severity"].append(
+            {"id": "F9", "surface": "safety", "evidence": "evidence/review-R01.md#F9"}
+        )
+        with self.assertRaisesRegex(ValidationError, "unknown blocking finding"):
+            validate_review(foreign_id)
+
+    def test_terminal_red_discovery_requires_severity_without_advisory_carrier(self) -> None:
+        absent = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        absent.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": ["F1"],
+            "verdict": "red",
+        })
+        self.assertNotIn("finding_severity", absent)
+        with self.assertRaisesRegex(ValidationError, "load-bearing evidence"):
+            validate_review(absent)
+
+        empty = copy.deepcopy(absent)
+        empty["finding_severity"] = []
+        with self.assertRaisesRegex(ValidationError, "load-bearing evidence"):
+            validate_review(empty)
+
+    def test_observation_evidence_must_bind_originating_review_evidence(self) -> None:
+        base = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        base.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": [],
+            "verdict": "green",
+        })
+        self.assertEqual(base["evidence_path"], "evidence/review-R01.md")
+
+        mismatched = copy.deepcopy(base)
+        mismatched["observations"] = [{
+            "id": "O1", "category": "advisory",
+            "evidence": "unrelated/R99.md#O1",
+            "disposition": "open", "disposition_basis": "",
+        }]
+        with self.assertRaisesRegex(ValidationError, "bind"):
+            validate_review(mismatched)
+
+        missing_source = copy.deepcopy(base)
+        missing_source["observations"] = [{
+            "id": "O1", "category": "advisory",
+            "evidence": "#O1",
+            "disposition": "open", "disposition_basis": "",
+        }]
+        with self.assertRaisesRegex(ValidationError, "bind"):
+            validate_review(missing_source)
+
+    def test_green_discovery_may_carry_advisory_only_observations(self) -> None:
+        base = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        base.update({
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": [],
+            "verdict": "green",
+            "observations": [
+                {
+                    "id": "O1",
+                    "category": "speculative_hardening",
+                    "evidence": "evidence/review-R01.md#O1",
+                    "disposition": "open",
+                    "disposition_basis": "",
+                },
+            ],
+        })
+        validate_review(base)
+
+    def test_review_attempt_rejects_material_advisory_overlap_and_malformed_observations(self) -> None:
+        overlap = self._aware_red_discovery()
+        overlap["observations"] = [{
+            "id": "F1",
+            "category": "preference",
+            "evidence": "evidence/review-R01.md#F1",
+            "disposition": "open",
+            "disposition_basis": "",
+        }]
+        with self.assertRaisesRegex(ValidationError, "downgrade"):
+            validate_review(overlap)
+
+        bad_category = self._aware_red_discovery()
+        bad_category["observations"] = [{
+            "id": "O1", "category": "cosmetic",
+            "evidence": "evidence/review-R01.md#O1",
+            "disposition": "open", "disposition_basis": "",
+        }]
+        with self.assertRaisesRegex(ValidationError, "unknown advisory category"):
+            validate_review(bad_category)
+
+        tracker_evidence = self._aware_red_discovery()
+        tracker_evidence["observations"] = [{
+            "id": "O1", "category": "advisory",
+            "evidence": "see issue #7",
+            "disposition": "open", "disposition_basis": "",
+        }]
+        with self.assertRaisesRegex(ValidationError, "tracker"):
+            validate_review(tracker_evidence)
+
+        pending_with_observations = self._aware_red_discovery()
+        pending_with_observations.update({
+            "attempt": "R02",
+            "verdict": "pending",
+            "evidence_path": "",
+            "discovery_complete": False,
+            "material_finding_ids": [],
+            "finding_severity": [],
+            "observations": [{
+                "id": "O1", "category": "advisory",
+                "evidence": "evidence/review-R02.md#O1",
+                "disposition": "open", "disposition_basis": "",
+            }],
+        })
+        with self.assertRaisesRegex(ValidationError, "terminal"):
+            validate_review(pending_with_observations)
+
+        legacy_with_observations = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        legacy_with_observations["observations"] = [{
+            "id": "O1", "category": "advisory",
+            "evidence": "evidence/review-R01.md#O1",
+            "disposition": "open", "disposition_basis": "",
+        }]
+        with self.assertRaisesRegex(ValidationError, "explicit review_kind"):
+            validate_review(legacy_with_observations)
+
+    def test_review_history_reconciles_observations_and_rejects_rewrite_vectors(self) -> None:
+        discovery = self._aware_red_discovery()
+        discovery["observations"] = [{
+            "id": "O1", "category": "optional_cleanup",
+            "evidence": "evidence/review-R01.md#O1",
+            "disposition": "open", "disposition_basis": "",
+        }]
+        closure = copy.deepcopy(discovery)
+        closure.update({
+            "attempt": "R02",
+            "review_kind": "closure_verification",
+            "source_discovery_attempt": "R01",
+            "discovery_complete": False,
+            "material_finding_ids": ["F1"],
+            "verdict": "green",
+        })
+        closure.pop("finding_severity", None)
+        closure.pop("observations", None)
+        closure["subject"]["blob"] = "4" * 40
+        rediscovery = copy.deepcopy(closure)
+        rediscovery.update({
+            "attempt": "R03",
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": [],
+            "observation_updates": [
+                {"id": "O1", "disposition": "cleanup_candidate", "basis": "Safe bounded cleanup."},
+            ],
+        })
+        validate_review_history([discovery, closure, rediscovery])
+
+        unknown_update = copy.deepcopy(rediscovery)
+        unknown_update["observation_updates"] = [
+            {"id": "O9", "disposition": "resolved", "basis": "No such observation."},
+        ]
+        with self.assertRaisesRegex(ValidationError, "unknown observation"):
+            validate_review_history([discovery, closure, unknown_update])
+
+        duplicate_intro = copy.deepcopy(rediscovery)
+        duplicate_intro.pop("observation_updates", None)
+        duplicate_intro["evidence_path"] = "evidence/review-R03.md"
+        duplicate_intro["observations"] = [{
+            "id": "O1", "category": "preference",
+            "evidence": "evidence/review-R03.md#O1",
+            "disposition": "open", "disposition_basis": "",
+        }]
+        with self.assertRaisesRegex(ValidationError, "already recorded"):
+            validate_review_history([discovery, closure, duplicate_intro])
+
+    def test_review_history_rejects_load_bearing_downgrade_within_epoch(self) -> None:
+        discovery = self._aware_red_discovery()
+        closure = copy.deepcopy(discovery)
+        closure.update({
+            "attempt": "R02",
+            "review_kind": "closure_verification",
+            "source_discovery_attempt": "R01",
+            "discovery_complete": False,
+            "verdict": "green",
+        })
+        closure.pop("finding_severity", None)
+        closure["subject"]["blob"] = "4" * 40
+        downgrade = copy.deepcopy(closure)
+        downgrade.update({
+            "attempt": "R03",
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": True,
+            "material_finding_ids": [],
+            "evidence_path": "evidence/review-R03.md",
+            "observations": [{
+                "id": "F1", "category": "preference",
+                "evidence": "evidence/review-R03.md#F1",
+                "disposition": "open", "disposition_basis": "",
+            }],
+        })
+        validate_review(downgrade)
+        with self.assertRaisesRegex(ValidationError, "downgrade"):
+            validate_review_history([discovery, closure, downgrade])
+
+    def test_tracker_rejects_observation_disposition_epoch_and_primary_store_authority(self) -> None:
+        base = {
+            "workstream_id": "sample-workstream",
+            "provider": "github",
+            "repository": "owner/repo",
+            "dedup_key": "project-workflow:sample-workstream",
+            "state": "linked",
+            "issue_number": 7,
+            "candidate_issue_numbers": [],
+            "readback_state": "verified",
+            "final_pr": 0,
+        }
+        validate_tracker(base, "sample-workstream")
+        for forbidden_key in (
+            "scope_authorized",
+            "repair_scope",
+            "observation_disposition",
+            "review_disposition",
+            "disposition",
+            "epoch_reset",
+            "epoch_reset_basis",
+            "primary_observation_store",
+            "observation_store",
+            "observations",
+        ):
+            with self.subTest(key=forbidden_key):
+                candidate = copy.deepcopy(base)
+                candidate[forbidden_key] = "tracker-claimed"
+                with self.assertRaisesRegex(ValidationError, "must not carry workflow authorization"):
+                    validate_tracker(candidate, "sample-workstream")
 
 
 if __name__ == "__main__":

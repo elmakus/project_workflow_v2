@@ -1,0 +1,177 @@
+{
+  "kind": "pwv2_mechanical_policy",
+  "registry_version": 1,
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "PWV21-K001",
+      "precedence": 100,
+      "predicate": "tracker_ambiguous",
+      "inputs": [
+        "tracker.state"
+      ],
+      "outcome": {
+        "disposition": "recovery",
+        "obligation": "recovery_boundary",
+        "owner_module": "workflow/RECOVERY.md"
+      },
+      "semantics": "An ambiguous durable tracker binding fails closed to Recovery; duplicate create is forbidden."
+    },
+    {
+      "id": "PWV21-K002",
+      "precedence": 200,
+      "predicate": "definition_premium_a_due",
+      "inputs": [
+        "definition.premium_a"
+      ],
+      "outcome": {
+        "disposition": "stop",
+        "obligation": "premium_A",
+        "owner_module": "workflow/DEFINITION.md"
+      },
+      "semantics": "A GREEN Definition with premium A due stops before material Strategic Planning."
+    },
+    {
+      "id": "PWV21-K003",
+      "precedence": 210,
+      "predicate": "planning_premium_a_due",
+      "inputs": [
+        "planning.premium_a"
+      ],
+      "outcome": {
+        "disposition": "stop",
+        "obligation": "premium_A",
+        "owner_module": "workflow/PLANNING.md"
+      },
+      "semantics": "A material planning re-entry with exact premium A due stops before Planning resumes."
+    },
+    {
+      "id": "PWV21-K004",
+      "precedence": 220,
+      "predicate": "planning_state_draft",
+      "inputs": [
+        "planning.state"
+      ],
+      "outcome": {
+        "disposition": "route",
+        "obligation": "planning",
+        "owner_module": "workflow/PLANNING.md"
+      },
+      "semantics": "A draft planning cycle with its prerequisite gate satisfied remains owned by Strategic Planning."
+    },
+    {
+      "id": "PWV21-K005",
+      "precedence": 230,
+      "predicate": "planning_frozen_premium_b_due",
+      "inputs": [
+        "planning.state",
+        "planning.premium_b"
+      ],
+      "outcome": {
+        "disposition": "stop",
+        "obligation": "premium_B",
+        "owner_module": "workflow/PLANNING.md"
+      },
+      "semantics": "A frozen plan with exact premium B due requires the mandatory fresh independent Plan Review boundary."
+    },
+    {
+      "id": "PWV21-K006",
+      "precedence": 240,
+      "predicate": "plan_review_pending",
+      "inputs": [
+        "plan_review.verdict"
+      ],
+      "outcome": {
+        "disposition": "route",
+        "obligation": "plan_review",
+        "owner_module": "workflow/PLAN_REVIEW.md"
+      },
+      "semantics": "A pending exact Plan Review attempt is owned by independent Plan Review."
+    },
+    {
+      "id": "PWV21-K007",
+      "precedence": 250,
+      "predicate": "plan_review_green",
+      "inputs": [
+        "plan_review.verdict"
+      ],
+      "outcome": {
+        "disposition": "route",
+        "obligation": "planning",
+        "owner_module": "workflow/PLANNING.md"
+      },
+      "semantics": "A GREEN exact Plan Review returns to Planning for deterministic approval consumption."
+    },
+    {
+      "id": "PWV21-K008",
+      "precedence": 260,
+      "predicate": "planning_approved_premium_c_due",
+      "inputs": [
+        "planning.state",
+        "planning.premium_c"
+      ],
+      "outcome": {
+        "disposition": "stop",
+        "obligation": "premium_C",
+        "owner_module": "workflow/PLANNING.md"
+      },
+      "semantics": "An approved GREEN-reviewed plan with exact premium C due stops before Execution Prep."
+    },
+    {
+      "id": "PWV21-K009",
+      "precedence": 150,
+      "predicate": "brainstorm_explicit_user_stop",
+      "inputs": [
+        "brainstorm.explicit_user_stop"
+      ],
+      "outcome": {
+        "disposition": "stop",
+        "obligation": "explicit_user_stop",
+        "owner_module": "workflow/BRAINSTORMING.md"
+      },
+      "semantics": "An explicit durable Brainstorming user stop remains a real user stop."
+    },
+    {
+      "id": "PWV21-K010",
+      "precedence": 310,
+      "predicate": "brainstorm_active",
+      "inputs": [
+        "brainstorm.state"
+      ],
+      "outcome": {
+        "disposition": "route",
+        "obligation": "brainstorming",
+        "owner_module": "workflow/BRAINSTORMING.md"
+      },
+      "semantics": "An active exploratory scope remains owned by Brainstorming."
+    },
+    {
+      "id": "PWV21-K011",
+      "precedence": 400,
+      "predicate": "board_one_ready_card",
+      "inputs": [
+        "board.cards"
+      ],
+      "outcome": {
+        "disposition": "route",
+        "obligation": "execution_prep",
+        "owner_module": "workflow/EXECUTION_PREP.md"
+      },
+      "semantics": "Exactly one READY Card identifies the launch-refresh candidate for Execution Prep."
+    },
+    {
+      "id": "PWV21-K012",
+      "precedence": 410,
+      "predicate": "board_all_cards_done",
+      "inputs": [
+        "board.cards"
+      ],
+      "outcome": {
+        "disposition": "route",
+        "obligation": "close",
+        "owner_module": "workflow/CLOSE.md"
+      },
+      "semantics": "A non-empty Task Board whose current Cards are all DONE routes to Close; terminal Cards are not themselves a stop."
+    }
+  ]
+}

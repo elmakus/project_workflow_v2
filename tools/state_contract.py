@@ -6,11 +6,149 @@ from __future__ import annotations
 import argparse
 import re
 import tomllib
+from collections.abc import Callable
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+try:
+    from tools.exact_locator import ExactLocatorError, normalize_locator_path
+    from tools.review_contract import (
+        CONVERGENCE_FIELDS,
+        REVIEW_KINDS,
+        REVIEW_SCOPE_DISCOVERY_CEILINGS,
+        ReviewContractError,
+        convergence_fields_present,
+        derive_observation_state,
+        failed_material_defect_classes,
+        finding_severity_records,
+        material_defect_classes,
+        observation_records,
+        observation_update_records,
+        review_convergence_state,
+        review_kind,
+        validate_finding_severity,
+    )
+    from tools.seam_contract import (
+        SeamContractError,
+        validate_seam_decisions,
+        validate_seam_declarations,
+    )
+    from tools.card_sizing_contract import (
+        CardSizingError,
+        validate_sizing_audits,
+    )
+    from tools.topology_contract import (
+        TopologyError,
+        validate_topology_audits,
+    )
+    from tools.late_oversize_contract import (
+        LateOversizeError,
+        validate_late_returns,
+    )
+    from tools.live_finding_contract import (
+        LiveFindingError,
+        validate_finding_trigger_gates,
+        validate_live_findings,
+    )
+    from tools.live_consumer_contract import (
+        LiveConsumerError,
+        validate_live_consumer_gates,
+    )
+except ModuleNotFoundError:  # direct script execution from tools/
+    from exact_locator import ExactLocatorError, normalize_locator_path
+    from review_contract import (
+        CONVERGENCE_FIELDS,
+        REVIEW_KINDS,
+        REVIEW_SCOPE_DISCOVERY_CEILINGS,
+        ReviewContractError,
+        convergence_fields_present,
+        derive_observation_state,
+        failed_material_defect_classes,
+        finding_severity_records,
+        material_defect_classes,
+        observation_records,
+        observation_update_records,
+        review_convergence_state,
+        review_kind,
+        validate_finding_severity,
+    )
+    from seam_contract import (
+        SeamContractError,
+        validate_seam_decisions,
+        validate_seam_declarations,
+    )
+    from card_sizing_contract import (
+        CardSizingError,
+        validate_sizing_audits,
+    )
+    from topology_contract import (
+        TopologyError,
+        validate_topology_audits,
+    )
+    from late_oversize_contract import (
+        LateOversizeError,
+        validate_late_returns,
+    )
+    from live_finding_contract import (
+        LiveFindingError,
+        validate_finding_trigger_gates,
+        validate_live_findings,
+    )
+    from live_consumer_contract import (
+        LiveConsumerError,
+        validate_live_consumer_gates,
+    )
+
+try:
+    from tools.editorial_exemption_contract import (
+        EditorialExemptionError,
+        validate_editorial_classification_locator,
+    )
+except ModuleNotFoundError:  # direct script execution from tools/
+    from editorial_exemption_contract import (
+        EditorialExemptionError,
+        validate_editorial_classification_locator,
+    )
+
+try:
+    from tools.research_provenance import (
+        ResearchProvenanceError,
+        validate_prior_art_proof_shape,
+    )
+except ModuleNotFoundError:  # direct script execution from tools/
+    from research_provenance import (
+        ResearchProvenanceError,
+        validate_prior_art_proof_shape,
+    )
+
+try:
+    from tools.definition_authority import (
+        DefinitionAuthorityError,
+        validate_definition_authority_key_shape,
+    )
+except ModuleNotFoundError:  # direct script execution from tools/
+    from definition_authority import (
+        DefinitionAuthorityError,
+        validate_definition_authority_key_shape,
+    )
+
+try:
+    from tools.review_attempt_provenance import (
+        ReviewAttemptProvenanceError,
+        validate_legacy_migration_shape,
+        validate_review_attempt_locator_shape,
+        verify_history_append_only,
+    )
+except ModuleNotFoundError:  # direct script execution from tools/
+    from review_attempt_provenance import (
+        ReviewAttemptProvenanceError,
+        validate_legacy_migration_shape,
+        validate_review_attempt_locator_shape,
+        verify_history_append_only,
+    )
+
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
-CARD_STATUSES = {"planned", "ready", "in_progress", "blocked", "done"}
+CARD_STATUSES = {"planned", "ready", "in_progress", "blocked", "done", "returned"}
 INTAKE_KINDS = {"issue", "feature", "change"}
 INTAKE_STATES = {"active", "complete"}
 RESPONSE_KINDS = {"none", "question", "concern", "alternative", "authorization"}
@@ -69,21 +207,30 @@ def _require(condition: bool, message: str) -> None:
 
 
 def read_toml(path: Path) -> dict[str, Any]:
-    with path.open("rb") as handle:
-        value = tomllib.load(handle)
+    try:
+        with path.open("rb") as handle:
+            value = tomllib.load(handle)
+    except (tomllib.TOMLDecodeError, ValueError) as exc:
+        raise ValidationError(f"{path}: malformed TOML: {exc}") from exc
     _require(isinstance(value, dict), f"{path}: top-level TOML must be a table")
     return value
 
 
 def read_project(path: Path) -> dict[str, Any]:
-    text = path.read_text(encoding="utf-8")
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValidationError(f"{path}: PROJECT.md is not UTF-8 text: {exc}") from exc
     lines = text.splitlines()
     _require(lines and lines[0] == "+++", f"{path}: missing TOML front matter")
     try:
         end = lines.index("+++", 1)
     except ValueError as exc:
         raise ValidationError(f"{path}: unterminated TOML front matter") from exc
-    return tomllib.loads("\n".join(lines[1:end]))
+    try:
+        return tomllib.loads("\n".join(lines[1:end]))
+    except (tomllib.TOMLDecodeError, ValueError) as exc:
+        raise ValidationError(f"{path}: malformed TOML front matter: {exc}") from exc
 
 
 def reject_prohibited_keys(value: Any, where: str = "$") -> None:
@@ -99,11 +246,10 @@ def reject_prohibited_keys(value: Any, where: str = "$") -> None:
 
 
 def _safe_relative_path(raw: Any, label: str) -> str:
-    _require(isinstance(raw, str) and raw, f"{label}: path must be non-empty string")
-    path = PurePosixPath(raw)
-    _require(not path.is_absolute(), f"{label}: absolute paths are not durable artifact locators")
-    _require(".." not in path.parts and "." not in path.parts, f"{label}: path traversal is forbidden")
-    return raw
+    try:
+        return normalize_locator_path(raw, label)
+    except ExactLocatorError as exc:
+        raise ValidationError(str(exc)) from exc
 
 
 def validate_locator(
@@ -124,6 +270,12 @@ def validate_locator(
         _require(workstream_id is not None, f"{label}: workstream binding required")
         prefix = f"implementation/workstreams/{workstream_id}/cards/"
         _require(path.startswith(prefix) and path.endswith(".md"), f"{label}: wrong Task Card class/path")
+        if "commit" in ref or "blob" in ref:
+            _require(
+                isinstance(ref.get("commit"), str) and SHA40.fullmatch(ref["commit"]) is not None
+                and isinstance(ref.get("blob"), str) and SHA40.fullmatch(ref["blob"]) is not None,
+                f"{label}: exact Task Card identity requires commit + blob 40-hex",
+            )
     elif expected_class in {"intake", "brainstorm", "research", "definition", "planning", "plan_review", "tracker"}:
         _require(workstream_id is not None, f"{label}: workstream binding required")
         filenames = {
@@ -139,9 +291,10 @@ def validate_locator(
         _require(path == expected, f"{label}: expected exact path {expected!r}")
     elif expected_class == "review_attempt":
         _require(workstream_id is not None, f"{label}: workstream binding required")
-        prefix = f"implementation/workstreams/{workstream_id}/reviews/"
-        _require(path.startswith(prefix) and path.endswith(".toml"),
-                 f"{label}: wrong review_attempt class/path")
+        try:
+            validate_review_attempt_locator_shape(ref, workstream_id, label)
+        except ReviewAttemptProvenanceError as exc:
+            raise ValidationError(str(exc)) from exc
     elif expected_class in {"evidence", "result"}:
         _require(workstream_id is not None, f"{label}: workstream binding required")
         directory = "evidence" if expected_class == "evidence" else "results"
@@ -161,6 +314,12 @@ def validate_locator(
     elif expected_class == "authority":
         allowed = ("requirements/", "decisions/", "planning/", "workflow/")
         _require(path.startswith(allowed), f"{label}: authority path is outside accepted authority roots")
+        if "commit" in ref or "blob" in ref:
+            _require(
+                isinstance(ref.get("commit"), str) and SHA40.fullmatch(ref["commit"]) is not None
+                and isinstance(ref.get("blob"), str) and SHA40.fullmatch(ref["blob"]) is not None,
+                f"{label}: exact authority identity requires commit + blob 40-hex",
+            )
     else:
         raise ValidationError(f"{label}: unsupported locator class {expected_class!r}")
     return path
@@ -252,12 +411,30 @@ def validate_intake(data: dict[str, Any], workstream_id: str) -> None:
                 diagnosis_prior_art_subject == repair_subject and bool(diagnosis_prior_art_result.strip()),
                 "intake: authorized issue requires exact durable diagnosis prior-art binding",
             )
+        proof = data.get("diagnosis_prior_art_proof")
+        binding_present = bool(diagnosis_prior_art_subject.strip()) or bool(diagnosis_prior_art_result.strip())
+        if binding_present:
+            _require(
+                proof is not None,
+                "intake diagnosis prior-art proof locator is required with a persisted prior-art binding",
+            )
+            try:
+                validate_prior_art_proof_shape(proof, workstream_id)
+            except ResearchProvenanceError as exc:
+                raise ValidationError(f"{exc}") from exc
+        else:
+            _require(
+                proof is None,
+                "intake diagnosis prior-art proof without a persisted prior-art binding is dangling",
+            )
     else:
         _require(alignment_state == "not_required",
                  "intake: feature/change discovery must not manufacture issue-repair alignment")
         _require(alignment_subject == "", "intake: non-issue alignment_subject must be empty")
         _require(diagnosis_prior_art_subject == "" and diagnosis_prior_art_result == "",
                  "intake: non-issue must not retain diagnosis prior-art binding")
+        _require(data.get("diagnosis_prior_art_proof") is None,
+                 "intake: non-issue must not retain diagnosis prior-art proof")
         _require(not micro_fix_candidate, "intake: micro-fix candidate is issue-only")
 
     if state == "complete" and kind == "issue":
@@ -425,17 +602,24 @@ def validate_planning(data: dict[str, Any], workstream_id: str) -> None:
     _require(review_mode in PLANNING_REVIEW_MODES, f"planning: invalid review_mode {review_mode!r}")
     exemption_basis = data.get("review_exemption_basis")
     exemption_base_subject = data.get("review_exemption_base_subject")
+    exemption_classification = data.get("review_exemption_classification")
     _require(isinstance(exemption_basis, str), "planning: review_exemption_basis must be a string")
     _require(isinstance(exemption_base_subject, str),
              "planning: review_exemption_base_subject must be a string")
     if review_mode == "independent":
         _require(exemption_basis == "" and exemption_base_subject == "",
                  "planning: independent review mode must not claim an editorial exemption")
+        _require(exemption_classification is None,
+                 "planning: independent review mode must not claim an editorial classification proof")
     else:
         _require(bool(exemption_basis.strip()),
                  "planning: editorial exemption requires a bounded semantic basis")
         _require(bool(exemption_base_subject.strip()),
                  "planning: editorial exemption requires the prior reviewed subject")
+        try:
+            validate_editorial_classification_locator(exemption_classification, workstream_id)
+        except EditorialExemptionError as exc:
+            raise ValidationError(f"{exc}") from exc
 
     premium_a = data.get("premium_a")
     premium_b = data.get("premium_b")
@@ -454,6 +638,26 @@ def validate_planning(data: dict[str, Any], workstream_id: str) -> None:
 
     _require(premium_a in {"due", "satisfied"} and premium_a_subject == entry_subject,
              "planning: current cycle requires exact premium A gate subject")
+
+    if "seams" in data:
+        try:
+            validate_seam_declarations(data["seams"])
+        except SeamContractError as exc:
+            raise ValidationError(f"{exc}") from exc
+
+    if "definition_authority_key" in data:
+        raw_key = data["definition_authority_key"]
+        _require(
+            isinstance(raw_key, str),
+            "planning: definition_authority_key must be a string",
+        )
+        if raw_key != "":
+            try:
+                validate_definition_authority_key_shape(
+                    raw_key, "planning.definition_authority_key"
+                )
+            except DefinitionAuthorityError as exc:
+                raise ValidationError(f"planning: {exc}") from exc
 
     subject = data.get("subject")
     if state == "draft":
@@ -497,8 +701,24 @@ def validate_planning(data: dict[str, Any], workstream_id: str) -> None:
                  "planning: approved plan requires exact premium C gate subject")
 
 
-def validate_plan_review(data: dict[str, Any], workstream_id: str, planning: dict[str, Any]) -> None:
+def validate_plan_review(
+    data: dict[str, Any],
+    workstream_id: str,
+    planning: dict[str, Any],
+    # H006: callers must pass the exact current Definition; an omitted or
+    # ambiguous Definition fails closed and can never authorize acceptance.
+    definition: dict[str, Any] | None = None,
+) -> None:
     validate_review(data)
+    # H006: Plan Review judges the frozen plan against accepted Definition
+    # authority, never an unrelated authority-rooted file or a Task Card.
+    acceptance = data.get("acceptance")
+    _require(
+        isinstance(acceptance, dict) and acceptance.get("class") == "authority",
+        "plan_review: acceptance must bind exact Definition authority",
+    )
+    _require(data.get("verdict") in {"pending", "green", "red"},
+             "plan_review: verdict must be pending, green or red")
     _require(data.get("workstream_id") == workstream_id, "plan_review: wrong workstream_id")
     _require(data.get("plan_revision") == planning.get("revision"),
              "plan_review: wrong plan_revision")
@@ -522,6 +742,88 @@ def validate_plan_review(data: dict[str, Any], workstream_id: str, planning: dic
         _safe_relative_path(evidence_path, "plan_review.evidence_path")
     else:
         _require(evidence_path == "", "plan_review: pending attempt must not claim evidence")
+
+    planning_raw = planning.get("definition_authority_key", "")
+    review_raw = data.get("definition_authority_key", "")
+    if "definition_authority_key" in planning:
+        _require(
+            isinstance(planning_raw, str),
+            "plan_review: planning authority key must be a string",
+        )
+        if planning_raw != "":
+            try:
+                validate_definition_authority_key_shape(
+                    planning_raw, "plan_review.planning_authority_key"
+                )
+            except DefinitionAuthorityError as exc:
+                raise ValidationError(f"plan_review: {exc}") from exc
+    else:
+        planning_raw = ""
+    if "definition_authority_key" in data:
+        _require(
+            isinstance(review_raw, str),
+            "plan_review: definition_authority_key must be a string",
+        )
+        if review_raw != "":
+            try:
+                validate_definition_authority_key_shape(
+                    review_raw, "plan_review.definition_authority_key"
+                )
+            except DefinitionAuthorityError as exc:
+                raise ValidationError(f"plan_review: {exc}") from exc
+    else:
+        review_raw = ""
+    planning_has = isinstance(planning_raw, str) and planning_raw != ""
+    review_has = isinstance(review_raw, str) and review_raw != ""
+    _require(
+        planning_has == review_has,
+        "plan_review: Planning and Plan Review authority bindings must both be present or both absent",
+    )
+    if planning_has:
+        _require(
+            planning_raw == review_raw,
+            "plan_review: Planning and Plan Review authority keys do not match",
+        )
+
+    # H006: the reviewed acceptance must name exactly one member of the
+    # current Definition authority set (requirements or a listed decision).
+    # Root-shaped-only acceptance cannot authorize GREEN, and an omitted
+    # Definition can never implicitly succeed.
+    if definition is None:
+        raise ValidationError(
+            "plan_review: missing Definition authority binding; exact current "
+            "Definition is required to prove acceptance membership"
+        )
+    _require(isinstance(definition, dict), "plan_review: Definition binding is ambiguous")
+    try:
+        requirements = definition["requirements"]
+        decisions = definition["decisions"]
+    except (KeyError, TypeError) as exc:
+        raise ValidationError(
+            f"plan_review: Definition authority set is ambiguous: {exc}"
+        ) from exc
+    _require(
+        isinstance(requirements, dict) and isinstance(decisions, list),
+        "plan_review: Definition authority set is ambiguous",
+    )
+    members: set[str] = set()
+    try:
+        members.add(_safe_relative_path(requirements.get("path"), "plan_review.definition.requirements"))
+        for index, decision in enumerate(decisions):
+            _require(isinstance(decision, dict), "plan_review: Definition authority set is ambiguous")
+            members.add(
+                _safe_relative_path(
+                    decision.get("path"), f"plan_review.definition.decisions[{index}]"
+                )
+            )
+    except ValidationError as exc:
+        raise ValidationError(f"plan_review: Definition authority set is ambiguous: {exc}") from exc
+    reviewed_path = acceptance.get("path")
+    _require(
+        isinstance(reviewed_path, str) and reviewed_path in members,
+        f"plan_review: acceptance {reviewed_path!r} is unrelated to the exact current "
+        "Definition authority {requirements,decisions}",
+    )
 
 
 def validate_tracker(data: dict[str, Any], workstream_id: str) -> None:
@@ -561,10 +863,21 @@ def validate_tracker(data: dict[str, Any], workstream_id: str) -> None:
         "implementation_authorized",
         "requirements_approved",
         "plan_approved",
+        "scope_authorized",
+        "repair_scope",
+        "observation_disposition",
+        "review_disposition",
+        "disposition",
+        "epoch_reset",
+        "epoch_reset_basis",
+        "primary_observation_store",
+        "observation_store",
+        "observations",
     }
     _require(
         not (forbidden_authority & set(data)),
-        "tracker: GitHub Issue bookkeeping must not carry workflow authorization/approval",
+        "tracker: GitHub Issue bookkeeping must not carry workflow authorization/approval, "
+        "scope/repair/disposition/epoch authority, or the primary observation store",
     )
 
     if state == "discovery":
@@ -663,10 +976,44 @@ def parse_task_card(text: str, expected_id: str, workstream_id: str) -> dict[str
     }
 
 
+def _bound_handoff_trigger(
+    returns: Any,
+    cards_by_id: dict[str, Any],
+    trigger: dict[str, Any],
+    after_card: str,
+) -> bool:
+    """Check the distinct return-handoff path for trigger advancement.
+
+    A trigger after a ``returned`` Card may advance only when a durable
+    late-oversize return binds that exact trigger id to a materialized
+    residual Card in ``residual_bound`` state. Full record validity is
+    enforced separately by the late-oversize gate; this linkage check only
+    gates the predecessor exception so forged satisfaction fails closed here.
+    """
+    predecessor = cards_by_id.get(after_card)
+    if not isinstance(predecessor, dict) or predecessor.get("status") != "returned":
+        return False
+    if not isinstance(returns, list):
+        return False
+    for record in returns:
+        if not isinstance(record, dict):
+            continue
+        if (
+            record.get("card_id") == after_card
+            and record.get("residual_trigger") == trigger.get("id")
+            and record.get("state") == "residual_bound"
+            and isinstance(record.get("residual_card"), str)
+            and record.get("residual_card") in cards_by_id
+        ):
+            return True
+    return False
+
+
 def validate_board(
     data: dict[str, Any],
     workstream: dict[str, Any],
     expected_revision: int | None = None,
+    planning_seams: list[dict[str, Any]] | None = None,
 ) -> None:
     reject_prohibited_keys(data, "task_board")
     _require(data.get("workstream_id") == workstream["workstream_id"], "task_board: wrong workstream_id")
@@ -692,7 +1039,12 @@ def validate_board(
         status = card.get("status")
         _require(status in CARD_STATUSES, f"{label}: invalid status {status!r}")
         active += int(status == "in_progress")
-        validate_locator(card.get("contract"), "task_card", f"{label}.contract", workstream["workstream_id"])
+        contract_path = validate_locator(card.get("contract"), "task_card", f"{label}.contract", workstream["workstream_id"])
+        expected_contract = f"implementation/workstreams/{workstream['workstream_id']}/cards/{card_id}.md"
+        _require(
+            contract_path == expected_contract,
+            f"{label}.contract: path {contract_path!r} does not match exact Card path {expected_contract!r}",
+        )
         if "result" in card:
             validate_locator(card["result"], "result", f"{label}.result", workstream["workstream_id"])
         attempts = card.get("review_attempts", [])
@@ -751,8 +1103,92 @@ def validate_board(
         _require(isinstance(condition, str) and condition.strip(), f"{label}: missing condition")
         if state in {"satisfied", "consumed"}:
             predecessor = cards_by_id[after_card]
-            _require(predecessor["status"] == "done" and "result" in predecessor,
-                     f"{label}: satisfied trigger requires DONE predecessor result")
+            if predecessor["status"] == "done" and "result" in predecessor:
+                pass
+            elif _bound_handoff_trigger(
+                data.get("late_oversize_returns"), cards_by_id,
+                trigger, after_card,
+            ):
+                pass
+            else:
+                raise ValidationError(
+                    f"{label}: satisfied trigger requires DONE predecessor "
+                    "result or a bound late-oversize handoff for the exact "
+                    "residual trigger"
+                )
+
+    if planning_seams:
+        _require(
+            "seam_decisions" in data,
+            "task_board: declared Planning seams require durable per-seam JIT decisions",
+        )
+    if "seam_decisions" in data:
+        _require(
+            planning_seams is not None,
+            "task_board: seam_decisions require accepted Planning seams for fidelity validation",
+        )
+        try:
+            validate_seam_decisions(data["seam_decisions"], planning_seams)
+        except SeamContractError as exc:
+            raise ValidationError(f"{exc}") from exc
+
+    try:
+        validate_sizing_audits(data.get("sizing_audits"), cards, triggers)
+    except CardSizingError as exc:
+        raise ValidationError(f"{exc}") from exc
+
+    try:
+        validate_topology_audits(
+            data.get("topology_audits"),
+            cards,
+            data.get("sizing_audits"),
+            data.get("seam_decisions"),
+            planning_seams,
+        )
+    except TopologyError as exc:
+        raise ValidationError(f"{exc}") from exc
+
+    try:
+        late_records = validate_late_returns(
+            data.get("late_oversize_returns"),
+            cards,
+            triggers,
+            workstream["workstream_id"],
+            data.get("sizing_audits"),
+        )
+    except LateOversizeError as exc:
+        raise ValidationError(f"{exc}") from exc
+
+    try:
+        validated_findings = validate_live_findings(
+            data.get("live_findings"), workstream["workstream_id"]
+        )
+    except LiveFindingError as exc:
+        raise ValidationError(f"{exc}") from exc
+
+    try:
+        validate_finding_trigger_gates(validated_findings, data.get("jit_triggers", []))
+    except LiveFindingError as exc:
+        raise ValidationError(f"{exc}") from exc
+
+    try:
+        validate_live_consumer_gates(
+            data.get("jit_triggers", []), workstream["workstream_id"]
+        )
+    except LiveConsumerError as exc:
+        raise ValidationError(f"{exc}") from exc
+
+    for index, card in enumerate(cards):
+        if card["status"] != "returned":
+            continue
+        record = late_records.get(card["id"])
+        if record is None or record.get("state") != "residual_bound":
+            raise ValidationError(
+                f"task_board.cards[{index}]: returned Card {card['id']!r} "
+                "requires a bound late-oversize return naming its "
+                "materialized residual Card; returned is a non-GREEN handoff "
+                "disposition, never an unbound terminal"
+            )
 
 
 def validate_blocker(data: dict[str, Any], workstream_id: str, card_id: str) -> None:
@@ -776,7 +1212,12 @@ def _review_subject_key(data: dict[str, Any]) -> str:
     return f"{subject['repository']}@{subject['commit']}:{subject['path']}@{subject['blob']}"
 
 
-def validate_review(data: dict[str, Any]) -> None:
+def validate_review(data: dict[str, Any], *, expected_review_scope: str | None = None) -> None:
+    if expected_review_scope is not None:
+        _require(
+            expected_review_scope in REVIEW_SCOPE_DISCOVERY_CEILINGS,
+            f"review: invalid expected_review_scope {expected_review_scope!r}",
+        )
     reject_prohibited_keys(data, "review")
     _require(isinstance(data.get("attempt"), str) and data["attempt"], "review: missing attempt")
     verdict = data.get("verdict")
@@ -796,6 +1237,11 @@ def validate_review(data: dict[str, Any]) -> None:
     acceptance_class = acceptance.get("class")
     if acceptance_class == "authority":
         validate_locator(acceptance, "authority", "review.acceptance")
+        unknown_authority = sorted(set(acceptance) - {"class", "path", "commit", "blob"})
+        _require(
+            not unknown_authority,
+            f"review.acceptance: unknown field(s): {', '.join(unknown_authority)}",
+        )
     elif acceptance_class == "task_card":
         workstream_id = data.get("workstream_id")
         _require(isinstance(workstream_id, str) and workstream_id,
@@ -803,8 +1249,16 @@ def validate_review(data: dict[str, Any]) -> None:
         path = validate_locator(acceptance, "task_card", "review.acceptance", workstream_id)
         card_id = data.get("card_id")
         _require(isinstance(card_id, str) and card_id, "review: task-card acceptance requires card_id")
-        _require(PurePosixPath(path).stem == card_id,
-                 "review: acceptance Task Card does not match card_id")
+        expected_path = f"implementation/workstreams/{workstream_id}/cards/{card_id}.md"
+        _require(
+            path == expected_path,
+            f"review: acceptance Task Card path {path!r} does not match exact Card path {expected_path!r}",
+        )
+        unknown_acceptance = sorted(set(acceptance) - {"class", "path", "commit", "blob"})
+        _require(
+            not unknown_acceptance,
+            f"review.acceptance: unknown field(s): {', '.join(unknown_acceptance)}",
+        )
     else:
         raise ValidationError("review: unsupported acceptance identity")
 
@@ -823,33 +1277,456 @@ def validate_review(data: dict[str, Any]) -> None:
     else:
         _require(evidence_path == "", "review: non-terminal attempt must not claim terminal evidence")
 
+    v21_fields = {
+        "review_kind", "source_discovery_attempt", "discovery_complete", "material_finding_ids",
+        "finding_severity", "observations", "observation_updates",
+    }
+    explicit_v21 = "review_kind" in data
+    _require(explicit_v21 or not any(key in data for key in v21_fields - {"review_kind"}),
+             "review: PWv2.1 review fields require explicit review_kind")
+    if explicit_v21:
+        kind = data.get("review_kind")
+        _require(kind in REVIEW_KINDS, f"review: invalid review_kind {kind!r}")
+        source = data.get("source_discovery_attempt")
+        _require(isinstance(source, str), "review: source_discovery_attempt must be a string")
+        discovery_complete = data.get("discovery_complete")
+        _require(isinstance(discovery_complete, bool), "review: discovery_complete must be boolean")
+        finding_ids = data.get("material_finding_ids")
+        _require(isinstance(finding_ids, list), "review: material_finding_ids must be an array")
+        _require(
+            all(isinstance(item, str) and item.strip() for item in finding_ids),
+            "review: material_finding_ids must contain non-empty strings",
+        )
+        _require(len(set(finding_ids)) == len(finding_ids),
+                 "review: material_finding_ids must be unique")
+
+        if kind == "discovery":
+            _require(source == "", "review: discovery attempt must not name source_discovery_attempt")
+            if verdict in {"green", "red"}:
+                _require(discovery_complete,
+                         "review: terminal discovery attempt requires complete acceptance-surface discovery")
+            if verdict == "green":
+                _require(not finding_ids,
+                         "review: GREEN discovery attempt cannot retain material blocking findings")
+            if verdict == "red":
+                _require(bool(finding_ids),
+                         "review: RED discovery attempt must record the complete material finding set")
+        else:
+            _require(bool(source.strip()),
+                     "review: closure_verification requires source_discovery_attempt")
+            _require(not discovery_complete,
+                     "review: closure_verification cannot claim full discovery completion")
+            _require(bool(finding_ids),
+                     "review: closure_verification must name the known material findings it verifies")
+
+    if explicit_v21:
+        try:
+            severity = finding_severity_records(data)
+            introduced = observation_records(data)
+            updates = observation_update_records(data)
+        except ReviewContractError as exc:
+            raise ValidationError(f"review: {exc}") from exc
+        introduced_ids = {record["id"] for record in introduced}
+        overlap = set(finding_ids) & introduced_ids
+        _require(
+            not overlap,
+            "review: observation ids downgrade load-bearing findings: "
+            + ", ".join(sorted(overlap)),
+        )
+        if kind == "discovery" and verdict == "red":
+            try:
+                validate_finding_severity(
+                    material_finding_ids=finding_ids,
+                    severity=severity,
+                    require_complete=True,
+                )
+            except ReviewContractError as exc:
+                raise ValidationError(f"review: {exc}") from exc
+        elif severity:
+            try:
+                validate_finding_severity(
+                    material_finding_ids=finding_ids,
+                    severity=severity,
+                    require_complete=False,
+                )
+            except ReviewContractError as exc:
+                raise ValidationError(f"review: {exc}") from exc
+    if "legacy_migration" in data:
+        _require(
+            not explicit_v21,
+            "review: explicit PWv2.1 attempt must not claim legacy migration provenance",
+        )
+        migration_workstream = data.get("workstream_id")
+        migration_card = data.get("card_id")
+        migration_attempt = data.get("attempt")
+        _require(
+            isinstance(migration_workstream, str) and migration_workstream
+            and isinstance(migration_card, str) and migration_card
+            and isinstance(migration_attempt, str) and migration_attempt,
+            "review: legacy migration provenance requires a Card-bound workstream/card/attempt",
+        )
+        try:
+            validate_legacy_migration_shape(
+                data["legacy_migration"],
+                workstream_id=migration_workstream,
+                card_id=migration_card,
+                attempt_id=migration_attempt,
+                label="review.legacy_migration",
+            )
+        except ReviewAttemptProvenanceError as exc:
+            raise ValidationError(str(exc)) from exc
+
+    convergence_aware = convergence_fields_present(data)
+    _require(
+        convergence_aware or not any(key in data for key in CONVERGENCE_FIELDS - {"review_epoch"}),
+        "review: convergence fields require explicit review_epoch",
+    )
+    if convergence_aware:
+        _require(explicit_v21, "review: convergence-aware attempt requires explicit review_kind")
+        scope = data.get("review_scope")
+        _require(scope in REVIEW_SCOPE_DISCOVERY_CEILINGS,
+                 f"review: invalid review_scope {scope!r}")
+        if expected_review_scope is not None:
+            _require(
+                scope == expected_review_scope,
+                f"review: review_scope {scope!r} does not match expected review owner scope {expected_review_scope!r}",
+            )
+        epoch = data.get("review_epoch")
+        _require(isinstance(epoch, str) and epoch.strip(),
+                 "review: review_epoch must be a non-empty string")
+        reset_basis = data.get("epoch_reset_basis")
+        _require(isinstance(reset_basis, str),
+                 "review: epoch_reset_basis must be a string")
+        reset_subject = data.get("epoch_reset_subject")
+        if reset_basis.strip():
+            _require(isinstance(reset_subject, dict),
+                     "review: non-empty epoch_reset_basis requires exact epoch_reset_subject")
+            _require(reset_subject.get("class") == "accepted_redesign",
+                     "review: epoch_reset_subject must have class 'accepted_redesign'")
+            for key in ("repository", "path"):
+                _require(isinstance(reset_subject.get(key), str) and reset_subject[key],
+                         f"review.epoch_reset_subject: missing {key}")
+            for key in ("commit", "blob"):
+                _require(
+                    isinstance(reset_subject.get(key), str)
+                    and SHA40.fullmatch(reset_subject[key]) is not None,
+                    f"review.epoch_reset_subject: {key} must be exact 40-hex",
+                )
+            _require(
+                reset_subject["repository"] == subject["repository"],
+                "review: epoch_reset_subject must belong to the reviewed project repository",
+            )
+            reset_path = _safe_relative_path(
+                reset_subject["path"], "review.epoch_reset_subject"
+            )
+            accepted_authority_roots = (
+                "requirements/", "decisions/", "planning/", "workflow/",
+            )
+            _require(
+                reset_path == acceptance.get("path")
+                or reset_path.startswith(accepted_authority_roots),
+                "review: epoch_reset_subject must bind exact accepted authority or acceptance redesign",
+            )
+        else:
+            _require(
+                reset_subject is None,
+                "review: epoch_reset_subject is allowed only with non-empty epoch_reset_basis",
+            )
+        try:
+            defect_classes = material_defect_classes(data)
+            failed_defect_classes = failed_material_defect_classes(data)
+        except ReviewContractError as exc:
+            raise ValidationError(f"review: {exc}") from exc
+        is_post = data.get("post_convergence_validation")
+        _require(isinstance(is_post, bool),
+                 "review: post_convergence_validation must be boolean")
+        convergence_basis = data.get("convergence_basis")
+        _require(isinstance(convergence_basis, str),
+                 "review: convergence_basis must be a string")
+
+        if is_post:
+            _require(kind == "discovery",
+                     "review: post-convergence validation must be a fresh discovery")
+            _require(bool(convergence_basis.strip()),
+                     "review: post-convergence validation requires durable convergence_basis")
+        else:
+            _require(convergence_basis == "",
+                     "review: ordinary attempt must not claim convergence_basis")
+
+        if kind == "discovery":
+            _require(
+                not failed_defect_classes,
+                "review: discovery attempt must not claim failed_material_defect_class_ids",
+            )
+            if verdict == "red":
+                _require(bool(defect_classes),
+                         "review: RED discovery must record material_defect_class_ids")
+            else:
+                _require(not defect_classes,
+                         "review: non-RED discovery must not claim material defect classes")
+        else:
+            _require(bool(defect_classes),
+                     "review: closure verification must record material_defect_class_ids")
+            if verdict == "red":
+                _require(
+                    bool(failed_defect_classes),
+                    "review: RED closure verification must record failed_material_defect_class_ids",
+                )
+                _require(
+                    failed_defect_classes.issubset(defect_classes),
+                    "review: failed_material_defect_class_ids must be a subset of material_defect_class_ids",
+                )
+            else:
+                _require(
+                    not failed_defect_classes,
+                    "review: non-RED closure must not claim failed material defect classes",
+                )
+
 
 def validate_review_history(
     attempts: list[dict[str, Any]],
     *,
     expected_card_id: str | None = None,
     workstream_id: str | None = None,
+    accepted_authority_paths: set[str] | None = None,
+    exact_blob_reader: Callable[[str, str, str], str | None] | None = None,
+    expected_review_scope: str | None = None,
+    prior_attempts: list[dict[str, Any]] | None = None,
 ) -> None:
     _require(isinstance(attempts, list) and attempts,
              "review_history: at least one attempt is required")
+    if prior_attempts is not None:
+        try:
+            verify_history_append_only(prior_attempts, attempts, label="review_history")
+        except ReviewAttemptProvenanceError as exc:
+            raise ValidationError(str(exc)) from exc
+    if expected_review_scope is None and expected_card_id is not None:
+        expected_review_scope = "card"
+    if expected_review_scope is not None:
+        _require(
+            expected_review_scope in REVIEW_SCOPE_DISCOVERY_CEILINGS,
+            f"review_history: invalid expected_review_scope {expected_review_scope!r}",
+        )
+    accepted_authorities = {
+        _safe_relative_path(path, "review_history.accepted_authority_paths")
+        for path in (accepted_authority_paths or set())
+    }
     seen_ids: set[str] = set()
+    attempts_by_id: dict[str, dict[str, Any]] = {}
+    open_findings: dict[str, set[str]] = {}
+    legacy_prefix = True
+    pre_convergence_prefix = True
+    current_epoch: str | None = None
+    current_scope: str | None = None
+    seen_epoch_ids: set[str] = set()
+    post_convergence_terminal_epoch: str | None = None
     nonterminal = 0
     for index, attempt in enumerate(attempts):
-        validate_review(attempt)
+        validate_review(attempt, expected_review_scope=expected_review_scope)
         attempt_id = attempt["attempt"]
+        explicit_v21 = "review_kind" in attempt
+        convergence_aware = convergence_fields_present(attempt)
+
+        if explicit_v21:
+            legacy_prefix = False
+            _require(
+                "legacy_migration" not in attempt,
+                "review_history: explicit PWv2.1 attempt must not claim legacy migration provenance",
+            )
+        else:
+            _require(legacy_prefix,
+                     "review_history: legacy review attempts must form the initial historical prefix")
+            _require(attempt["verdict"] in {"green", "red"},
+                     "review_history: new/active review attempts require explicit review_kind")
+            _require(
+                isinstance(attempt.get("legacy_migration"), dict),
+                "review_history: legacy-shaped attempt requires explicit migration "
+                "provenance bound to the exact immutable source attempt and source "
+                "Git/workstream state; file shape alone never proves historical status",
+            )
+
+        if convergence_aware:
+            pre_convergence_prefix = False
+            epoch = attempt["review_epoch"]
+            scope = attempt["review_scope"]
+            reset_basis = attempt["epoch_reset_basis"]
+            reset_subject = attempt.get("epoch_reset_subject")
+            if current_epoch is None:
+                _require(reset_basis == "",
+                         "review_history: initial convergence-aware epoch must not claim reset basis")
+                _require(reset_subject is None,
+                         "review_history: initial convergence-aware epoch must not claim reset subject")
+                current_epoch = epoch
+                current_scope = scope
+                seen_epoch_ids.add(epoch)
+            elif epoch != current_epoch:
+                _require(bool(reset_basis.strip()),
+                         "review_history: changed review_epoch requires durable accepted-redesign reset basis")
+                _require(isinstance(reset_subject, dict),
+                         "review_history: changed review_epoch requires exact accepted-redesign reset subject")
+                reset_path = reset_subject["path"]
+                _require(
+                    reset_path == attempt["acceptance"].get("path")
+                    or reset_path in accepted_authorities,
+                    "review_history: epoch reset subject must bind exact accepted authority or acceptance redesign",
+                )
+                _require(scope == current_scope,
+                         "review_history: review_scope cannot change across epoch reset in one review history")
+                _require(epoch not in seen_epoch_ids,
+                         "review_history: review_epoch identity cannot be reused after reset")
+                _require(
+                    exact_blob_reader is not None,
+                    "review_history: changed review_epoch requires exact Git redesign readback",
+                )
+                reset_blob = exact_blob_reader(
+                    reset_subject["repository"],
+                    reset_subject["commit"],
+                    reset_path,
+                )
+                _require(
+                    reset_blob == reset_subject["blob"],
+                    "review_history: epoch reset subject exact Git readback does not match claimed blob",
+                )
+                current_subject = attempt["subject"]
+                accepted_blob = exact_blob_reader(
+                    current_subject["repository"],
+                    current_subject["commit"],
+                    reset_path,
+                )
+                _require(
+                    accepted_blob == reset_subject["blob"],
+                    "review_history: epoch reset subject is not the accepted redesign content at the current reviewed subject",
+                )
+                previous_subject = attempts[index - 1]["subject"]
+                previous_blob = exact_blob_reader(
+                    previous_subject["repository"],
+                    previous_subject["commit"],
+                    reset_path,
+                )
+                _require(
+                    previous_blob != reset_subject["blob"],
+                    "review_history: epoch reset requires a material accepted redesign; accepted content is unchanged",
+                )
+                current_epoch = epoch
+                seen_epoch_ids.add(epoch)
+                post_convergence_terminal_epoch = None
+                open_findings.clear()
+            else:
+                _require(reset_basis == "",
+                         "review_history: unchanged review_epoch must not claim reset basis")
+                _require(reset_subject is None,
+                         "review_history: unchanged review_epoch must not claim reset subject")
+                _require(scope == current_scope,
+                         "review_history: review_scope cannot change inside one review history")
+                _require(
+                    post_convergence_terminal_epoch != epoch,
+                    "review_history: terminal post-convergence validation requires structural resolution or a new accepted-redesign epoch",
+                )
+        else:
+            _require(pre_convergence_prefix,
+                     "review_history: pre-convergence attempts must form the initial historical prefix")
+            _require(attempt["verdict"] in {"green", "red"},
+                     "review_history: active attempts require convergence-aware epoch fields")
+
         _require(attempt_id not in seen_ids, f"review_history: duplicate attempt {attempt_id!r}")
         seen_ids.add(attempt_id)
         if expected_card_id is not None:
             _require(attempt.get("card_id") == expected_card_id,
                      "review_history: attempt belongs to another Card")
+            _require(
+                isinstance(attempt.get("acceptance"), dict)
+                and attempt["acceptance"].get("class") == "task_card",
+                "review_history: Card Review acceptance must bind the exact selected Task Card",
+            )
         if workstream_id is not None:
             _require(attempt.get("workstream_id") == workstream_id,
                      "review_history: attempt belongs to another workstream")
+
+        if explicit_v21 and review_kind(attempt) == "discovery":
+            still_open = {source_id for source_id, findings in open_findings.items() if findings}
+            _require(
+                not still_open,
+                "review_history: fresh discovery cannot start before all known material findings are closure-verified",
+            )
+            if convergence_aware:
+                try:
+                    prior = review_convergence_state(
+                        attempts[:index], expected_review_scope=expected_review_scope
+                    )
+                except ReviewContractError as exc:
+                    raise ValidationError(f"review_history: {exc}") from exc
+                is_post = attempt["post_convergence_validation"]
+                if is_post:
+                    _require(prior.convergence_required,
+                             "review_history: post-convergence validation requires a reached convergence threshold")
+                    _require(prior.post_convergence_attempt is None,
+                             "review_history: only one post-convergence validation is allowed per epoch")
+                elif prior.review_epoch == attempt["review_epoch"]:
+                    _require(not prior.convergence_required,
+                             "review_history: convergence threshold requires post-convergence validation, not another ordinary discovery")
+            if attempt["verdict"] == "red":
+                open_findings[attempt_id] = set(attempt["material_finding_ids"])
+
+        if attempt.get("review_kind") == "closure_verification":
+            source_id = attempt["source_discovery_attempt"]
+            source = attempts_by_id.get(source_id)
+            _require(source is not None,
+                     "review_history: closure source discovery must be an earlier attempt")
+            _require(review_kind(source) == "discovery",
+                     "review_history: closure source must be a discovery attempt")
+            _require(source["verdict"] == "red",
+                     "review_history: closure source discovery must be RED")
+            source_findings = source.get("material_finding_ids")
+            _require(isinstance(source_findings, list),
+                     "review_history: PWv2.1 closure source must record material_finding_ids")
+            _require(set(attempt["material_finding_ids"]).issubset(set(source_findings)),
+                     "review_history: closure may verify only findings frozen by its source discovery")
+            if convergence_aware:
+                closure_classes = material_defect_classes(attempt)
+                if convergence_fields_present(source):
+                    _require(source["review_epoch"] == attempt["review_epoch"],
+                             "review_history: closure cannot cross review epochs")
+                    source_classes = material_defect_classes(source)
+                    _require(closure_classes.issubset(source_classes),
+                             "review_history: closure may verify only defect classes frozen by its source discovery")
+                else:
+                    # A terminal explicit T01 discovery may still have open findings when
+                    # convergence accounting is first introduced. Its frozen finding IDs
+                    # remain authoritative; the first convergence-aware epoch may durably
+                    # introduce class identity without retroactively inventing discovery
+                    # accounting. After any accepted epoch reset, the redesigned authority/
+                    # acceptance surface requires fresh discovery and may not import a
+                    # pre-convergence source from the prior surface.
+                    _require("review_kind" in source,
+                             "review_history: convergence-aware closure cannot adapt legacy source without frozen finding IDs")
+                    _require(
+                        len(seen_epoch_ids) == 1,
+                        "review_history: pre-convergence closure adaptation is allowed only in the initial convergence-aware epoch",
+                    )
+            if attempt["verdict"] == "green":
+                open_findings[source_id].difference_update(attempt["material_finding_ids"])
+
+        if (
+            convergence_aware
+            and attempt.get("post_convergence_validation") is True
+            and attempt["verdict"] in {"green", "red"}
+        ):
+            post_convergence_terminal_epoch = attempt["review_epoch"]
+
+        attempts_by_id[attempt_id] = attempt
         if attempt["verdict"] in {"pending", "in_progress"}:
             nonterminal += 1
             _require(index == len(attempts) - 1,
                      "review_history: only the latest attempt may be non-terminal")
     _require(nonterminal <= 1, "review_history: multiple active attempts are forbidden")
+    try:
+        review_convergence_state(attempts, expected_review_scope=expected_review_scope)
+    except ReviewContractError as exc:
+        raise ValidationError(f"review_history: {exc}") from exc
+    try:
+        derive_observation_state(attempts)
+    except ReviewContractError as exc:
+        raise ValidationError(f"review_history: {exc}") from exc
 
 
 def validate_external_effect(data: dict[str, Any], workstream_id: str) -> None:

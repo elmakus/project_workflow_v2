@@ -1,4 +1,5 @@
 # TEMPLATE ONLY — append a new attempt for a changed exact plan subject.
+# Verdict domain is pending/green/red only; in_progress and unknown verdicts fail closed.
 workstream_id = "example-workstream"
 plan_revision = "P1"
 planning_cycle = 1
@@ -16,6 +17,12 @@ blob = "0000000000000000000000000000000000000000"
 [acceptance]
 class = "authority"
 path = "requirements/REQUIREMENTS.md"
+# H006: Plan Review binds one exact current Definition authority member
+# (requirements or a listed decision) with exact content. Commit the
+# authority file and record its real Git identity; path-only or unrelated
+# acceptance cannot prove the reviewed authority at the serving boundary.
+commit = "0000000000000000000000000000000000000000"
+blob = "0000000000000000000000000000000000000000"
 
 [independence]
 materially_produced_or_repaired_subject = false

@@ -14,11 +14,12 @@ A new managed intent must not adopt an unrelated active workstream merely becaus
 
 ## Durable issue alignment
 
-The exact workstream-local INTAKE record owns kind/lifecycle, diagnosis revision, current repair subject, the exact reconciled diagnosis-prior-art subject/result binding, semantic user-response class, alignment state/subject and bounded micro-fix candidacy.
+The exact workstream-local INTAKE record owns kind/lifecycle, diagnosis revision, current repair subject, the exact reconciled diagnosis-prior-art subject/result binding plus its exact consumed-Research proof locator, semantic user-response class, alignment state/subject and bounded micro-fix candidacy.
 
 For an issue:
 - once diagnosis has a concrete current `repair_subject`, Intake must materialize proportional prior-art Research under `workflow/RESEARCH.md` with `origin_role = intake`, `origin_subject` equal to that exact repair subject and `return_target = intake`; repair alignment may not proceed until that exact Research result is applied and consumed;
-- when that exact Research result is applied/consumed, Intake persists `diagnosis_prior_art_subject = repair_subject` plus the exact non-empty `diagnosis_prior_art_result` before alignment proceeds; this Intake-owned binding survives legitimate reuse of the single current Research slot for later Brainstorming/Definition facts;
+- when that exact Research result is applied/consumed, Intake persists `diagnosis_prior_art_subject = repair_subject` plus the exact non-empty `diagnosis_prior_art_result` and the exact `diagnosis_prior_art_proof` RF007 locator (`class`/`repository`/`commit`/`path`/`blob`) to the immutable consumed-Research Git blob before alignment proceeds; this Intake-owned binding survives legitimate reuse of the single current Research slot for later Brainstorming/Definition facts;
+- a persisted binding without exact proof, or proof whose consumed origin/result differs from the binding, fails closed to Recovery and can never present stable alignment; a declared binding alone is never proof;
 - a changed repair subject makes the prior durable diagnosis-prior-art binding stale; the same durable transition that changes the repair subject clears that binding and requires a new exact proportional check before alignment resumes;
 - pending means no implementation authorization;
 - question/concern/alternative is a response but not authorization;

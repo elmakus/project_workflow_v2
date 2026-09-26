@@ -5,11 +5,66 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
+import tomllib
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 
-from tools.execution_contract import ExecutionContractError, parse_card_result
+from tools.editorial_exemption_contract import (
+    EditorialExemptionError,
+    validate_editorial_exemption_classification,
+)
+from tools.exact_locator import (
+    ExactLocatorError,
+    normalize_locator_path,
+    verify_exact_git_locator,
+    verify_worktree_freshness,
+)
+from tools.definition_authority import (
+    DefinitionAuthorityError,
+    verify_planning_authority_freshness,
+)
+from tools.execution_contract import ExecutionContractError, is_accepted_success, parse_card_result
 from tools.recovery_contract import RecoveryContractError, classify_resolution, exact_result_subject, review_subject
+from tools.research_provenance import (
+    ResearchProvenanceError,
+    verify_complete_board_return,
+    verify_complete_workstream_return,
+    verify_consumed_prior_art_proof,
+)
+from tools.review_contract import (
+    can_finalize_review_obligation,
+    remaining_closure_findings,
+    review_convergence_state,
+    review_kind,
+)
+from tools.policy_kernel import MechanicalDecision, PolicyKernel
+from tools.topology_contract import compute_card_contract_digest, ready_topology_hold
+from tools.late_oversize_contract import (
+    bound_handoff_hold,
+    pending_late_return,
+    unfinished_residual_scope,
+)
+from tools.live_finding_contract import (
+    LiveFindingError,
+    live_finding_owner_module,
+    validate_finding_trigger_gates,
+    validate_live_findings,
+    verify_finding_trigger_records,
+    verify_live_finding_records,
+)
+from tools.live_consumer_contract import (
+    LiveConsumerError,
+    validate_live_consumer_gates,
+    verify_live_consumer_records,
+)
+from tools.review_attempt_provenance import (
+    ReviewAttemptProvenanceError,
+    require_commit_in_head_ancestry,
+    verify_legacy_migration,
+    verify_review_attempt_locator,
+    verify_terminal_append_only_from_git,
+)
 from tools.state_contract import (
     ValidationError,
     read_project,
@@ -66,9 +121,11 @@ class Reads:
         self.items: list[str] = []
 
     def _read_path(self, root: Path, raw: str, owner: str) -> Path:
-        rel = PurePosixPath(raw)
-        if rel.is_absolute() or "." in rel.parts or ".." in rel.parts:
-            raise ValidationError(f"unsafe {owner} path {raw!r}")
+        try:
+            canonical = normalize_locator_path(raw, owner)
+        except ExactLocatorError as exc:
+            raise ValidationError(f"unsafe {owner} path {raw!r}: {exc}") from exc
+        rel = PurePosixPath(canonical)
         path = (root / Path(*rel.parts)).resolve()
         try:
             path.relative_to(root)
@@ -103,6 +160,128 @@ def recovery(reads: Reads, reason: str) -> RouteResult:
                   owner_module="workflow/RECOVERY.md")
 
 
+def project_git_blob_reader(project_root: Path, project_repository: str):
+    """Return an exact blob reader for immutable subjects in the selected project Git repository."""
+    def read_blob(repository: str, commit: str, path: str) -> str | None:
+        if repository != project_repository:
+            return None
+        try:
+            resolved = subprocess.run(
+                ["git", "-C", str(project_root), "rev-parse", "--verify", f"{commit}:{path}"],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=5,
+            )
+            if resolved.returncode != 0:
+                return None
+            sha = resolved.stdout.strip()
+            if len(sha) != 40 or any(char not in "0123456789abcdef" for char in sha):
+                return None
+            kind = subprocess.run(
+                ["git", "-C", str(project_root), "cat-file", "-t", sha],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=5,
+            )
+            if kind.returncode != 0 or kind.stdout.strip() != "blob":
+                return None
+            return sha
+        except (OSError, subprocess.SubprocessError):
+            return None
+
+    return read_blob
+
+
+def read_exact_editorial_classification(
+    reads: Reads,
+    project_repository: str,
+    ref: dict[str, object],
+) -> dict[str, object]:
+    """Read the one RF008 proof record by exact Git identity.
+
+    Identity proof reuses the shared RF007 exact-locator resolver; the
+    RF008 serving boundary keeps its accepted messages and readback shape.
+    """
+    repository = ref.get("repository")
+    commit = ref.get("commit")
+    path = ref.get("path")
+    expected_blob = ref.get("blob")
+    if repository != project_repository:
+        raise ValidationError("editorial classification repository does not match selected project")
+    if not isinstance(commit, str) or not isinstance(path, str) or not isinstance(expected_blob, str):
+        raise ValidationError("editorial classification locator is incomplete")
+    try:
+        normalize_locator_path(path, "editorial classification")
+    except ExactLocatorError as exc:
+        raise ValidationError("editorial classification path is unsafe") from exc
+    try:
+        verify_exact_git_locator(
+            project_root=reads.project_root,
+            repository=repository,
+            expected_repository=project_repository,
+            commit=commit,
+            path=path,
+            blob=expected_blob,
+            label="editorial classification",
+        )
+    except ExactLocatorError as exc:
+        if exc.kind == "dangling":
+            raise ValidationError("editorial classification exact Git subject does not resolve") from exc
+        if exc.kind == "blob_mismatch":
+            raise ValidationError("editorial classification blob does not match exact locator") from exc
+        if exc.kind == "not_blob":
+            raise ValidationError("editorial classification locator does not resolve to a Git blob") from exc
+        if exc.kind == "git_unavailable":
+            raise ValidationError(f"editorial classification Git readback failed: {exc}") from exc
+        raise ValidationError(f"editorial classification locator is invalid: {exc}") from exc
+    try:
+        payload = subprocess.run(
+            ["git", "-C", str(reads.project_root), "cat-file", "-p", expected_blob],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+        if payload.returncode != 0:
+            raise ValidationError("editorial classification blob content is unreadable")
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ValidationError(f"editorial classification Git readback failed: {exc}") from exc
+    reads.items.append(
+        f"project-git:{repository}@{commit}:{path}@{expected_blob}"
+    )
+    try:
+        parsed = tomllib.loads(payload.stdout)
+    except (tomllib.TOMLDecodeError, ValueError) as exc:
+        raise ValidationError(f"editorial classification TOML is malformed: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise ValidationError("editorial classification top-level TOML must be a table")
+    return parsed
+
+
+def policy_result(
+    reads: Reads,
+    decision: MechanicalDecision,
+    reason: str,
+    *,
+    subject: str | None = None,
+) -> RouteResult:
+    if decision.disposition == "recovery":
+        try:
+            reads.package(decision.owner_module).read_text(encoding="utf-8")
+        except OSError:
+            reason += "; recovery module unreadable"
+    return result(
+        reads,
+        decision.disposition,
+        decision.obligation,
+        reason,
+        subject=subject,
+        owner_module=decision.owner_module,
+    )
+
+
 def classify_jit_refinement(change_class: str) -> tuple[str, str]:
     routes = {
         "bounded_execution_detail": (
@@ -121,10 +300,96 @@ def classify_jit_refinement(change_class: str) -> tuple[str, str]:
             "research",
             "Missing factual evidence must be resolved by Research before preparation continues",
         ),
+        "required_seam_challenge": (
+            "planning",
+            "Evidence that a required seam is wrong returns to Strategic Planning "
+            "for accepted revision; Execution Prep cannot silently override it",
+        ),
+        "preferred_seam_deviation": (
+            "execution_prep",
+            "Preferred-seam merge/split deviation stays in Execution Prep only with "
+            "qualifying durable technical rationale",
+        ),
+        "topology_challenge": (
+            "execution_prep",
+            "Materially risky Card topology requires a fresh independent "
+            "topology challenge before first launch; Execution Prep owns the "
+            "challenge and any bounded re-decomposition",
+        ),
+        "late_oversize_return": (
+            "execution_prep",
+            "Material execution/review evidence that the active Card is "
+            "oversized returns only the residual unaccepted scope to "
+            "Execution Prep for bounded re-decomposition; independently valid "
+            "evidence is preserved and the Worker never self-splits",
+        ),
     }
     if change_class not in routes:
         raise ValidationError(f"unknown JIT refinement class {change_class!r}")
     return routes[change_class]
+
+
+def accepted_planning_seams(reads: Reads, workstream: dict) -> list[dict] | None:
+    """Return accepted Planning seam declarations for Task Board fidelity validation.
+
+    Returns None when the workstream binds no Planning record or the accepted
+    record declares no seams (legacy plans stay valid). Otherwise the Task
+    Board must carry exactly one durable JIT decision per declared seam.
+    """
+    if "planning" not in workstream:
+        return None
+    planning = read_toml(reads.project(workstream["planning"]["path"]))
+    validate_planning(planning, workstream["workstream_id"])
+    return planning.get("seams")
+
+
+def read_verified_card_result(
+    reads: Reads,
+    project_repository: str,
+    card: dict,
+) -> str:
+    """Read the active Card result only after proving its exact locator.
+
+    A declared ``(commit, blob)`` identity must resolve in Git and the
+    current worktree bytes must still match that blob (H010/H020); legacy
+    locators without declared identity keep worktree existence/readback.
+    Returns the verified text so callers never re-read past the proof.
+    """
+    ref = card["result"]
+    locator_path = ref["path"]
+    if "commit" in ref or "blob" in ref:
+        try:
+            verified = verify_exact_git_locator(
+                project_root=reads.project_root,
+                repository=project_repository,
+                expected_repository=project_repository,
+                commit=ref.get("commit"),
+                path=locator_path,
+                blob=ref.get("blob"),
+                label="card result",
+            )
+            content = verify_worktree_freshness(
+                project_root=reads.project_root,
+                path=locator_path,
+                blob=ref.get("blob"),
+                label="card result",
+            )
+        except ExactLocatorError as exc:
+            raise ValidationError(str(exc)) from exc
+        reads.items.append(f"project-git:{verified.key}")
+        reads.project(locator_path)
+        try:
+            return content.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValidationError(
+                f"card result {locator_path!r} is not UTF-8 text: {exc}"
+            ) from exc
+    try:
+        return reads.project(locator_path).read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValidationError(
+            f"card result {locator_path!r} is not UTF-8 text: {exc}"
+        ) from exc
 
 
 def refresh_ready_card(
@@ -132,10 +397,27 @@ def refresh_ready_card(
     board: dict,
     workstream: dict,
     card: dict,
+    *,
+    project_repository: str,
 ) -> dict:
     contract_path = card["contract"]["path"]
     text = reads.project(contract_path).read_text(encoding="utf-8")
     contract = parse_task_card(text, card["id"], workstream["workstream_id"])
+
+    for audit in board.get("topology_audits", []) or []:
+        if audit.get("card_id") == card["id"] and audit.get("risk") == "risky":
+            challenge = audit.get("challenge") or {}
+            expected = challenge.get("card_contract_digest", "")
+            actual = compute_card_contract_digest(
+                reads.project(contract_path).read_bytes()
+            )
+            if actual != expected:
+                raise ValidationError(
+                    f"READY Card {card['id']} topology challenge subject does not "
+                    "match the exact current Card contract; the challenge is stale "
+                    "and must be renewed before launch"
+                )
+            break
 
     for authority_path in contract["authority_refs"]:
         reads.project(authority_path).read_text(encoding="utf-8")
@@ -159,6 +441,25 @@ def refresh_ready_card(
             raise ValidationError(
                 f"ready Card dependency {dependency['path']!r} no longer matches the exact current DONE predecessor result"
             )
+        try:
+            verified = verify_exact_git_locator(
+                project_root=reads.project_root,
+                repository=project_repository,
+                expected_repository=project_repository,
+                commit=dependency["commit"],
+                path=dependency["path"],
+                blob=dependency["blob"],
+                label="ready Card dependency",
+            )
+            verify_worktree_freshness(
+                project_root=reads.project_root,
+                path=dependency["path"],
+                blob=dependency["blob"],
+                label="ready Card dependency",
+            )
+        except ExactLocatorError as exc:
+            raise ValidationError(str(exc)) from exc
+        reads.items.append(f"project-git:{verified.key}")
         reads.project(dependency["path"]).read_text(encoding="utf-8")
 
     technical_contract = contract["technical_contract"]
@@ -201,31 +502,56 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
         expected_manifest = f"implementation/workstreams/{workstream['workstream_id']}/WORKSTREAM.toml"
         if manifest_rel != expected_manifest:
             raise ValidationError(f"selected manifest must be exact path {expected_manifest!r}")
+        kernel = PolicyKernel.from_path(reads.package("policy/mechanical_policy.json"))
+        kernel.verify_projection(reads.package("workflow/POLICY_KERNEL.md"))
         research = None
+        research_active = False
         if "research" in workstream:
             research = read_toml(reads.project(workstream["research"]["path"]))
             validate_research(research, workstream["workstream_id"])
+            # RF003: generic active-Research dispatch is deferred until after
+            # the owning explicit/premium/Intake boundary is evaluated below.
+            # Completed Research still returns immediately through its exact
+            # RF009 verified owner; only the active branch moves.
             if research["state"] == "active":
-                return result(
-                    reads, "route", "research",
-                    "Active Research owns the next factual obligation",
-                    subject=research["origin_subject"], owner_module="workflow/RESEARCH.md",
-                )
+                research_active = True
             if research["state"] == "complete":
                 owner_modules = {
                     "intake": "workflow/INTAKE.md",
                     "brainstorming": "workflow/BRAINSTORMING.md",
                     "definition": "workflow/DEFINITION.md",
                 }
+
+                def _read_origin_owner(role: str) -> dict | None:
+                    owned = {
+                        "intake": ("intake", validate_intake),
+                        "brainstorming": ("brainstorm", validate_brainstorm),
+                        "definition": ("definition", validate_definition),
+                    }
+                    key, validator = owned[role]
+                    if key not in workstream:
+                        return None
+                    owner = read_toml(reads.project(workstream[key]["path"]))
+                    validator(owner, workstream["workstream_id"])
+                    return owner
+
+                try:
+                    verified_target = verify_complete_workstream_return(
+                        research=research,
+                        workstream=workstream,
+                        read_owner=_read_origin_owner,
+                    )
+                except ResearchProvenanceError as exc:
+                    raise ValidationError(f"{exc}") from exc
                 reason = (
                     "Completed Research must be reconciled by its exact return owner"
                     if research["return_reconciliation"] == "pending"
                     else "Research result is already applied; return owner may only consume/clear it"
                 )
                 return result(
-                    reads, "route", research["return_target"], reason,
+                    reads, "route", verified_target, reason,
                     subject=research["origin_subject"],
-                    owner_module=owner_modules[research["return_target"]],
+                    owner_module=owner_modules[verified_target],
                 )
 
         intake = None
@@ -237,6 +563,18 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     intake["diagnosis_prior_art_subject"] == intake["repair_subject"]
                     and bool(intake["diagnosis_prior_art_result"].strip())
                 )
+                if stable_diagnosis_prior_art:
+                    try:
+                        consumed_prior_art, proof_read = verify_consumed_prior_art_proof(
+                            project_root=reads.project_root,
+                            project_repository=project["repository"],
+                            workstream_id=workstream["workstream_id"],
+                            intake=intake,
+                        )
+                    except ResearchProvenanceError as exc:
+                        raise ValidationError(f"{exc}") from exc
+                    validate_research(consumed_prior_art, workstream["workstream_id"])
+                    reads.items.append(proof_read)
                 if not stable_diagnosis_prior_art:
                     exact_diagnosis_research = (
                         research is not None
@@ -290,9 +628,10 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
         if "tracker" in workstream:
             tracker = read_toml(reads.project(workstream["tracker"]["path"]))
             validate_tracker(tracker, workstream["workstream_id"])
-            if tracker["state"] == "ambiguous":
-                return recovery(
+            if (decision := kernel.route("PWV21-K001", {"tracker": tracker})) is not None:
+                return policy_result(
                     reads,
+                    decision,
                     "GitHub Issue tracker recovery is ambiguous; creating another tracker is forbidden",
                 )
             if tracker["state"] == "discovery":
@@ -321,11 +660,42 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                 raise ValidationError("Definition locator requires durable Brainstorming promotion state")
             expected_scope = f"{brainstorm['scope_id']}@{brainstorm['revision']}"
             if (
-                brainstorm["promotion_state"] != "authorized"
+                brainstorm["state"] != "promoted"
+                or brainstorm["promotion_state"] != "authorized"
                 or brainstorm["promotion_subject"] != expected_scope
                 or definition["source_scope_subject"] != expected_scope
             ):
                 raise ValidationError("Definition source does not match exact promoted Brainstorming revision")
+
+        # RF002 stop precedence is pre-execution only: Board-coupled Definition
+        # routes keep parent behavior, while brainstorm-only stop is unchanged.
+        if brainstorm is not None and ("task_board" not in workstream or definition is None):
+            exact_scope = f"{brainstorm['scope_id']}@{brainstorm['revision']}"
+            if (decision := kernel.route("PWV21-K009", {"brainstorm": brainstorm})) is not None:
+                return policy_result(
+                    reads,
+                    decision,
+                    "Brainstorming carries an explicit user stop",
+                    subject=exact_scope,
+                )
+
+        # RF003: the owning Definition GREEN premium-A boundary is evaluated
+        # before generic active-Research dispatch. K002 and active-Definition
+        # work are mutually exclusive states, so hoisting K002 ahead of the
+        # Definition-active branch preserves every non-Research route. The
+        # deferred workstream-Research checks sit after all pre-execution
+        # owning/generic dispatch (no-Board path) and after Board owning
+        # evaluation (Board-coupled path) so no generic Research route can
+        # bypass an owning premium, Review, result, or Board-continuation gate.
+        if definition is not None:
+            if (decision := kernel.route("PWV21-K002", {"definition": definition})) is not None:
+                return policy_result(
+                    reads,
+                    decision,
+                    "Definition is GREEN; premium stop A is due before material Strategic Planning; "
+                    "recommend the best available model/context for Strategic Planning without making model identity canonical",
+                    subject=definition["revision"],
+                )
 
         plan_gate_passed_with_board = False
         if definition is not None:
@@ -334,13 +704,6 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     reads, "route", "definition",
                     "Promoted scope has active Definition work",
                     subject=definition["source_scope_subject"], owner_module="workflow/DEFINITION.md",
-                )
-            if definition["premium_a"] == "due":
-                return result(
-                    reads, "stop", "premium_A",
-                    "Definition is GREEN; premium stop A is due before material Strategic Planning; "
-                    "recommend the best available model/context for Strategic Planning without making model identity canonical",
-                    subject=definition["revision"], owner_module="workflow/DEFINITION.md",
                 )
 
             planning = None
@@ -355,76 +718,189 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     subject=definition["revision"], owner_module="workflow/PLANNING.md",
                 )
 
-            if planning["premium_a"] == "due":
-                return result(
-                    reads, "stop", "premium_A",
+            if (decision := kernel.route("PWV21-K003", {"planning": planning})) is not None:
+                return policy_result(
+                    reads,
+                    decision,
                     "Material planning re-entry has a new exact cycle; premium stop A is due before Planning resumes; "
                     "recommend the best available model/context for Strategic Planning without making model identity canonical",
-                    subject=planning["entry_subject"], owner_module="workflow/PLANNING.md",
+                    subject=planning["entry_subject"],
                 )
 
-            if planning["state"] == "draft":
-                return result(
-                    reads, "route", "planning",
+            if (decision := kernel.route("PWV21-K004", {"planning": planning})) is not None:
+                return policy_result(
+                    reads,
+                    decision,
                     "Current planning cycle has exact premium A satisfaction and is still being authored",
-                    subject=planning["entry_subject"], owner_module="workflow/PLANNING.md",
+                    subject=planning["entry_subject"],
                 )
 
             plan_review = None
             if "plan_review" in workstream:
                 plan_review = read_toml(reads.project(workstream["plan_review"]["path"]))
-                validate_plan_review(plan_review, workstream["workstream_id"], planning)
+                validate_plan_review(
+                    plan_review, workstream["workstream_id"], planning, definition
+                )
+
+            try:
+                authority_reads = verify_planning_authority_freshness(
+                    project_root=reads.project_root,
+                    project_repository=project["repository"],
+                    workstream_id=workstream["workstream_id"],
+                    definition=definition,
+                    planning=planning,
+                    plan_review=plan_review,
+                )
+            except DefinitionAuthorityError as exc:
+                raise ValidationError(f"planning authority freshness failed: {exc}") from exc
+            reads.items.extend(authority_reads)
+
+            if plan_review is not None:
+                # H006: Plan Review acceptance binding — the reviewed
+                # acceptance must name an exact current Definition authority
+                # member with exact content identity. Membership is proved by
+                # state validation above; explicit-key attempts additionally
+                # prove the declared (commit, blob) in Git with HEAD ancestry
+                # and worktree freshness, mirroring H005 Card acceptance.
+                # Keyless legacy attempts prove claimed identity when present
+                # and stay valid path-only otherwise.
+                reviewed_acceptance = plan_review.get("acceptance")
+                if not isinstance(reviewed_acceptance, dict):
+                    raise ValidationError(
+                        "plan review acceptance must bind exact Definition authority"
+                    )
+                reviewed_path = reviewed_acceptance.get("path")
+                if reviewed_acceptance.get("class") != "authority" or not isinstance(
+                    reviewed_path, str
+                ):
+                    raise ValidationError(
+                        "plan review acceptance must bind exact Definition authority"
+                    )
+                acceptance_commit = reviewed_acceptance.get("commit")
+                acceptance_blob = reviewed_acceptance.get("blob")
+                planning_key = planning.get("definition_authority_key", "")
+                planning_has_key = isinstance(planning_key, str) and planning_key != ""
+                if planning_has_key and (
+                    not isinstance(acceptance_commit, str)
+                    or not isinstance(acceptance_blob, str)
+                ):
+                    raise ValidationError(
+                        "plan review acceptance requires exact commit + blob "
+                        "Definition-authority identity; path-only acceptance "
+                        "cannot prove exact content"
+                    )
+                if isinstance(acceptance_commit, str) and isinstance(acceptance_blob, str):
+                    try:
+                        verified_acceptance = verify_exact_git_locator(
+                            project_root=reads.project_root,
+                            repository=project["repository"],
+                            expected_repository=project["repository"],
+                            commit=acceptance_commit,
+                            path=reviewed_path,
+                            blob=acceptance_blob,
+                            label="plan review acceptance",
+                        )
+                        verify_worktree_freshness(
+                            project_root=reads.project_root,
+                            path=reviewed_path,
+                            blob=acceptance_blob,
+                            label="plan review acceptance",
+                        )
+                    except ExactLocatorError as exc:
+                        if exc.kind == "mutated":
+                            raise ValidationError(
+                                "plan review acceptance is stale for the exact current "
+                                f"Definition authority: {exc}"
+                            ) from exc
+                        raise ValidationError(
+                            f"plan review acceptance exact Definition-authority proof failed: {exc}"
+                        ) from exc
+                    try:
+                        require_commit_in_head_ancestry(
+                            project_root=reads.project_root,
+                            commit=acceptance_commit,
+                            label="plan review acceptance",
+                        )
+                    except ReviewAttemptProvenanceError as exc:
+                        raise ValidationError(
+                            f"plan review acceptance HEAD ancestry failed: {exc}"
+                        ) from exc
+                    reads.items.append(f"project-git:{verified_acceptance.key}")
+                    reads.project(reviewed_path)
 
             subject_key = (
                 f"{planning['subject']['repository']}@{planning['subject']['commit']}:"
                 f"{planning['subject']['path']}@{planning['subject']['blob']}"
             )
             if planning["state"] == "frozen":
-                if planning["premium_b"] == "due":
-                    return result(
-                        reads, "stop", "premium_B",
+                if (decision := kernel.route("PWV21-K005", {"planning": planning})) is not None:
+                    return policy_result(
+                        reads,
+                        decision,
                         "Exact plan subject is frozen; premium stop B requires a fresh independent best-available review context",
-                        subject=subject_key, owner_module="workflow/PLANNING.md",
+                        subject=subject_key,
                     )
                 if plan_review is None:
                     raise ValidationError("premium B satisfied without exact Plan Review attempt")
-                if plan_review["verdict"] == "pending":
-                    return result(
-                        reads, "route", "plan_review",
+                if (decision := kernel.route("PWV21-K006", {"plan_review": plan_review})) is not None:
+                    return policy_result(
+                        reads,
+                        decision,
                         "Fresh independent Plan Review owns the frozen exact subject",
-                        subject=subject_key, owner_module="workflow/PLAN_REVIEW.md",
+                        subject=subject_key,
                     )
-                if plan_review["verdict"] == "green":
+                if (decision := kernel.route("PWV21-K007", {"plan_review": plan_review})) is not None:
+                    return policy_result(
+                        reads,
+                        decision,
+                        "GREEN Plan Review must be consumed into approved plan state",
+                        subject=subject_key,
+                    )
+                if plan_review["verdict"] == "red":
                     return result(
                         reads, "route", "planning",
-                        "GREEN Plan Review must be consumed into approved plan state",
+                        "RED Plan Review returns to Planning for correction classification",
                         subject=subject_key, owner_module="workflow/PLANNING.md",
                     )
-                return result(
-                    reads, "route", "planning",
-                    "RED Plan Review returns to Planning for correction classification",
-                    subject=subject_key, owner_module="workflow/PLANNING.md",
+                raise ValidationError(
+                    f"unsupported Plan Review verdict {plan_review['verdict']!r}; "
+                    "frozen plan routes only pending, green or red"
                 )
 
             if planning["review_mode"] == "editorial_exempt":
                 if plan_review is None or plan_review["verdict"] != "green":
                     raise ValidationError("editorial exemption requires prior exact GREEN Plan Review")
+                classification_ref = planning["review_exemption_classification"]
+                classification = read_exact_editorial_classification(
+                    reads,
+                    project["repository"],
+                    classification_ref,
+                )
+                try:
+                    validate_editorial_exemption_classification(
+                        classification,
+                        workstream_id=workstream["workstream_id"],
+                        planning=planning,
+                    )
+                except EditorialExemptionError as exc:
+                    raise ValidationError(f"{exc}") from exc
                 if "task_board" not in workstream:
                     return result(
                         reads, "route", "execution_prep",
-                        "Editorial/mechanical-only plan change preserves prior GREEN review and satisfied C; no new Stage-6 review is due",
+                        "Exact independent GREEN editorial-only classification preserves prior GREEN review and satisfied C; no new Stage-6 review is due",
                         subject=subject_key, owner_module="workflow/EXECUTION_PREP.md",
                     )
                 plan_gate_passed_with_board = True
             else:
                 if plan_review is None or plan_review["verdict"] != "green":
                     raise ValidationError("approved plan requires exact GREEN Plan Review")
-                if planning["premium_c"] == "due":
-                    return result(
-                        reads, "stop", "premium_C",
+                if (decision := kernel.route("PWV21-K008", {"planning": planning})) is not None:
+                    return policy_result(
+                        reads,
+                        decision,
                         "GREEN Plan Review is approved; premium stop C is due before Execution Prep; "
                         "recommend switching to a lighter/cheaper model/context for Execution Prep",
-                        subject=subject_key, owner_module="workflow/PLANNING.md",
+                        subject=subject_key,
                     )
                 if "task_board" not in workstream:
                     return result(
@@ -436,17 +912,12 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
 
         if not plan_gate_passed_with_board and brainstorm is not None:
             exact_scope = f"{brainstorm['scope_id']}@{brainstorm['revision']}"
-            if brainstorm["explicit_user_stop"]:
-                return result(
-                    reads, "stop", "explicit_user_stop",
-                    "Brainstorming carries an explicit user stop",
-                    subject=exact_scope, owner_module="workflow/BRAINSTORMING.md",
-                )
-            if brainstorm["state"] == "active":
-                return result(
-                    reads, "route", "brainstorming",
+            if (decision := kernel.route("PWV21-K010", {"brainstorm": brainstorm})) is not None:
+                return policy_result(
+                    reads,
+                    decision,
                     "Active exploratory scope owns the next product/strategy clarification",
-                    subject=exact_scope, owner_module="workflow/BRAINSTORMING.md",
+                    subject=exact_scope,
                 )
             if brainstorm["promotion_state"] == "pending":
                 return result(
@@ -454,10 +925,27 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     "Brainstorming is ready but exact current revision is not authorized for Definition",
                     subject=exact_scope, owner_module="workflow/BRAINSTORMING.md",
                 )
+            if brainstorm["state"] != "promoted":
+                raise ValidationError(
+                    "Brainstorming carries exact promotion authorization but is not promoted; "
+                    "Definition entry requires promoted state"
+                )
             return result(
                 reads, "route", "definition",
-                "Exact current exploratory revision is authorized for Definition",
+                "Exact current exploratory revision is promoted and authorized for Definition",
                 subject=exact_scope, owner_module="workflow/DEFINITION.md",
+            )
+
+        # RF003 no-Board path: lone workstream active Research with no owning
+        # pre-execution boundary still routes research without reading a Task
+        # Board, preserving the progressive-disclosure bound. Board-coupled
+        # workstreams fall through to Board owning evaluation below.
+        if research_active and "task_board" not in workstream:
+            assert research is not None
+            return result(
+                reads, "route", "research",
+                "No owning explicit/premium/Intake/Review boundary is due; active Research owns the next factual obligation",
+                subject=research["origin_subject"], owner_module="workflow/RESEARCH.md",
             )
 
         if not plan_gate_passed_with_board and "task_board" not in workstream:
@@ -476,45 +964,132 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             )
 
         board = read_toml(reads.project(workstream["task_board"]["path"]))
-        validate_board(board, workstream)
+        validate_board(
+            board, workstream, planning_seams=accepted_planning_seams(reads, workstream)
+        )
 
+        board_research_active = False
+        board_research_subject: str | None = None
         if board.get("research_obligation") is not None:
             research_ref = board["research_obligation"]
             board_research = read_toml(reads.project(research_ref["path"]))
             validate_research(board_research, workstream["workstream_id"])
             if board_research["origin_role"] not in {"execution_prep", "execution", "execution_resolution"}:
                 raise ValidationError("Task Board Research pointer must own implementation/recovery Research")
+            # RF003: generic Board active-Research dispatch is deferred until
+            # after result reconciliation/review and Board continuation are
+            # evaluated below. Completed Research still returns immediately
+            # through its exact RF009 verified owner; only the active branch
+            # moves.
             if board_research["state"] == "active":
-                return result(
-                    reads, "route", "research",
-                    "Implementation/recovery Research owns the next factual obligation",
-                    subject=board_research["origin_subject"], owner_module="workflow/RESEARCH.md",
-                )
-            if board_research["state"] == "complete":
-                return_target = board_research["return_target"]
-                if return_target.startswith("execution_resolution:"):
-                    obligation = "execution_resolution"
-                elif return_target.startswith("execution_prep:"):
-                    obligation = "execution_prep"
-                elif return_target.startswith("execution:"):
-                    obligation = "execution"
-                else:
-                    raise ValidationError("Task Board Research has non-execution return target")
+                board_research_active = True
+                board_research_subject = board_research["origin_subject"]
+            elif board_research["state"] == "complete":
+                try:
+                    obligation = verify_complete_board_return(
+                        research=board_research, board=board
+                    )
+                except ResearchProvenanceError as exc:
+                    raise ValidationError(f"{exc}") from exc
                 return result(
                     reads, "route", obligation,
                     "Completed implementation Research returns once to its exact durable owner before pointer cleanup",
-                    subject=return_target.split(":", 1)[1],
+                    subject=board_research["origin_subject"],
                     owner_module="workflow/RECOVERY.md" if obligation == "execution_resolution" else (
                         "workflow/EXECUTION_PREP.md" if obligation == "execution_prep" else "workflow/EXECUTION.md"
                     ),
                 )
-            return result(
-                reads, "route", "research_cleanup",
-                "Task Board still points to consumed Research; clear only the stale pointer without replay",
-                subject=board_research["origin_subject"], owner_module="workflow/RECOVERY.md",
-            )
+            else:
+                return result(
+                    reads, "route", "research_cleanup",
+                    "Task Board still points to consumed Research; clear only the stale pointer without replay",
+                    subject=board_research["origin_subject"], owner_module="workflow/RECOVERY.md",
+                )
     except (OSError, ValidationError, KeyError) as exc:
         return recovery(reads, f"selected workstream identity invalid: {exc}")
+
+    if board.get("live_findings"):
+        def _live_record_reader(raw: str) -> str | None:
+            try:
+                return reads.project(raw).read_text(encoding="utf-8")
+            except (OSError, ValidationError):
+                return None
+
+        try:
+            verify_live_finding_records(board, record_reader=_live_record_reader)
+        except LiveFindingError as exc:
+            return recovery(reads, f"live-finding intake verification failed: {exc}")
+
+        try:
+            verify_finding_trigger_records(board, record_reader=_live_record_reader)
+        except LiveFindingError as exc:
+            return recovery(reads, f"affected-JIT reconciliation verification failed: {exc}")
+
+    if board.get("jit_triggers"):
+        def _consumer_record_reader(raw: str) -> str | None:
+            try:
+                return reads.project(raw).read_text(encoding="utf-8")
+            except (OSError, ValidationError):
+                return None
+
+        try:
+            verify_live_consumer_records(
+                board,
+                record_reader=_consumer_record_reader,
+                git_reader=project_git_blob_reader(
+                    reads.project_root, project["repository"]
+                ),
+            )
+        except LiveConsumerError as exc:
+            return recovery(reads, f"live-consumer admission verification failed: {exc}")
+
+    late = pending_late_return(board)
+    handoff = bound_handoff_hold(board) if late is None else None
+    held = late if late is not None else handoff
+    if held is not None:
+        try:
+            record = next(
+                item for item in board.get("late_oversize_returns", [])
+                if isinstance(item, dict) and item.get("card_id") == held
+            )
+        except StopIteration as exc:
+            return recovery(reads, f"late-oversize return record unreadable: {exc}")
+        try:
+            for ref in record.get("preserved_refs", []):
+                reads.project(ref).read_text(encoding="utf-8")
+        except (OSError, ValidationError) as exc:
+            return recovery(reads, f"late-oversize preserved evidence unreadable: {exc}")
+        if record.get("origin") == "review":
+            try:
+                attempt_data = read_toml(reads.project(record.get("origin_attempt_path", "")))
+            except (OSError, ValueError) as exc:
+                return recovery(reads, f"late-oversize review attempt readback failed: {exc}")
+            if attempt_data.get("attempt") != record.get("origin_attempt"):
+                return recovery(
+                    reads,
+                    f"late-oversize review attempt binding mismatch for Card {held}: "
+                    f"locator {record.get('origin_attempt_path')!r} does not carry "
+                    f"attempt {record.get('origin_attempt')!r}",
+                )
+        if late is not None:
+            reason = (
+                f"Card {held} has a pending late-oversize return; independently "
+                "valid evidence is preserved and only the residual unaccepted "
+                "scope returns to Execution Prep, which must materialize the "
+                "residual Card and bind the return before the original "
+                "transitions to returned"
+            )
+        else:
+            reason = (
+                f"Card {held} has a bound late-oversize return; Execution Prep owns "
+                "handoff finalization — transition the original to returned, "
+                "its non-GREEN terminal disposition, so the bound residual "
+                "Card can proceed"
+            )
+        return result(
+            reads, "route", "execution_prep", reason,
+            subject=held, owner_module="workflow/EXECUTION_PREP.md",
+        )
 
     active = [card for card in board["cards"] if card["status"] == "in_progress"]
     ready = [card for card in board["cards"] if card["status"] == "ready"]
@@ -522,25 +1097,83 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
     if active:
         card = active[0]
         try:
-            reads.project(card["contract"]["path"]).read_text(encoding="utf-8")
+            card_text = reads.project(card["contract"]["path"]).read_text(encoding="utf-8")
+            contract = parse_task_card(
+                card_text,
+                card["id"],
+                workstream["workstream_id"],
+            )
             if "result" in card:
-                result_text = reads.project(card["result"]["path"]).read_text(encoding="utf-8")
-                parse_card_result(result_text, card["id"], workstream["workstream_id"])
-                contract = parse_task_card(
-                    reads.project(card["contract"]["path"]).read_text(encoding="utf-8"),
-                    card["id"],
-                    workstream["workstream_id"],
+                result_text = read_verified_card_result(
+                    reads, project["repository"], card
                 )
+                parsed_result = parse_card_result(
+                    result_text, card["id"], workstream["workstream_id"]
+                )
+                if not is_accepted_success(parsed_result):
+                    raise ValidationError(
+                        "card result is not accepted success; only structured "
+                        "Result status success can authorize reconciliation, "
+                        "review, or no-replay recovery"
+                    )
+                for evidence_ref in parsed_result["evidence_refs"]:
+                    try:
+                        reads.project(evidence_ref).read_text(encoding="utf-8")
+                    except (OSError, ValidationError) as exc:
+                        raise ValidationError(
+                            f"card result evidence {evidence_ref!r} cannot be read back: {exc}"
+                        ) from exc
                 requirement = contract["review_requirement"]
-                attempts: list[dict] = []
-                for attempt_ref in card.get("review_attempts", []):
-                    attempt = read_toml(reads.project(attempt_ref["path"]))
-                    attempts.append(attempt)
+                attempt_refs = card.get("review_attempts", [])
+                if requirement == "none":
+                    # Review-free Cards never rely on attempt history; still
+                    # reject malformed locators so Boards stay shape-clean.
+                    attempts: list[dict] = []
+                    for attempt_ref in attempt_refs:
+                        attempt = read_toml(reads.project(attempt_ref["path"]))
+                        attempts.append(attempt)
+                else:
+                    attempts = []
+                    for index, attempt_ref in enumerate(attempt_refs):
+                        label = f"review_attempts[{index}]"
+                        try:
+                            attempt, _, locator_read = verify_review_attempt_locator(
+                                project_root=reads.project_root,
+                                project_repository=project["repository"],
+                                workstream_id=workstream["workstream_id"],
+                                card_id=card["id"],
+                                ref=attempt_ref,
+                                label=label,
+                            )
+                        except ReviewAttemptProvenanceError as exc:
+                            raise ValidationError(
+                                f"review attempt identity failed: {exc}"
+                            ) from exc
+                        reads.items.append(locator_read)
+                        reads.project(attempt_ref["path"])
+                        if "review_kind" not in attempt and attempt.get("verdict") in {
+                            "green",
+                            "red",
+                        }:
+                            try:
+                                provenance_read = verify_legacy_migration(
+                                    project_root=reads.project_root,
+                                    project_repository=project["repository"],
+                                    workstream_id=workstream["workstream_id"],
+                                    card_id=card["id"],
+                                    attempt=attempt,
+                                )
+                            except ReviewAttemptProvenanceError as exc:
+                                raise ValidationError(
+                                    f"legacy review attempt provenance failed: {exc}"
+                                ) from exc
+                            reads.items.append(provenance_read)
+                        attempts.append(attempt)
 
                 if requirement == "none":
                     return result(
                         reads, "route", "result_reconciliation",
-                        "A valid semantic result is already durable and this Card requires no independent review; do not replay implementation",
+                        "An accepted-success semantic result is already durable and this Card requires no independent review; do not replay implementation",
                         subject=card["id"], owner_module="workflow/EXECUTION.md",
                     )
                 if not attempts:
@@ -554,7 +1187,29 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     attempts,
                     expected_card_id=card["id"],
                     workstream_id=workstream["workstream_id"],
+                    accepted_authority_paths=set(contract["authority_refs"]),
+                    exact_blob_reader=project_git_blob_reader(
+                        reads.project_root,
+                        project["repository"],
+                    ),
+                    expected_review_scope="card",
                 )
+                # Terminal bytes freeze against actual Git history: a same-ID
+                # rewrite with a rebound Board locator still routes unless the
+                # prior durable state is re-derived here. Runs after history
+                # validation so established failure reasons keep precedence.
+                try:
+                    history_reads = verify_terminal_append_only_from_git(
+                        project_root=reads.project_root,
+                        workstream_id=workstream["workstream_id"],
+                        card_id=card["id"],
+                        attempts=attempts,
+                    )
+                except ReviewAttemptProvenanceError as exc:
+                    raise ValidationError(
+                        f"review history is not append-only: {exc}"
+                    ) from exc
+                reads.items.extend(history_reads)
                 current_subject = exact_result_subject(project["repository"], card["result"])
                 verdict = attempts[-1]["verdict"]
                 covered_subject = review_subject(attempts[-1])
@@ -566,6 +1221,74 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                         "Current durable result changed after terminal review history; preserve history and freeze a new exact attempt",
                         subject=card["id"], owner_module="workflow/REVIEW.md",
                     )
+                # H005: Card Review acceptance binding — exact selected Task Card
+                # path plus exact acceptance content. Alternate same-stem paths
+                # and same-path mutated content fail closed; stale terminal
+                # bindings freeze a new exact attempt like result mismatch.
+                selected_card_path = card["contract"]["path"]
+                reviewed_acceptance = attempts[-1].get("acceptance")
+                if not isinstance(reviewed_acceptance, dict):
+                    raise ValidationError("review acceptance must bind the exact selected Task Card")
+                reviewed_path = reviewed_acceptance.get("path")
+                if reviewed_acceptance.get("class") != "task_card" or not isinstance(reviewed_path, str):
+                    raise ValidationError("review acceptance must bind the exact selected Task Card")
+                if reviewed_path != selected_card_path:
+                    if verdict in {"pending", "in_progress"}:
+                        raise ValidationError(
+                            f"active review attempt acceptance {reviewed_path!r} does not match exact selected Card {selected_card_path!r}"
+                        )
+                    return result(
+                        reads, "route", "review_freeze",
+                        f"Review acceptance {reviewed_path!r} does not match exact selected Card {selected_card_path!r}; preserve history and freeze a new exact attempt",
+                        subject=card["id"], owner_module="workflow/REVIEW.md",
+                    )
+                acceptance_commit = reviewed_acceptance.get("commit")
+                acceptance_blob = reviewed_acceptance.get("blob")
+                if not isinstance(acceptance_commit, str) or not isinstance(acceptance_blob, str):
+                    raise ValidationError(
+                        "review acceptance requires exact commit + blob Task Card identity; path-only acceptance cannot prove exact content"
+                    )
+                try:
+                    verified_acceptance = verify_exact_git_locator(
+                        project_root=reads.project_root,
+                        repository=project["repository"],
+                        expected_repository=project["repository"],
+                        commit=acceptance_commit,
+                        path=reviewed_path,
+                        blob=acceptance_blob,
+                        label="review acceptance",
+                    )
+                    verify_worktree_freshness(
+                        project_root=reads.project_root,
+                        path=reviewed_path,
+                        blob=acceptance_blob,
+                        label="review acceptance",
+                    )
+                except ExactLocatorError as exc:
+                    if exc.kind == "mutated":
+                        if verdict in {"pending", "in_progress"}:
+                            raise ValidationError(
+                                f"active review attempt acceptance is stale for the exact current Task Card: {exc}"
+                            ) from exc
+                        return result(
+                            reads, "route", "review_freeze",
+                            "Current Task Card acceptance changed after terminal review history; "
+                            f"preserve history and freeze a new exact attempt: {exc}",
+                            subject=card["id"], owner_module="workflow/REVIEW.md",
+                        )
+                    raise ValidationError(f"review acceptance exact Task Card proof failed: {exc}") from exc
+                try:
+                    require_commit_in_head_ancestry(
+                        project_root=reads.project_root,
+                        commit=acceptance_commit,
+                        label="review acceptance",
+                    )
+                except ReviewAttemptProvenanceError as exc:
+                    raise ValidationError(
+                        f"review acceptance HEAD ancestry failed: {exc}"
+                    ) from exc
+                reads.items.append(f"project-git:{verified_acceptance.key}")
+                reads.project(reviewed_path)
                 if verdict in {"pending", "in_progress"}:
                     return result(
                         reads, "route", "review",
@@ -573,10 +1296,53 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                         subject=card["id"], owner_module="workflow/REVIEW.md",
                     )
                 if verdict == "green":
+                    if can_finalize_review_obligation(attempts[-1]):
+                        return result(
+                            reads, "route", "post_review_finalization",
+                            "Exact current fresh discovery review is GREEN; Card finalization is deterministic and is not a verdict-only stop",
+                            subject=card["id"], owner_module="workflow/EXECUTION.md",
+                        )
+                    if review_kind(attempts[-1]) == "closure_verification":
+                        source_id = attempts[-1]["source_discovery_attempt"]
+                        remaining = remaining_closure_findings(attempts, source_id)
+                        if remaining:
+                            return result(
+                                reads, "route", "review_freeze",
+                                "Some known findings remain unverified; freeze another closure-verification attempt before fresh discovery",
+                                subject=card["id"], owner_module="workflow/REVIEW.md",
+                            )
+                        convergence = review_convergence_state(
+                            attempts, expected_review_scope="card"
+                        )
+                        if (
+                            convergence.convergence_required
+                            and convergence.post_convergence_attempt is None
+                        ):
+                            return result(
+                                reads, "route", "review_freeze",
+                                "Known findings are closed after a convergence threshold; freeze the single fresh post-convergence full-scope validation",
+                                subject=card["id"], owner_module="workflow/REVIEW.md",
+                            )
+                        return result(
+                            reads, "route", "review_freeze",
+                            "All known findings are closure-verified, but closure cannot satisfy the review obligation; freeze a fresh full-scope discovery attempt",
+                            subject=card["id"], owner_module="workflow/REVIEW.md",
+                        )
+
+                convergence = review_convergence_state(
+                    attempts, expected_review_scope="card"
+                )
+                if attempts[-1].get("post_convergence_validation") is True:
                     return result(
-                        reads, "route", "post_review_finalization",
-                        "Exact current review is GREEN; Card finalization is deterministic and is not a verdict-only stop",
-                        subject=card["id"], owner_module="workflow/EXECUTION.md",
+                        reads, "route", "review_structural_resolution",
+                        "Fresh post-convergence validation is RED; broader structural classification is required instead of another ordinary review loop",
+                        subject=card["id"], owner_module="workflow/RECOVERY.md",
+                    )
+                if convergence.convergence_required:
+                    return result(
+                        reads, "route", "review_convergence",
+                        "Review discovery or per-class repair/closure ceiling is reached; Main convergence/root-cause analysis owns the next correction mode",
+                        subject=card["id"], owner_module="workflow/RECOVERY.md",
                     )
                 return result(
                     reads, "route", "execution_resolution",
@@ -613,16 +1379,37 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             subject=card["id"], owner_module="workflow/RECOVERY.md",
         )
 
-    if len(ready) == 1:
+    held = ready_topology_hold(board)
+    if held is not None:
+        triggers = next(
+            (
+                ", ".join(audit.get("triggers", []))
+                for audit in board.get("topology_audits", [])
+                if audit.get("card_id") == held
+            ),
+            "",
+        )
+        return result(
+            reads, "route", "topology_challenge",
+            f"READY Card {held} has materially risky topology ({triggers}); "
+            "a fresh independent topology challenge must be GREEN before first launch",
+            subject=held, owner_module="workflow/EXECUTION_PREP.md",
+        )
+
+    if (decision := kernel.route("PWV21-K011", {"board": board})) is not None:
         card = ready[0]
         try:
-            refresh_ready_card(reads, board, workstream, card)
+            refresh_ready_card(
+                reads, board, workstream, card,
+                project_repository=project["repository"],
+            )
         except (OSError, ValidationError, KeyError) as exc:
             return recovery(reads, f"ready Card launch refresh failed: {exc}")
-        return result(
-            reads, "route", "execution_prep",
+        return policy_result(
+            reads,
+            decision,
             "READY Card passed launch refresh against current authority, DONE dependency results and optional technical contract",
-            subject=card["id"], owner_module="workflow/EXECUTION_PREP.md",
+            subject=card["id"],
         )
 
     if len(ready) > 1:
@@ -632,11 +1419,125 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             owner_module="workflow/EXECUTION_PREP.md",
         )
 
-    if board["cards"] and all(card["status"] == "done" for card in board["cards"]):
+    if (decision := kernel.route("PWV21-K012", {"board": board})) is not None:
+        return policy_result(
+            reads,
+            decision,
+            "All current Cards are terminal; Close owns finalization and decides whether approved scope is durably complete",
+        )
+
+    statuses = {card["status"] for card in board["cards"]}
+    if statuses and statuses <= {"done", "returned"} and "returned" in statuses:
+        unfinished = unfinished_residual_scope(board)
+        if unfinished is not None:
+            return result(
+                reads, "route", "execution_prep", unfinished,
+                owner_module="workflow/EXECUTION_PREP.md",
+            )
         return result(
             reads, "route", "close",
-            "All current Cards are terminal; Close owns finalization and decides whether approved scope is durably complete",
+            "All current Cards are terminal and every bound residual outcome "
+            "lands in accepted downstream Cards; Close owns finalization and "
+            "must not equate a returned Card alone with accepted completion",
             owner_module="workflow/CLOSE.md",
+        )
+
+    if board.get("live_findings") and board.get("jit_triggers"):
+        try:
+            validated = validate_live_findings(
+                board.get("live_findings"), workstream["workstream_id"]
+            )
+            holds = validate_finding_trigger_gates(validated, board["jit_triggers"])
+        except LiveFindingError as exc:
+            return recovery(reads, f"affected-JIT gate invalid: {exc}")
+        states = {
+            trigger["id"]: trigger.get("state")
+            for trigger in board["jit_triggers"]
+            if isinstance(trigger, dict) and isinstance(trigger.get("id"), str)
+        }
+        held = sorted(
+            trigger_id for trigger_id in holds if states.get(trigger_id) == "satisfied"
+        )
+        if held:
+            parts = []
+            for trigger_id in held:
+                owners = sorted({
+                    str(validated[finding_id].get("owner_stage"))
+                    for finding_id in holds[trigger_id]
+                })
+                parts.append(
+                    f"{trigger_id} (finding(s) "
+                    f"{', '.join(holds[trigger_id])} @ {', '.join(owners)})"
+                )
+            first_finding = holds[held[0]][0]
+            first_owner = str(validated[first_finding].get("owner_stage"))
+            try:
+                owner_module = live_finding_owner_module(first_owner)
+            except LiveFindingError as exc:
+                return recovery(reads, f"affected-JIT gate invalid: {exc}")
+            return result(
+                reads, "route", "finding_reconciliation",
+                "Satisfied JIT trigger(s) "
+                + "; ".join(parts)
+                + " held by pending material live finding(s); owning-stage "
+                "reconciliation must be accepted and read back before "
+                "Execution Prep consumes the affected trigger",
+                subject=held[0], owner_module=owner_module,
+            )
+
+    if board.get("jit_triggers"):
+        try:
+            consumer_holds = validate_live_consumer_gates(
+                board["jit_triggers"], workstream["workstream_id"]
+            )
+        except LiveConsumerError as exc:
+            return recovery(reads, f"live-consumer gate invalid: {exc}")
+        states = {
+            trigger["id"]: trigger.get("state")
+            for trigger in board["jit_triggers"]
+            if isinstance(trigger, dict) and isinstance(trigger.get("id"), str)
+        }
+        consumer_held = sorted(
+            trigger_id
+            for trigger_id in consumer_holds
+            if states.get(trigger_id) == "satisfied"
+        )
+        if consumer_held:
+            return result(
+                reads, "route", "live_consumer_readiness",
+                "Satisfied intentional live-consumer trigger(s) "
+                + ", ".join(consumer_held)
+                + " held by pending readiness; verified corrected authority "
+                "and every required Definition, Planning, review, predecessor "
+                "and Milestone gate must be complete and read back before "
+                "Execution Prep consumes the intended consumer",
+                subject=consumer_held[0],
+                owner_module="workflow/EXECUTION_PREP.md",
+            )
+
+    # RF003 Board-coupled path: workstream active Research reaches here only
+    # when the Task Board carries no owning result/review or continuation
+    # obligation (any non-empty Board routes above), so pre-execution
+    # investigation still owns before the generic fallback. Board-owned
+    # active Research follows next for the same lone-Board case.
+    if research_active:
+        assert research is not None
+        return result(
+            reads, "route", "research",
+            "No owning explicit/premium/Intake/Review/Board boundary is due; active Research owns the next factual obligation",
+            subject=research["origin_subject"], owner_module="workflow/RESEARCH.md",
+        )
+
+    # RF003: lone Board active Research with no owning result/review or
+    # Board-continuation obligation still routes research before the generic
+    # Execution Prep fallback.
+    if board_research_active:
+        assert board_research_subject is not None
+        return result(
+            reads, "route", "research",
+            "No owning Board result/review or continuation obligation is due; "
+            "implementation/recovery Research owns the next factual obligation",
+            subject=board_research_subject, owner_module="workflow/RESEARCH.md",
         )
 
     return result(reads, "route", "execution_prep",

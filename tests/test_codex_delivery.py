@@ -17,6 +17,7 @@ SKILL = ROOT / "skills" / "project_workflow_v2" / "SKILL.md"
 HOOKS = ROOT / "hooks" / "hooks.json"
 SESSION_START = ROOT / "hooks" / "session-start.py"
 ROUTER = ROOT / "workflow" / "ROUTER.md"
+MANIFEST = ROOT / ".codex-plugin" / "router-integrity.json"
 
 
 class CodexDeliveryTests(unittest.TestCase):
@@ -67,9 +68,10 @@ class CodexDeliveryTests(unittest.TestCase):
             shutil.copytree(source, installed)
             self.assertEqual(digest_tree(source), digest_tree(installed))
 
-    def test_session_start_read_set_is_router_only(self) -> None:
+    def test_session_start_read_set_is_router_plus_manifest_only(self) -> None:
         text = SESSION_START.read_text(encoding="utf-8")
         self.assertIn('root / "workflow" / "ROUTER.md"', text)
+        self.assertIn('root / ".codex-plugin" / "router-integrity.json"', text)
         self.assertNotIn(".glob(", text)
         self.assertNotIn(".rglob(", text)
         self.assertNotIn("PROJECT.md", text)
@@ -92,8 +94,10 @@ class CodexDeliveryTests(unittest.TestCase):
 
     def _copy_package(self, destination: Path) -> Path:
         (destination / "hooks").mkdir(parents=True)
+        (destination / ".codex-plugin").mkdir(parents=True)
         (destination / "workflow").mkdir(parents=True)
         shutil.copy2(SESSION_START, destination / "hooks" / "session-start.py")
+        shutil.copy2(MANIFEST, destination / ".codex-plugin" / "router-integrity.json")
         shutil.copy2(ROUTER, destination / "workflow" / "ROUTER.md")
         return destination / "hooks" / "session-start.py"
 

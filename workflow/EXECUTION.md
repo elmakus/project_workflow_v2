@@ -19,6 +19,12 @@ Main:
 
 A worker/subagent must not finalize Task Board/manifest state or create another Project Workflow Card.
 
+## Typed obligation/result boundary
+
+Before runtime realization, Project Workflow derives the transport-neutral typed package defined by `workflow/EXECUTION_CONTRACTS.md`. PW resolves exact authority content and hashes, binds the relevant freshness fingerprint and mutation pre/postconditions, and supplies only that bounded package.
+
+Before accepting a returned typed result, PW validates its exact obligation/freshness binding and reconciles any stale result according to that contract. Runtime infrastructure may realize the package, but it cannot add/drop authority or directly finalize canonical PW state.
+
 ## Delegated or direct realization
 
 Delegation qualifies only when all are true:
@@ -30,14 +36,23 @@ When all qualify, Main delegates substantive implementation/debugging/testing. O
 
 Runtime-internal work may use zero, one or many workers sequentially or concurrently inside the one active Card. Those workers may produce multiple evidence contributions, but only Main may reconcile them into the single semantic result.
 
+## Worker falsification-first evidence
+
+Where an accepted Card outcome can be meaningfully falsified, the Worker starts from a failing automated or observable acceptance check on the pre-implementation subject, then implements the minimum in-scope change and demonstrates the same check GREEN on the implemented subject. Documentation, migration and workflow-policy outcomes that cannot naturally use a unit test use an explicit justified observable check instead of an artificial test. Deterministic validation lives in `tools/worker_evidence_contract.py`: RED baseline, bounded implementation and GREEN verification bind strict chronology, exact Git subject identity and distinct baseline/verification evidence. Missing, generic, retrospective or out-of-order baselines and GREEN-before-implementation claims fail the Worker evidence check and return to `correct`; absence of a Worker evidence record stays legacy-compatible for historical results. This SHOULD-level discipline creates no new Card, Milestone or premium gate and records no runtime worker identity.
+
+## Worker YAGNI-bounded scope
+
+The accepted Card outcome is the binding boundary for Worker implementation and any post-GREEN refactor. Speculative functionality, premature abstraction/future-proofing and adjacent scope outside the Card are forbidden; a genuine accepted need remains allowed. After GREEN local evidence, bounded in-scope refactoring is permitted only with renewed GREEN verification of the same local check, distinct renewed evidence, no new product/architecture scope and no concealed change. DRY is guidance rather than an absolute mandate: local duplication may remain when abstraction would increase coupling, risk or scope. Deterministic validation lives in `tools/worker_scope_contract.py` and composes with the falsification-first evidence contract by binding the same Card; scope violations fail the Worker scope check and return to `correct`; absence of a Worker scope record stays legacy-compatible for historical results. This MUST-level discipline creates no new Card, Milestone or premium gate and records no runtime worker identity.
+
 ## Returned result classification
 
 Returned implementation is classified before durable reconciliation:
 - acceptance/evidence valid -> reconcile one durable accepted result;
 - contract still valid but return is incomplete/incorrect -> keep Card `in_progress` and correct it;
+- material evidence that the Card is oversized or exposes separable review-worthy outcomes -> preserve independently valid evidence and return only the residual unaccepted scope to Execution Prep for bounded re-decomposition (never reconcile as GREEN; the handoff terminal is `returned`, never `done`);
 - a real unresolved blocker prevents the Card contract -> persist proportional blocker state and mark Card `blocked`.
 
-A bad worker result is not a new Project Card and is not by itself a real stop.
+A bad worker result is not a new Project Card and is not by itself a real stop. A worker must not silently broaden scope, merge Cards, self-split or rewrite the stable Card; Main owns the late-oversize return decision (see `workflow/EXECUTION_PREP.md`).
 
 ## Accepted semantic result
 
@@ -45,11 +60,14 @@ An accepted result is a workstream-local `results/*.md` artifact using the Card-
 - exact Card ID;
 - exact implementation subject;
 - one or more durable evidence refs;
-- concise tests/readback summary.
+- concise tests/readback summary;
+- structured result status (`success`, `failed`, or `blocked`).
+
+Only structured `success` is accepted success and can authorize result reconciliation, review, or no-replay recovery. The tests/readback summary never authorizes by presence, non-emptiness, or substring. A `success` status co-edited with the exact normative `FAILED:` Tests/readback summary prefix is contradictory and fails closed; it is never accepted success. Legacy 4-field Results without structured status parse for history inspection but are never accepted success. Recovered Execution validates the full stable Card contract before routing execution, so a Card that `parse_task_card` rejects fails closed to Recovery.
 
 It does not record runtime/provider/model/session/worker/invocation identity.
 
-Once a valid result locator is durable on the active Card, runtime/session disappearance must not cause implementation replay. Later review/finalization/recovery starts from that durable result.
+Once an accepted-success result locator is durable on the active Card, runtime/session disappearance must not cause implementation replay. Later review/finalization/recovery starts from that durable result.
 
 ## Concurrency boundary
 
