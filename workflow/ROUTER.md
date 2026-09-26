@@ -28,7 +28,8 @@ The registry is deliberately not an expression language. It names exact canonica
 - concrete issue diagnosis without an exact durable Intake-owned prior-art subject/result binding -> Intake Research/reconciliation before alignment; once persisted, later Research-slot reuse does not erase that proof;
 - issue without post-diagnosis response -> alignment stop;
 - question/concern/alternative -> Brainstorming, not repair authorization;
-- active/completed Research -> exact Research/return owner; applied result is consume-only;
+- owning explicit/premium/Intake/Review boundary before generic workstream active-Research dispatch; Board-coupled workstream Research additionally yields to Board owning result/review/continuation evaluation; completed Research -> exact verified return owner; applied result is consume-only; lone active Research with no owning boundary -> Research (no-Board path reads no Task Board);
+- owning Board result reconciliation/review/continuation before generic Board active-Research dispatch; completed Board Research -> exact verified return owner once before pointer cleanup;
 - tracker discovery -> GitHub Issues dedup/recovery before create;
 - tracker create_pending_readback -> GitHub Issues readback before any retry;
 - ambiguous tracker -> Recovery; duplicate create is forbidden;

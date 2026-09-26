@@ -1040,6 +1040,11 @@ class RouterTests(unittest.TestCase):
         )
         temp, project = self.copy_fixture()
         try:
+            # RF003: Board-coupled workstream active Research now yields to
+            # Board owning/result/continuation evaluation, so the lone
+            # workstream positive uses the no-Board path (Task Board read
+            # still excluded from the progressive-disclosure bound).
+            self.remove_board_locator(project)
             self.install_state_record(project, "research", "research", "RESEARCH.toml", 'state = "active"\n' + base)
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("route", "research"))
@@ -1079,6 +1084,312 @@ class RouterTests(unittest.TestCase):
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("route", "brainstorming"))
             self.assertIn("reconciled", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def rf003_active_research_content(self, *, origin_role: str, origin_subject: str,
+                                      return_target: str) -> str:
+        return (
+            'state = "active"\n'
+            'workstream_id = "sample-workstream"\n'
+            f'origin_role = "{origin_role}"\n'
+            f'origin_subject = "{origin_subject}"\n'
+            f'return_target = "{return_target}"\n'
+            'return_reconciliation = "pending"\n'
+            'return_result = ""\n'
+            'finding = ""\n'
+            'limitations = ""\n'
+            'conflicts = ""\n'
+            '[[sources]]\nclass = "official_upstream"\nstatus = "pending"\nweight = "primary"\n'
+            '[[sources]]\nclass = "project_runtime"\nstatus = "pending"\nweight = "direct"\n'
+            '[[sources]]\nclass = "tracker_discussion"\nstatus = "pending"\nweight = "supporting"\n'
+            '[[sources]]\nclass = "practitioner_community"\nstatus = "pending"\nweight = "supporting"\n'
+        )
+
+    def test_rf003_a_active_research_yields_to_explicit_stop(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_state_record(
+                project, "brainstorm", "brainstorm", "BRAINSTORM.toml",
+                self.rf002_brainstorm_content(
+                    state="promoted", promotion_state="authorized",
+                    promotion_subject="scope-a@2", explicit_user_stop=True,
+                ),
+            )
+            self.install_state_record(
+                project, "research", "research", "RESEARCH.toml",
+                self.rf003_active_research_content(
+                    origin_role="brainstorming", origin_subject="scope-a@2",
+                    return_target="brainstorming",
+                ),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation), ("stop", "explicit_user_stop")
+            )
+            self.assertEqual(routed.subject, "scope-a@2")
+            self.assertEqual(routed.owner_module, "workflow/BRAINSTORMING.md")
+        finally:
+            temp.cleanup()
+
+    def test_rf003_b_active_unrelated_research_yields_to_intake_diagnosis(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_intake(project, (
+                'workstream_id = "sample-workstream"\n'
+                'kind = "issue"\n'
+                'state = "active"\n'
+                'diagnosis_revision = 2\n'
+                'repair_subject = "repair:v2"\n'
+                'diagnosis_prior_art_subject = ""\n'
+                'diagnosis_prior_art_result = ""\n'
+                'response_kind = "none"\n'
+                'response_observed = false\n'
+                'alignment_state = "pending"\n'
+                'alignment_subject = ""\n'
+                'micro_fix_candidate = false\n'
+            ))
+            self.install_state_record(
+                project, "research", "research", "RESEARCH.toml",
+                self.rf003_active_research_content(
+                    origin_role="brainstorming", origin_subject="scope-a@1",
+                    return_target="brainstorming",
+                ),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "intake"))
+            self.assertEqual(routed.subject, "repair:v2")
+            self.assertIn("prior-art Research", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_rf003_c_active_research_yields_to_premium_a(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_state_record(
+                project, "brainstorm", "brainstorm", "BRAINSTORM.toml",
+                self.rf002_brainstorm_content(
+                    state="promoted", promotion_state="authorized",
+                    promotion_subject="scope-a@2",
+                ),
+            )
+            self.install_state_record(
+                project, "definition", "definition", "DEFINITION.toml",
+                self.rf002_definition_green_content(premium_a="due"),
+            )
+            self.install_state_record(
+                project, "research", "research", "RESEARCH.toml",
+                self.rf003_active_research_content(
+                    origin_role="definition", origin_subject="R1",
+                    return_target="definition",
+                ),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation), ("stop", "premium_A")
+            )
+            self.assertEqual(routed.subject, "R1")
+            self.assertEqual(routed.owner_module, "workflow/DEFINITION.md")
+        finally:
+            temp.cleanup()
+
+    def test_rf003_board_active_yields_to_result_review(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            self.install_board_research(project, state="active")
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation), ("route", "review_freeze")
+            )
+            self.assertEqual(routed.subject, "M01-T04")
+        finally:
+            temp.cleanup()
+
+    def test_rf003_board_active_yields_to_board_continuation(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_board_research(project, state="active")
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation), ("route", "execution")
+            )
+            self.assertEqual(routed.subject, "M01-T04")
+        finally:
+            temp.cleanup()
+
+    def test_rf003_board_lone_active_routes_research(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            board = project / BOARD
+            board.write_text(
+                'workstream_id = "sample-workstream"\n'
+                'revision = 3\n'
+                'cards = []\n'
+                '\n[execution_ref]\n'
+                'branch = "feat/sample-workstream"\n'
+                '\n[research_obligation]\nclass = "research"\n'
+                'path = "implementation/workstreams/sample-workstream/RESEARCH.toml"\n'
+            )
+            research = project / "implementation/workstreams/sample-workstream/RESEARCH.toml"
+            research.write_text(
+                'state = "active"\n'
+                'workstream_id = "sample-workstream"\n'
+                'origin_role = "execution"\n'
+                'origin_subject = "M01-T04"\n'
+                'return_target = "execution:M01-T04"\n'
+                'return_reconciliation = "pending"\n'
+                'return_result = ""\n'
+                'finding = ""\n'
+                'limitations = ""\n'
+                'conflicts = ""\n'
+                '[[sources]]\nclass = "official_upstream"\nstatus = "pending"\nweight = "primary"\n'
+                '[[sources]]\nclass = "project_runtime"\nstatus = "pending"\nweight = "direct"\n'
+                '[[sources]]\nclass = "tracker_discussion"\nstatus = "pending"\nweight = "supporting"\n'
+                '[[sources]]\nclass = "practitioner_community"\nstatus = "pending"\nweight = "supporting"\n'
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "research"))
+            self.assertEqual(routed.subject, "M01-T04")
+        finally:
+            temp.cleanup()
+
+    def test_rf003_d_active_research_yields_to_premium_b(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(state="frozen", premium_b="due"),
+            )
+            self.install_state_record(
+                project, "research", "research", "RESEARCH.toml",
+                self.rf003_active_research_content(
+                    origin_role="definition", origin_subject="R1",
+                    return_target="definition",
+                ),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation), ("stop", "premium_B")
+            )
+            self.assertIn("best-available", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_rf003_e_active_research_yields_to_plan_review_consumption(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(state="frozen", premium_b="satisfied"),
+            )
+            self.install_state_record(
+                project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                self.plan_review_content("green"),
+            )
+            self.install_state_record(
+                project, "research", "research", "RESEARCH.toml",
+                self.rf003_active_research_content(
+                    origin_role="definition", origin_subject="R1",
+                    return_target="definition",
+                ),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "planning"))
+            self.assertIn("consumed", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_rf003_f_active_research_yields_to_premium_c(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(
+                    state="approved", premium_b="satisfied", premium_c="due"
+                ),
+            )
+            self.install_state_record(
+                project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                self.plan_review_content("green"),
+            )
+            self.install_state_record(
+                project, "research", "research", "RESEARCH.toml",
+                self.rf003_active_research_content(
+                    origin_role="definition", origin_subject="R1",
+                    return_target="definition",
+                ),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation), ("stop", "premium_C")
+            )
+            self.assertIn("lighter/cheaper", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_rf003_workstream_active_yields_to_board_result_review(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            self.install_state_record(
+                project, "research", "research", "RESEARCH.toml",
+                self.rf003_active_research_content(
+                    origin_role="brainstorming", origin_subject="scope-a@1",
+                    return_target="brainstorming",
+                ),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation), ("route", "review_freeze")
+            )
+            self.assertEqual(routed.subject, "M01-T04")
+        finally:
+            temp.cleanup()
+
+    def test_rf003_workstream_active_yields_to_ready_board_owner(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.make_ready_card(project)
+            self.install_state_record(
+                project, "research", "research", "RESEARCH.toml",
+                self.rf003_active_research_content(
+                    origin_role="brainstorming", origin_subject="scope-a@1",
+                    return_target="brainstorming",
+                ),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation), ("route", "execution_prep")
+            )
+            self.assertEqual(routed.subject, "M01-T04")
+        finally:
+            temp.cleanup()
+
+    def test_rf003_workstream_lone_active_on_empty_board_routes_research(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            board = project / BOARD
+            board.write_text(
+                'workstream_id = "sample-workstream"\n'
+                'revision = 3\n'
+                'cards = []\n'
+                '\n[execution_ref]\n'
+                'branch = "feat/sample-workstream"\n'
+            )
+            self.install_state_record(
+                project, "research", "research", "RESEARCH.toml",
+                self.rf003_active_research_content(
+                    origin_role="brainstorming", origin_subject="scope-a@1",
+                    return_target="brainstorming",
+                ),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "research"))
+            self.assertEqual(routed.subject, "scope-a@1")
         finally:
             temp.cleanup()
 
@@ -3597,8 +3908,11 @@ class RouterTests(unittest.TestCase):
         )
 
     def test_task_board_research_return_is_recovered_before_execution(self) -> None:
+        # RF003: exact complete/cleanup returns still precede Board
+        # continuation, but generic active dispatch no longer preempts the
+        # active Card's execution obligation (see test_rf003_board_active_*).
         for state, reconciliation, expected in (
-            ("active", "pending", "research"),
+            ("active", "pending", "execution"),
             ("complete", "pending", "execution_resolution"),
             ("complete", "applied", "execution_resolution"),
             ("consumed", "applied", "research_cleanup"),

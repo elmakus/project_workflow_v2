@@ -505,15 +505,16 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
         kernel = PolicyKernel.from_path(reads.package("policy/mechanical_policy.json"))
         kernel.verify_projection(reads.package("workflow/POLICY_KERNEL.md"))
         research = None
+        research_active = False
         if "research" in workstream:
             research = read_toml(reads.project(workstream["research"]["path"]))
             validate_research(research, workstream["workstream_id"])
+            # RF003: generic active-Research dispatch is deferred until after
+            # the owning explicit/premium/Intake boundary is evaluated below.
+            # Completed Research still returns immediately through its exact
+            # RF009 verified owner; only the active branch moves.
             if research["state"] == "active":
-                return result(
-                    reads, "route", "research",
-                    "Active Research owns the next factual obligation",
-                    subject=research["origin_subject"], owner_module="workflow/RESEARCH.md",
-                )
+                research_active = True
             if research["state"] == "complete":
                 owner_modules = {
                     "intake": "workflow/INTAKE.md",
@@ -678,14 +679,15 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     subject=exact_scope,
                 )
 
-        plan_gate_passed_with_board = False
+        # RF003: the owning Definition GREEN premium-A boundary is evaluated
+        # before generic active-Research dispatch. K002 and active-Definition
+        # work are mutually exclusive states, so hoisting K002 ahead of the
+        # Definition-active branch preserves every non-Research route. The
+        # deferred workstream-Research checks sit after all pre-execution
+        # owning/generic dispatch (no-Board path) and after Board owning
+        # evaluation (Board-coupled path) so no generic Research route can
+        # bypass an owning premium, Review, result, or Board-continuation gate.
         if definition is not None:
-            if definition["state"] == "active":
-                return result(
-                    reads, "route", "definition",
-                    "Promoted scope has active Definition work",
-                    subject=definition["source_scope_subject"], owner_module="workflow/DEFINITION.md",
-                )
             if (decision := kernel.route("PWV21-K002", {"definition": definition})) is not None:
                 return policy_result(
                     reads,
@@ -693,6 +695,15 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     "Definition is GREEN; premium stop A is due before material Strategic Planning; "
                     "recommend the best available model/context for Strategic Planning without making model identity canonical",
                     subject=definition["revision"],
+                )
+
+        plan_gate_passed_with_board = False
+        if definition is not None:
+            if definition["state"] == "active":
+                return result(
+                    reads, "route", "definition",
+                    "Promoted scope has active Definition work",
+                    subject=definition["source_scope_subject"], owner_module="workflow/DEFINITION.md",
                 )
 
             planning = None
@@ -925,6 +936,18 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                 subject=exact_scope, owner_module="workflow/DEFINITION.md",
             )
 
+        # RF003 no-Board path: lone workstream active Research with no owning
+        # pre-execution boundary still routes research without reading a Task
+        # Board, preserving the progressive-disclosure bound. Board-coupled
+        # workstreams fall through to Board owning evaluation below.
+        if research_active and "task_board" not in workstream:
+            assert research is not None
+            return result(
+                reads, "route", "research",
+                "No owning explicit/premium/Intake/Review boundary is due; active Research owns the next factual obligation",
+                subject=research["origin_subject"], owner_module="workflow/RESEARCH.md",
+            )
+
         if not plan_gate_passed_with_board and "task_board" not in workstream:
             if intake is None:
                 raise ValidationError("selected workstream has no routable pre-execution state or Task Board")
@@ -945,19 +968,23 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             board, workstream, planning_seams=accepted_planning_seams(reads, workstream)
         )
 
+        board_research_active = False
+        board_research_subject: str | None = None
         if board.get("research_obligation") is not None:
             research_ref = board["research_obligation"]
             board_research = read_toml(reads.project(research_ref["path"]))
             validate_research(board_research, workstream["workstream_id"])
             if board_research["origin_role"] not in {"execution_prep", "execution", "execution_resolution"}:
                 raise ValidationError("Task Board Research pointer must own implementation/recovery Research")
+            # RF003: generic Board active-Research dispatch is deferred until
+            # after result reconciliation/review and Board continuation are
+            # evaluated below. Completed Research still returns immediately
+            # through its exact RF009 verified owner; only the active branch
+            # moves.
             if board_research["state"] == "active":
-                return result(
-                    reads, "route", "research",
-                    "Implementation/recovery Research owns the next factual obligation",
-                    subject=board_research["origin_subject"], owner_module="workflow/RESEARCH.md",
-                )
-            if board_research["state"] == "complete":
+                board_research_active = True
+                board_research_subject = board_research["origin_subject"]
+            elif board_research["state"] == "complete":
                 try:
                     obligation = verify_complete_board_return(
                         research=board_research, board=board
@@ -972,11 +999,12 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                         "workflow/EXECUTION_PREP.md" if obligation == "execution_prep" else "workflow/EXECUTION.md"
                     ),
                 )
-            return result(
-                reads, "route", "research_cleanup",
-                "Task Board still points to consumed Research; clear only the stale pointer without replay",
-                subject=board_research["origin_subject"], owner_module="workflow/RECOVERY.md",
-            )
+            else:
+                return result(
+                    reads, "route", "research_cleanup",
+                    "Task Board still points to consumed Research; clear only the stale pointer without replay",
+                    subject=board_research["origin_subject"], owner_module="workflow/RECOVERY.md",
+                )
     except (OSError, ValidationError, KeyError) as exc:
         return recovery(reads, f"selected workstream identity invalid: {exc}")
 
@@ -1486,6 +1514,31 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                 subject=consumer_held[0],
                 owner_module="workflow/EXECUTION_PREP.md",
             )
+
+    # RF003 Board-coupled path: workstream active Research reaches here only
+    # when the Task Board carries no owning result/review or continuation
+    # obligation (any non-empty Board routes above), so pre-execution
+    # investigation still owns before the generic fallback. Board-owned
+    # active Research follows next for the same lone-Board case.
+    if research_active:
+        assert research is not None
+        return result(
+            reads, "route", "research",
+            "No owning explicit/premium/Intake/Review/Board boundary is due; active Research owns the next factual obligation",
+            subject=research["origin_subject"], owner_module="workflow/RESEARCH.md",
+        )
+
+    # RF003: lone Board active Research with no owning result/review or
+    # Board-continuation obligation still routes research before the generic
+    # Execution Prep fallback.
+    if board_research_active:
+        assert board_research_subject is not None
+        return result(
+            reads, "route", "research",
+            "No owning Board result/review or continuation obligation is due; "
+            "implementation/recovery Research owns the next factual obligation",
+            subject=board_research_subject, owner_module="workflow/RESEARCH.md",
+        )
 
     return result(reads, "route", "execution_prep",
                   "No executable Card is selected; common Execution Prep owns bounded JIT materialization/refinement",
