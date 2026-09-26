@@ -3,14 +3,19 @@ from __future__ import annotations
 import subprocess
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 from tools.close_contract import (
     CloseContractError,
+    H017RecoveryProof,
+    _h017_compute_package_digest,
     RefreshSnapshot,
+    _select_cleanup_readback_action,
     classify_review_coverage,
     cleanup_branch_action,
     close_continuation,
+    derive_recovery_package_from_board,
     external_effect_recovery_action,
     reconcile_issue_readback,
     stacked_integration_path,
@@ -20,6 +25,7 @@ from tools.close_contract import (
     verify_final_observation_reconciliation_from_board,
     verify_pre_mutation_target,
     verify_target_side_recovery,
+    verify_target_side_recovery_from_board,
     verify_terminal_unmerged_closure,
 )
 
@@ -231,8 +237,10 @@ class CloseRefreshTests(unittest.TestCase):
         )
 
 
-    def test_target_side_recovery_does_not_require_live_source_ref(self) -> None:
-        self.assertEqual(
+    def test_target_side_recovery_rejects_caller_attested_sets(self) -> None:
+        # H017 retired the bypass this case used to encode: even textually
+        # complete caller-supplied sets can never yield independence.
+        with self.assertRaisesRegex(CloseContractError, "caller-attested"):
             verify_target_side_recovery(
                 source_branch="feat/example",
                 source_head="source-head",
@@ -241,9 +249,7 @@ class CloseRefreshTests(unittest.TestCase):
                 immutable_merge_evidence=True,
                 required_artifacts=frozenset({"manifest", "board", "evidence"}),
                 present_artifacts=frozenset({"manifest", "board", "evidence", "card"}),
-            ),
-            "source_ref_independent_recovery",
-        )
+            )
 
     def test_target_side_recovery_fails_when_unique_artifact_is_missing(self) -> None:
         with self.assertRaisesRegex(CloseContractError, "missing unique recovery artifacts"):
@@ -259,8 +265,8 @@ class CloseRefreshTests(unittest.TestCase):
 
     def test_cleanup_treats_auto_deleted_source_as_normal_success(self) -> None:
         self.assertEqual(
-            cleanup_branch_action(
-                terminal_package_independent=True,
+            _select_cleanup_readback_action(
+                package_independent=True,
                 source_ref_exists=False,
                 current_head="",
                 cleanup_state="none",
@@ -271,8 +277,8 @@ class CloseRefreshTests(unittest.TestCase):
 
     def test_safe_to_delete_revalidates_exact_head_before_delete(self) -> None:
         self.assertEqual(
-            cleanup_branch_action(
-                terminal_package_independent=True,
+            _select_cleanup_readback_action(
+                package_independent=True,
                 source_ref_exists=True,
                 current_head="same-head",
                 cleanup_state="safe_to_delete",
@@ -281,8 +287,8 @@ class CloseRefreshTests(unittest.TestCase):
             "delete_exact_ref",
         )
         with self.assertRaisesRegex(CloseContractError, "head is stale"):
-            cleanup_branch_action(
-                terminal_package_independent=True,
+            _select_cleanup_readback_action(
+                package_independent=True,
                 source_ref_exists=True,
                 current_head="moved-head",
                 cleanup_state="safe_to_delete",
@@ -291,8 +297,8 @@ class CloseRefreshTests(unittest.TestCase):
 
     def test_absence_readback_is_required_before_deleted_state(self) -> None:
         self.assertEqual(
-            cleanup_branch_action(
-                terminal_package_independent=True,
+            _select_cleanup_readback_action(
+                package_independent=True,
                 source_ref_exists=False,
                 current_head="",
                 cleanup_state="safe_to_delete",
@@ -301,13 +307,34 @@ class CloseRefreshTests(unittest.TestCase):
             "record_deleted_after_absence_readback",
         )
         with self.assertRaisesRegex(CloseContractError, "contradicts surviving source ref"):
-            cleanup_branch_action(
-                terminal_package_independent=True,
+            _select_cleanup_readback_action(
+                package_independent=True,
                 source_ref_exists=True,
                 current_head="old-head",
                 cleanup_state="deleted",
                 verified_head="old-head",
             )
+
+    def test_public_cleanup_rejects_caller_attested_independence(self) -> None:
+        # The old terminal_package_independent=True bypass is gone: the
+        # parameter no longer exists and booleans fail proof integrity.
+        with self.assertRaises(TypeError):
+            cleanup_branch_action(  # type: ignore[call-arg]
+                terminal_package_independent=True,
+                source_ref_exists=True,
+                current_head="same-head",
+                cleanup_state="safe_to_delete",
+                verified_head="same-head",
+            )
+        for bogus in (True, None, "proof", 1):
+            with self.assertRaisesRegex(CloseContractError, "fresh durable Board"):
+                cleanup_branch_action(
+                    recovery_proof=bogus,  # type: ignore[arg-type]
+                    source_ref_exists=True,
+                    current_head="same-head",
+                    cleanup_state="safe_to_delete",
+                    verified_head="same-head",
+                )
 
     def test_terminal_unmerged_closure_preserves_history_without_code(self) -> None:
         self.assertEqual(
@@ -1295,6 +1322,855 @@ class H018CompleteHistoryTests(unittest.TestCase):
                     card_id=BOARD_CARD,
                     observations=[],
                 )
+
+
+class H017LegacyEmptyPackageTests(unittest.TestCase):
+    def test_legacy_empty_required_present_cannot_yield_independent_recovery(self) -> None:
+        with self.assertRaisesRegex(CloseContractError, "empty|completeness|genuinely"):
+            verify_target_side_recovery(
+                source_branch="feat/example",
+                source_head="source-head",
+                merged_source_head="source-head",
+                target_package_subject_head="source-head",
+                immutable_merge_evidence=True,
+                required_artifacts=frozenset(),
+                present_artifacts=frozenset(),
+            )
+
+
+H017_WORKSTREAM_PATH = (
+    f"implementation/workstreams/{BOARD_WORKSTREAM}/WORKSTREAM.toml"
+)
+H017_CARD_PATH = (
+    f"implementation/workstreams/{BOARD_WORKSTREAM}/cards/{BOARD_CARD}.md"
+)
+H017_RESULT_PATH = (
+    f"implementation/workstreams/{BOARD_WORKSTREAM}/results/{BOARD_CARD}.md"
+)
+H017_EVIDENCE_PATH = (
+    f"implementation/workstreams/{BOARD_WORKSTREAM}/evidence/{BOARD_CARD}-evidence.md"
+)
+H017_REVIEW_EVIDENCE_PATH = (
+    f"implementation/workstreams/{BOARD_WORKSTREAM}/evidence/review-R01.md"
+)
+
+
+def _h017_write_workstream(project: Path, branch: str = "work/h017-fixture") -> None:
+    path = project / H017_WORKSTREAM_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        f'workstream_id = "{BOARD_WORKSTREAM}"\n'
+        'kind = "feature"\n'
+        f'branch = "{branch}"\n'
+        f'created_from = "{"a" * 40}"\n'
+        'integration_target = "main"\n'
+        'authority = [{ class = "authority", path = "workflow/CLOSE.md" }]\n'
+        "\n[task_board]\n"
+        'class = "task_board"\n'
+        f'path = "{BOARD_PATH}"\n',
+        encoding="utf-8",
+    )
+
+
+def _h017_write_card(project: Path) -> None:
+    path = project / H017_CARD_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        f"# Task Card — {BOARD_CARD}\n\n"
+        f"- Card ID: {BOARD_CARD}\n"
+        "- Included scope: H017 derived recovery package fixture.\n"
+        "- Excluded scope: H019 cleanup semantic proof.\n"
+        "- Authority refs: workflow/CLOSE.md\n"
+        "- Dependencies: none\n"
+        "- Acceptance: Derived package proves every required class.\n"
+        "- Required tests/readback: H017 fixtures.\n"
+        "- Review requirement: required\n"
+        "- Technical contract: none\n",
+        encoding="utf-8",
+    )
+
+
+def _h017_write_result(project: Path, evidence_refs: list[str]) -> None:
+    path = project / H017_RESULT_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    refs = ", ".join(evidence_refs)
+    path.write_text(
+        "# Card Result\n\n"
+        f"- Card ID: {BOARD_CARD}\n"
+        "- Implementation subject: h017-fixture-subject\n"
+        f"- Evidence refs: {refs}\n"
+        "- Tests/readback summary: GREEN; H017 fixture.\n"
+        "- Result status: success\n",
+        encoding="utf-8",
+    )
+
+
+def _h017_write_evidence(project: Path, relpath: str) -> None:
+    path = project / relpath
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("# evidence\n\nH017 fixture evidence.\n", encoding="utf-8")
+
+
+def _h017_commit_all(project: Path, message: str) -> str:
+    if not (project / ".git").exists():
+        subprocess.run(["git", "init", "-q", str(project)], check=True)
+        subprocess.run(
+            ["git", "-C", str(project), "config", "user.email", "fixture@example.invalid"],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(project), "config", "user.name", "Fixture"],
+            check=True,
+        )
+    subprocess.run(["git", "-C", str(project), "add", "-A"], check=True)
+    subprocess.run(
+        ["git", "-C", str(project), "commit", "-q", "-m", message], check=True
+    )
+    return subprocess.run(
+        ["git", "-C", str(project), "rev-parse", "HEAD"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+
+
+def _h017_blob_for(project: Path, relpath: str, commit: str = "HEAD") -> str:
+    return subprocess.run(
+        ["git", "-C", str(project), "rev-parse", f"{commit}:{relpath}"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+
+
+def _h017_write_board_package(
+    project: Path,
+    *,
+    branch: str = "work/h017-fixture",
+    cards: list[dict] | None = None,
+) -> None:
+    if cards is None:
+        cards = []
+    path = project / BOARD_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        f'workstream_id = "{BOARD_WORKSTREAM}"',
+        "revision = 1",
+    ]
+    if not cards:
+        lines.append("cards = []")
+    lines.extend([
+        "",
+        "[execution_ref]",
+        f'branch = "{branch}"',
+        "",
+    ])
+    for card in cards:
+        lines.append("[[cards]]")
+        lines.append(f'id = "{card["id"]}"')
+        lines.append(f'status = "{card.get("status", "done")}"')
+        if card.get("result") is not None:
+            result = card["result"]
+            lines.append("")
+            lines.append("[cards.result]")
+            lines.append('class = "result"')
+            lines.append(f'path = "{result["path"]}"')
+            if "commit" in result and "blob" in result:
+                lines.append(f'commit = "{result["commit"]}"')
+                lines.append(f'blob = "{result["blob"]}"')
+        lines.append("")
+        lines.append("[cards.contract]")
+        lines.append('class = "task_card"')
+        contract_path = card.get("contract_path", H017_CARD_PATH)
+        lines.append(f'path = "{contract_path}"')
+        for review in card.get("reviews", []):
+            lines.append("")
+            lines.append("[[cards.review_attempts]]")
+            lines.append('class = "review_attempt"')
+            lines.append(f'path = "{review["path"]}"')
+            if "commit" in review and "blob" in review:
+                lines.append(f'commit = "{review["commit"]}"')
+                lines.append(f'blob = "{review["blob"]}"')
+        lines.append("")
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _h017_complete_fixture(project: Path) -> tuple[str, str, str]:
+    _h017_write_workstream(project)
+    _h017_write_card(project)
+    _h017_write_evidence(project, H017_EVIDENCE_PATH)
+    _h017_write_evidence(project, H017_REVIEW_EVIDENCE_PATH)
+    _h017_write_result(project, [H017_EVIDENCE_PATH])
+    review = _write_attempt_toml(project, "R01")
+    head1 = _h017_commit_all(project, "h017 package files")
+    result_blob = _h017_blob_for(project, H017_RESULT_PATH, head1)
+    review_blob = _h017_blob_for(project, review, head1)
+    _h017_write_board_package(project, cards=[{
+        "id": BOARD_CARD,
+        "status": "done",
+        "result": {"path": H017_RESULT_PATH, "commit": head1, "blob": result_blob},
+        "reviews": [{"path": review, "commit": head1, "blob": review_blob}],
+    }])
+    head2 = _h017_commit_all(project, "h017 board")
+    return head1, head2, review
+
+
+class H017DerivedRecoveryPackageTests(unittest.TestCase):
+    def test_complete_exact_package_continues_deterministically(self) -> None:
+        from tools.close_contract import verify_target_side_recovery_from_board
+
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _, head2, _ = _h017_complete_fixture(project)
+            self.assertEqual(
+                verify_target_side_recovery_from_board(
+                    project_root=project,
+                    workstream_path=H017_WORKSTREAM_PATH,
+                    board_path=BOARD_PATH,
+                    source_branch="work/h017-fixture",
+                    source_head=head2,
+                    merge_commit=head2,
+                    project_repository="owner/fixture",
+                ),
+                "source_ref_independent_recovery",
+            )
+
+    def test_genuinely_empty_no_history_recovers_vacuously(self) -> None:
+        from tools.close_contract import verify_target_side_recovery_from_board
+
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _h017_write_workstream(project)
+            _h017_write_board_package(project, cards=[])
+            head = _h017_commit_all(project, "h017 empty workstream")
+            self.assertEqual(
+                verify_target_side_recovery_from_board(
+                    project_root=project,
+                    workstream_path=H017_WORKSTREAM_PATH,
+                    board_path=BOARD_PATH,
+                    source_branch="work/h017-fixture",
+                    source_head=head,
+                    merge_commit=head,
+                    project_repository="owner/fixture",
+                ),
+                "source_ref_independent_recovery",
+            )
+
+    def test_empty_board_with_durable_history_cannot_recover(self) -> None:
+        from tools.close_contract import verify_target_side_recovery_from_board
+
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _h017_write_workstream(project)
+            _h017_write_card(project)
+            _h017_write_evidence(project, H017_EVIDENCE_PATH)
+            _h017_write_result(project, [H017_EVIDENCE_PATH])
+            review = _write_attempt_toml(project, "R01")
+            _h017_commit_all(project, "h017 durable history")
+            _h017_write_board_package(project, cards=[])
+            head = _h017_commit_all(project, "h017 empty board over history")
+            with self.assertRaisesRegex(CloseContractError, "empty|history|omits|durable"):
+                verify_target_side_recovery_from_board(
+                    project_root=project,
+                    workstream_path=H017_WORKSTREAM_PATH,
+                    board_path=BOARD_PATH,
+                    source_branch="work/h017-fixture",
+                    source_head=head,
+                    merge_commit=head,
+                    project_repository="owner/fixture",
+                )
+            _ = review
+
+    def test_omitted_result_class_fails_closed(self) -> None:
+        from tools.close_contract import verify_target_side_recovery_from_board
+
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _h017_write_workstream(project)
+            _h017_write_card(project)
+            _h017_write_evidence(project, H017_EVIDENCE_PATH)
+            _h017_write_evidence(project, H017_REVIEW_EVIDENCE_PATH)
+            review = _write_attempt_toml(project, "R01")
+            head1 = _h017_commit_all(project, "h017 files without result")
+            review_blob = _h017_blob_for(project, review, head1)
+            _h017_write_board_package(project, cards=[{
+                "id": BOARD_CARD,
+                "status": "done",
+                "reviews": [{"path": review, "commit": head1, "blob": review_blob}],
+            }])
+            head2 = _h017_commit_all(project, "h017 board omits result")
+            with self.assertRaisesRegex(CloseContractError, "omits|result|required|completeness"):
+                verify_target_side_recovery_from_board(
+                    project_root=project,
+                    workstream_path=H017_WORKSTREAM_PATH,
+                    board_path=BOARD_PATH,
+                    source_branch="work/h017-fixture",
+                    source_head=head2,
+                    merge_commit=head2,
+                    project_repository="owner/fixture",
+                )
+
+    def test_dangling_result_locator_fails_closed(self) -> None:
+        from tools.close_contract import verify_target_side_recovery_from_board
+
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _h017_write_workstream(project)
+            _h017_write_card(project)
+            _h017_write_evidence(project, H017_EVIDENCE_PATH)
+            _h017_write_evidence(project, H017_REVIEW_EVIDENCE_PATH)
+            _h017_write_result(project, [H017_EVIDENCE_PATH])
+            review = _write_attempt_toml(project, "R01")
+            head1 = _h017_commit_all(project, "h017 files")
+            review_blob = _h017_blob_for(project, review, head1)
+            missing = (
+                f"implementation/workstreams/{BOARD_WORKSTREAM}/results/{BOARD_CARD}-MISSING.md"
+            )
+            _h017_write_board_package(project, cards=[{
+                "id": BOARD_CARD,
+                "status": "done",
+                "result": {"path": missing, "commit": head1, "blob": "f" * 40},
+                "reviews": [{"path": review, "commit": head1, "blob": review_blob}],
+            }])
+            head2 = _h017_commit_all(project, "h017 board dangling result")
+            with self.assertRaisesRegex(CloseContractError, "dangling|resolve|missing|recovery package"):
+                verify_target_side_recovery_from_board(
+                    project_root=project,
+                    workstream_path=H017_WORKSTREAM_PATH,
+                    board_path=BOARD_PATH,
+                    source_branch="work/h017-fixture",
+                    source_head=head2,
+                    merge_commit=head2,
+                    project_repository="owner/fixture",
+                )
+
+    def test_stale_result_locator_fails_closed(self) -> None:
+        from tools.close_contract import verify_target_side_recovery_from_board
+
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _, head2, _ = _h017_complete_fixture(project)
+            (project / H017_RESULT_PATH).write_text(
+                (project / H017_RESULT_PATH).read_text(encoding="utf-8")
+                + "\n# stale mutation\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(CloseContractError, "stale|mutated|mismatch|recovery package"):
+                verify_target_side_recovery_from_board(
+                    project_root=project,
+                    workstream_path=H017_WORKSTREAM_PATH,
+                    board_path=BOARD_PATH,
+                    source_branch="work/h017-fixture",
+                    source_head=head2,
+                    merge_commit=head2,
+                    project_repository="owner/fixture",
+                )
+
+    def test_sibling_contract_locator_fails_closed(self) -> None:
+        from tools.close_contract import verify_target_side_recovery_from_board
+
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _h017_write_workstream(project)
+            _h017_write_card(project)
+            _h017_write_evidence(project, H017_EVIDENCE_PATH)
+            _h017_write_evidence(project, H017_REVIEW_EVIDENCE_PATH)
+            _h017_write_result(project, [H017_EVIDENCE_PATH])
+            review = _write_attempt_toml(project, "R01")
+            head1 = _h017_commit_all(project, "h017 files")
+            result_blob = _h017_blob_for(project, H017_RESULT_PATH, head1)
+            review_blob = _h017_blob_for(project, review, head1)
+            sibling = (
+                f"implementation/workstreams/{BOARD_WORKSTREAM}/cards/M01-T02.md"
+            )
+            _h017_write_board_package(project, cards=[{
+                "id": BOARD_CARD,
+                "status": "done",
+                "contract_path": sibling,
+                "result": {"path": H017_RESULT_PATH, "commit": head1, "blob": result_blob},
+                "reviews": [{"path": review, "commit": head1, "blob": review_blob}],
+            }])
+            head2 = _h017_commit_all(project, "h017 board sibling contract")
+            with self.assertRaisesRegex(CloseContractError, "sibling|another|does not match|exact Card"):
+                verify_target_side_recovery_from_board(
+                    project_root=project,
+                    workstream_path=H017_WORKSTREAM_PATH,
+                    board_path=BOARD_PATH,
+                    source_branch="work/h017-fixture",
+                    source_head=head2,
+                    merge_commit=head2,
+                    project_repository="owner/fixture",
+                )
+
+    def test_duplicate_review_locator_fails_closed(self) -> None:
+        from tools.close_contract import verify_target_side_recovery_from_board
+
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _h017_write_workstream(project)
+            _h017_write_card(project)
+            _h017_write_evidence(project, H017_EVIDENCE_PATH)
+            _h017_write_evidence(project, H017_REVIEW_EVIDENCE_PATH)
+            _h017_write_result(project, [H017_EVIDENCE_PATH])
+            review = _write_attempt_toml(project, "R01")
+            head1 = _h017_commit_all(project, "h017 files")
+            result_blob = _h017_blob_for(project, H017_RESULT_PATH, head1)
+            review_blob = _h017_blob_for(project, review, head1)
+            entry = {"path": review, "commit": head1, "blob": review_blob}
+            _h017_write_board_package(project, cards=[{
+                "id": BOARD_CARD,
+                "status": "done",
+                "result": {"path": H017_RESULT_PATH, "commit": head1, "blob": result_blob},
+                "reviews": [entry, dict(entry)],
+            }])
+            head2 = _h017_commit_all(project, "h017 board duplicate review")
+            with self.assertRaisesRegex(CloseContractError, "duplicate"):
+                verify_target_side_recovery_from_board(
+                    project_root=project,
+                    workstream_path=H017_WORKSTREAM_PATH,
+                    board_path=BOARD_PATH,
+                    source_branch="work/h017-fixture",
+                    source_head=head2,
+                    merge_commit=head2,
+                    project_repository="owner/fixture",
+                )
+
+    def test_board_bound_cleanup_blocks_empty_with_history_and_allows_complete(self) -> None:
+        from tools.close_contract import cleanup_branch_action_from_board
+
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _h017_write_workstream(project)
+            _h017_write_card(project)
+            _h017_write_evidence(project, H017_EVIDENCE_PATH)
+            _h017_write_result(project, [H017_EVIDENCE_PATH])
+            _write_attempt_toml(project, "R01")
+            _h017_commit_all(project, "h017 durable history")
+            _h017_write_board_package(project, cards=[])
+            head = _h017_commit_all(project, "h017 empty board over history")
+            with self.assertRaisesRegex(CloseContractError, "empty|history|omits|durable|recovery"):
+                cleanup_branch_action_from_board(
+                    project_root=project,
+                    workstream_path=H017_WORKSTREAM_PATH,
+                    board_path=BOARD_PATH,
+                    source_branch="work/h017-fixture",
+                    source_head=head,
+                    merge_commit=head,
+                    project_repository="owner/fixture",
+                    source_ref_exists=True,
+                    current_head=head,
+                    cleanup_state="safe_to_delete",
+                    verified_head=head,
+                )
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _, head2, _ = _h017_complete_fixture(project)
+            self.assertEqual(
+                cleanup_branch_action_from_board(
+                    project_root=project,
+                    workstream_path=H017_WORKSTREAM_PATH,
+                    board_path=BOARD_PATH,
+                    source_branch="work/h017-fixture",
+                    source_head=head2,
+                    merge_commit=head2,
+                    project_repository="owner/fixture",
+                    source_ref_exists=True,
+                    current_head=head2,
+                    cleanup_state="safe_to_delete",
+                    verified_head=head2,
+                ),
+                "delete_exact_ref",
+            )
+
+
+H017_FINDING_ID = "LF-001"
+H017_FINDING_EVIDENCE = (
+    f"implementation/workstreams/{BOARD_WORKSTREAM}/evidence/LF-001.md"
+)
+H017_FINDING_RECORD = (
+    f"implementation/workstreams/{BOARD_WORKSTREAM}/findings/LF-001.toml"
+)
+H017_TRIGGER_ID = "after-M01-T01"
+H017_READINESS_RECORD = (
+    f"implementation/workstreams/{BOARD_WORKSTREAM}/readiness/after-M01-T01.toml"
+)
+H017_HANDOFF_PATH = (
+    f"implementation/workstreams/{BOARD_WORKSTREAM}/handoffs/note.md"
+)
+
+
+def _h017_append_live_finding(project: Path) -> None:
+    path = project / BOARD_PATH
+    text = path.read_text(encoding="utf-8")
+    text += (
+        "\n[[live_findings]]\n"
+        f'id = "{H017_FINDING_ID}"\n'
+        'finding_class = "implementation_defect"\n'
+        'observed = "Live execution showed the retry helper succeeding without writing."\n'
+        f'evidence_refs = ["{H017_FINDING_EVIDENCE}"]\n'
+        'owner_stage = "execution"\n'
+        'authorization = "owning_stage_accepted"\n'
+        "\n[live_findings.acceptance]\n"
+        'stage = "execution"\n'
+        "\n[live_findings.acceptance.record]\n"
+        'class = "finding_acceptance"\n'
+        f'path = "{H017_FINDING_RECORD}"\n'
+    )
+    path.write_text(text, encoding="utf-8")
+
+
+def _h017_write_finding_record(project: Path) -> None:
+    path = project / H017_FINDING_RECORD
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        f'finding_id = "{H017_FINDING_ID}"\n'
+        'finding_class = "implementation_defect"\n'
+        'accepting_stage = "execution"\n'
+        'decision = "accepted"\n',
+        encoding="utf-8",
+    )
+
+
+def _h017_append_admitted_trigger(project: Path) -> None:
+    path = project / BOARD_PATH
+    text = path.read_text(encoding="utf-8")
+    text += (
+        "\n[[jit_triggers]]\n"
+        f'id = "{H017_TRIGGER_ID}"\n'
+        f'after_card = "{BOARD_CARD}"\n'
+        'state = "satisfied"\n'
+        'condition = "Downstream live-consumer test depends on the predecessor result."\n'
+        "\n[jit_triggers.live_consumer]\n"
+        "intended = true\n"
+        'readiness = "admitted"\n'
+        "\n[jit_triggers.live_consumer.authority]\n"
+        'repository = "owner/fixture"\n'
+        f'commit = "{"e" * 40}"\n'
+        'path = "planning/PLAN.md"\n'
+        f'blob = "{"f" * 40}"\n'
+        "\n[jit_triggers.live_consumer.admission]\n"
+        'stage = "execution_prep"\n'
+        "\n[jit_triggers.live_consumer.admission.record]\n"
+        'class = "live_consumer_admission"\n'
+        f'path = "{H017_READINESS_RECORD}"\n'
+    )
+    path.write_text(text, encoding="utf-8")
+
+
+def _h017_write_readiness_record(project: Path) -> None:
+    path = project / H017_READINESS_RECORD
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        f'trigger_id = "{H017_TRIGGER_ID}"\n'
+        'decision = "admitted"\n',
+        encoding="utf-8",
+    )
+
+
+def _h017_complete_fixture_with_records(
+    project: Path,
+    *,
+    with_finding_record: bool = False,
+    with_readiness_record: bool = False,
+    cite_finding: bool = False,
+    cite_readiness: bool = False,
+) -> tuple[str, str]:
+    _h017_write_workstream(project)
+    _h017_write_card(project)
+    _h017_write_evidence(project, H017_EVIDENCE_PATH)
+    _h017_write_evidence(project, H017_REVIEW_EVIDENCE_PATH)
+    _h017_write_evidence(project, H017_FINDING_EVIDENCE)
+    if with_finding_record:
+        _h017_write_finding_record(project)
+    if with_readiness_record:
+        _h017_write_readiness_record(project)
+    _h017_write_result(project, [H017_EVIDENCE_PATH])
+    review = _write_attempt_toml(project, "R01")
+    head1 = _h017_commit_all(project, "h017 package files")
+    result_blob = _h017_blob_for(project, H017_RESULT_PATH, head1)
+    review_blob = _h017_blob_for(project, review, head1)
+    _h017_write_board_package(project, cards=[{
+        "id": BOARD_CARD,
+        "status": "done",
+        "result": {"path": H017_RESULT_PATH, "commit": head1, "blob": result_blob},
+        "reviews": [{"path": review, "commit": head1, "blob": review_blob}],
+    }])
+    if cite_finding:
+        _h017_append_live_finding(project)
+    if cite_readiness:
+        _h017_append_admitted_trigger(project)
+    head2 = _h017_commit_all(project, "h017 board")
+    return head1, head2
+
+
+class H017MergeEvidenceTests(unittest.TestCase):
+    def test_old_ancestor_is_not_exact_merged_source_head(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _, source_head, _ = _h017_complete_fixture(project)
+            (project / "later-target-only.txt").write_text("later target\n", encoding="utf-8")
+            later = _h017_commit_all(project, "target advances after source")
+            with self.assertRaisesRegex(CloseContractError, "exact merged source parent"):
+                verify_target_side_recovery_from_board(
+                    project_root=project,
+                    workstream_path=H017_WORKSTREAM_PATH,
+                    board_path=BOARD_PATH,
+                    source_branch="work/h017-fixture",
+                    source_head=source_head,
+                    merge_commit=later,
+                    project_repository="owner/fixture",
+                )
+
+    def test_malformed_merge_commit_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _, head2, _ = _h017_complete_fixture(project)
+            with self.assertRaisesRegex(CloseContractError, "40-hex|merge-commit identity"):
+                verify_target_side_recovery_from_board(
+                    project_root=project,
+                    workstream_path=H017_WORKSTREAM_PATH,
+                    board_path=BOARD_PATH,
+                    source_branch="work/h017-fixture",
+                    source_head=head2,
+                    merge_commit="not-a-commit",
+                    project_repository="owner/fixture",
+                )
+
+    def test_unknown_merge_commit_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _, head2, _ = _h017_complete_fixture(project)
+            with self.assertRaisesRegex(CloseContractError, "does not resolve"):
+                verify_target_side_recovery_from_board(
+                    project_root=project,
+                    workstream_path=H017_WORKSTREAM_PATH,
+                    board_path=BOARD_PATH,
+                    source_branch="work/h017-fixture",
+                    source_head=head2,
+                    merge_commit="0" * 40,
+                    project_repository="owner/fixture",
+                )
+
+    def test_source_head_outside_merge_history_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            head1, head2, _ = _h017_complete_fixture(project)
+            with self.assertRaisesRegex(CloseContractError, "not contained|stale|sibling"):
+                verify_target_side_recovery_from_board(
+                    project_root=project,
+                    workstream_path=H017_WORKSTREAM_PATH,
+                    board_path=BOARD_PATH,
+                    source_branch="work/h017-fixture",
+                    source_head=head2,
+                    merge_commit=head1,
+                    project_repository="owner/fixture",
+                )
+
+    def test_merge_target_missing_package_file_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            head1, _, _ = _h017_complete_fixture(project)
+            # head1 predates the Board commit: the merge target tree lacks
+            # the selected Board, so containment must fail.
+            with self.assertRaisesRegex(
+                CloseContractError, "does not match the exact merged source head"
+            ):
+                verify_target_side_recovery_from_board(
+                    project_root=project,
+                    workstream_path=H017_WORKSTREAM_PATH,
+                    board_path=BOARD_PATH,
+                    source_branch="work/h017-fixture",
+                    source_head=head1,
+                    merge_commit=head1,
+                    project_repository="owner/fixture",
+                )
+
+
+class H017ProofIntegrityTests(unittest.TestCase):
+    def test_derive_binds_exact_locator_classes(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _h017_complete_fixture(project)
+            proof = derive_recovery_package_from_board(
+                project_root=project,
+                workstream_path=H017_WORKSTREAM_PATH,
+                board_path=BOARD_PATH,
+                source_branch="work/h017-fixture",
+                project_repository="owner/fixture",
+            )
+            self.assertFalse(proof.genuinely_empty)
+            classes = sorted(item.locator_class for item in proof.locators)
+            self.assertEqual(
+                classes,
+                ["evidence", "evidence", "result", "review_attempt", "task_card"],
+            )
+            self.assertTrue(proof.package_digest.startswith("sha256:"))
+            # Even a derived digest cannot replace a fresh Board/merge readback.
+            with self.assertRaisesRegex(CloseContractError, "fresh durable Board"):
+                cleanup_branch_action(
+                    recovery_proof=proof,
+                    source_ref_exists=True,
+                    current_head="same-head",
+                    cleanup_state="safe_to_delete",
+                    verified_head="same-head",
+                )
+
+    def test_tampered_proof_cannot_authorize_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _h017_complete_fixture(project)
+            proof = derive_recovery_package_from_board(
+                project_root=project,
+                workstream_path=H017_WORKSTREAM_PATH,
+                board_path=BOARD_PATH,
+                source_branch="work/h017-fixture",
+                project_repository="owner/fixture",
+            )
+            tampered = H017RecoveryProof(
+                workstream_id=proof.workstream_id,
+                workstream_path=proof.workstream_path,
+                workstream_commit=proof.workstream_commit,
+                workstream_blob=proof.workstream_blob,
+                board_path=proof.board_path,
+                board_commit=proof.board_commit,
+                board_blob=proof.board_blob,
+                locators=(),
+                genuinely_empty=proof.genuinely_empty,
+                package_digest=proof.package_digest,
+            )
+            with self.assertRaisesRegex(CloseContractError, "fresh durable Board"):
+                cleanup_branch_action(
+                    recovery_proof=tampered,
+                    source_ref_exists=True,
+                    current_head="same-head",
+                    cleanup_state="safe_to_delete",
+                    verified_head="same-head",
+                )
+
+    def test_recomputed_digest_cannot_forge_cleanup_authority(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _h017_complete_fixture(project)
+            proof = derive_recovery_package_from_board(
+                project_root=project,
+                workstream_path=H017_WORKSTREAM_PATH,
+                board_path=BOARD_PATH,
+                source_branch="work/h017-fixture",
+                project_repository="owner/fixture",
+            )
+            forged = replace(proof, locators=(), genuinely_empty=True)
+            forged = replace(forged, package_digest=_h017_compute_package_digest(forged))
+            with self.assertRaisesRegex(CloseContractError, "fresh durable Board"):
+                cleanup_branch_action(
+                    recovery_proof=forged,
+                    source_ref_exists=True,
+                    current_head="same-head",
+                    cleanup_state="safe_to_delete",
+                    verified_head="same-head",
+                )
+
+    def test_empty_derive_marks_genuine_emptiness(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _h017_write_workstream(project)
+            _h017_write_board_package(project, cards=[])
+            _h017_commit_all(project, "h017 empty workstream")
+            proof = derive_recovery_package_from_board(
+                project_root=project,
+                workstream_path=H017_WORKSTREAM_PATH,
+                board_path=BOARD_PATH,
+                source_branch="work/h017-fixture",
+                project_repository="owner/fixture",
+            )
+            self.assertTrue(proof.genuinely_empty)
+            self.assertEqual(proof.locators, ())
+
+
+class H017RecordClosureTests(unittest.TestCase):
+    def test_cited_finding_record_joins_package(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _h017_complete_fixture_with_records(
+                project, with_finding_record=True, cite_finding=True
+            )
+            proof = derive_recovery_package_from_board(
+                project_root=project,
+                workstream_path=H017_WORKSTREAM_PATH,
+                board_path=BOARD_PATH,
+                source_branch="work/h017-fixture",
+                project_repository="owner/fixture",
+            )
+            self.assertIn(
+                H017_FINDING_RECORD, [item.path for item in proof.locators]
+            )
+
+    def test_missing_cited_finding_record_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _h017_complete_fixture_with_records(project, cite_finding=True)
+            with self.assertRaisesRegex(CloseContractError, "finding_record|dangling"):
+                derive_recovery_package_from_board(
+                    project_root=project,
+                    workstream_path=H017_WORKSTREAM_PATH,
+                    board_path=BOARD_PATH,
+                    source_branch="work/h017-fixture",
+                    project_repository="owner/fixture",
+                )
+
+    def test_cited_readiness_record_joins_package(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _h017_complete_fixture_with_records(
+                project, with_readiness_record=True, cite_readiness=True
+            )
+            proof = derive_recovery_package_from_board(
+                project_root=project,
+                workstream_path=H017_WORKSTREAM_PATH,
+                board_path=BOARD_PATH,
+                source_branch="work/h017-fixture",
+                project_repository="owner/fixture",
+            )
+            self.assertIn(
+                H017_READINESS_RECORD, [item.path for item in proof.locators]
+            )
+
+    def test_missing_cited_readiness_record_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _h017_complete_fixture_with_records(project, cite_readiness=True)
+            with self.assertRaisesRegex(CloseContractError, "readiness_record|dangling"):
+                derive_recovery_package_from_board(
+                    project_root=project,
+                    workstream_path=H017_WORKSTREAM_PATH,
+                    board_path=BOARD_PATH,
+                    source_branch="work/h017-fixture",
+                    project_repository="owner/fixture",
+                )
+
+
+class H017HandoffTests(unittest.TestCase):
+    def test_head_handoff_joins_package_and_deleted_handoff_is_excluded(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _h017_complete_fixture(project)
+            handoff = project / H017_HANDOFF_PATH
+            handoff.parent.mkdir(parents=True, exist_ok=True)
+            handoff.write_text("# handoff\n", encoding="utf-8")
+            _h017_commit_all(project, "h017 add handoff")
+            proof = derive_recovery_package_from_board(
+                project_root=project,
+                workstream_path=H017_WORKSTREAM_PATH,
+                board_path=BOARD_PATH,
+                source_branch="work/h017-fixture",
+                project_repository="owner/fixture",
+            )
+            self.assertIn(H017_HANDOFF_PATH, [item.path for item in proof.locators])
+            handoff.unlink()
+            _h017_commit_all(project, "h017 discard handoff")
+            proof = derive_recovery_package_from_board(
+                project_root=project,
+                workstream_path=H017_WORKSTREAM_PATH,
+                board_path=BOARD_PATH,
+                source_branch="work/h017-fixture",
+                project_repository="owner/fixture",
+            )
+            self.assertNotIn(H017_HANDOFF_PATH, [item.path for item in proof.locators])
 
 
 if __name__ == "__main__":

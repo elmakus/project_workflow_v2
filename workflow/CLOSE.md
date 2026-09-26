@@ -66,7 +66,7 @@ If a source ref survives and later cleanup is needed, use the minimal `safe_to_d
 
 A terminal unmerged/superseded workstream must preserve its recovery/history package independently of the source ref before cleanup, but rejected implementation content must not be imported into the integration target merely to preserve metadata.
 
-Production deterministic helpers in `tools/close_contract.py` verify target-package completeness and exact merge identity, safe-delete head freshness/absence readback, and terminal-unmerged history separation.
+Production deterministic helpers in `tools/close_contract.py` derive the mandatory package from the durable workstream and Board, verify each locator's exact Git identity, and check the exact source head and package blobs at the target merge commit. `cleanup_branch_action_from_board` repeats those readbacks before the exact-head/absence cleanup decision. A caller-supplied artifact set, boolean, or digest-bearing object is not recovery proof. Terminal-unmerged history remains a separate gate.
 
 ## Pre-Final observation reconciliation and bounded cleanup
 
