@@ -35,6 +35,11 @@ RF012_KEY = (
 RF012_PLAN_PATH = "planning/MASTER_PLAN.md"
 RF012_PLAN_CONTENT = "# Master plan\n"
 
+# RF009 fixture provenance: the consumed intake Research blob committed under
+# this path, bound by the fixture PROJECT.md repository below.
+RF009_RESEARCH = "implementation/workstreams/sample-workstream/RESEARCH.toml"
+RF009_PROOF_REPOSITORY = "owner/router-fixture"
+
 
 class RouterTests(unittest.TestCase):
     def copy_fixture(self) -> tuple[tempfile.TemporaryDirectory[str], Path]:
@@ -141,6 +146,18 @@ class RouterTests(unittest.TestCase):
             check=True, capture_output=True, text=True,
         ).stdout.strip()
         return commit, blob
+
+    def prior_art_proof(self, project: Path) -> str:
+        """Commit the live consumed intake Research; return its INTAKE proof stanza."""
+        commit, blob = self.git_identity_for(project, RF009_RESEARCH)
+        return (
+            "[diagnosis_prior_art_proof]\n"
+            'class = "research"\n'
+            f'repository = "{RF009_PROOF_REPOSITORY}"\n'
+            f'commit = "{commit}"\n'
+            f'path = "{RF009_RESEARCH}"\n'
+            f'blob = "{blob}"\n'
+        )
 
     @staticmethod
     def board_result_identity(project: Path) -> tuple[str, str]:
@@ -644,6 +661,7 @@ class RouterTests(unittest.TestCase):
             self.assertEqual((routed.disposition, routed.obligation), ("route", "intake"))
             self.assertIn("persist its exact subject/result binding", routed.reason)
 
+            proof = self.prior_art_proof(project)
             intake_path = project / "implementation/workstreams/sample-workstream/INTAKE.toml"
             intake_path.write_text(
                 intake_path.read_text().replace(
@@ -652,6 +670,7 @@ class RouterTests(unittest.TestCase):
                     'diagnosis_prior_art_subject = "repair:v2"\n'
                     'diagnosis_prior_art_result = "evidence/intake-prior-art.md"\n',
                 )
+                + proof
             )
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("stop", "issue_alignment"))
@@ -661,6 +680,8 @@ class RouterTests(unittest.TestCase):
     def test_issue_without_post_diagnosis_response_is_real_alignment_stop(self) -> None:
         temp, project = self.copy_fixture()
         try:
+            (project / RF009_RESEARCH).write_text(self.issue_research_content("repair:v1"))
+            proof = self.prior_art_proof(project)
             self.install_intake(project, (
                 'workstream_id = "sample-workstream"\n'
                 'kind = "issue"\n'
@@ -674,6 +695,7 @@ class RouterTests(unittest.TestCase):
                 'alignment_state = "pending"\n'
                 'alignment_subject = ""\n'
                 'micro_fix_candidate = false\n'
+                + proof
             ))
             self.install_state_record(
                 project, "research", "research", "RESEARCH.toml",
@@ -689,6 +711,8 @@ class RouterTests(unittest.TestCase):
     def test_issue_question_continues_alignment_without_authorizing_repair(self) -> None:
         temp, project = self.copy_fixture()
         try:
+            (project / RF009_RESEARCH).write_text(self.issue_research_content("repair:v1"))
+            proof = self.prior_art_proof(project)
             self.install_intake(project, (
                 'workstream_id = "sample-workstream"\n'
                 'kind = "issue"\n'
@@ -702,6 +726,7 @@ class RouterTests(unittest.TestCase):
                 'alignment_state = "pending"\n'
                 'alignment_subject = ""\n'
                 'micro_fix_candidate = false\n'
+                + proof
             ))
             self.install_state_record(
                 project, "research", "research", "RESEARCH.toml",
@@ -717,6 +742,8 @@ class RouterTests(unittest.TestCase):
     def test_later_brainstorming_research_does_not_erase_issue_diagnosis_prior_art(self) -> None:
         temp, project = self.copy_fixture()
         try:
+            (project / RF009_RESEARCH).write_text(self.issue_research_content("repair:v2"))
+            proof = self.prior_art_proof(project)
             self.install_intake(project, (
                 'workstream_id = "sample-workstream"\n'
                 'kind = "issue"\n'
@@ -730,6 +757,7 @@ class RouterTests(unittest.TestCase):
                 'alignment_state = "pending"\n'
                 'alignment_subject = ""\n'
                 'micro_fix_candidate = false\n'
+                + proof
             ))
             later_research = (
                 'state = "consumed"\n'
@@ -760,6 +788,8 @@ class RouterTests(unittest.TestCase):
     def test_completed_authorized_issue_continues_to_existing_board(self) -> None:
         temp, project = self.copy_fixture()
         try:
+            (project / RF009_RESEARCH).write_text(self.issue_research_content("repair:v2"))
+            proof = self.prior_art_proof(project)
             self.install_intake(project, (
                 'workstream_id = "sample-workstream"\n'
                 'kind = "issue"\n'
@@ -773,6 +803,7 @@ class RouterTests(unittest.TestCase):
                 'alignment_state = "authorized"\n'
                 'alignment_subject = "repair:v2"\n'
                 'micro_fix_candidate = true\n'
+                + proof
             ))
             self.install_state_record(
                 project, "research", "research", "RESEARCH.toml",
@@ -822,6 +853,12 @@ class RouterTests(unittest.TestCase):
         for intake_content, expected in cases:
             temp, project = self.copy_fixture()
             try:
+                if 'kind = "issue"' in intake_content:
+                    (project / RF009_RESEARCH).write_text(
+                        self.issue_research_content("repair:v2")
+                    )
+                    proof = self.prior_art_proof(project)
+                    intake_content = intake_content + proof
                 self.install_intake(project, intake_content)
                 if 'kind = "issue"' in intake_content:
                     self.install_state_record(
@@ -911,6 +948,16 @@ class RouterTests(unittest.TestCase):
         )
         temp, project = self.copy_fixture()
         try:
+            self.install_state_record(project, "brainstorm", "brainstorm", "BRAINSTORM.toml", (
+                'workstream_id = "sample-workstream"\n'
+                'scope_id = "scope-a"\n'
+                'revision = 1\n'
+                'state = "active"\n'
+                'challenge_audit = "pending"\n'
+                'explicit_user_stop = false\n'
+                'promotion_state = "pending"\n'
+                'promotion_subject = ""\n'
+            ))
             self.install_state_record(project, "research", "research", "RESEARCH.toml", complete)
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("route", "brainstorming"))

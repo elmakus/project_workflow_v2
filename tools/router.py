@@ -26,6 +26,12 @@ from tools.definition_authority import (
 )
 from tools.execution_contract import ExecutionContractError, is_accepted_success, parse_card_result
 from tools.recovery_contract import RecoveryContractError, classify_resolution, exact_result_subject, review_subject
+from tools.research_provenance import (
+    ResearchProvenanceError,
+    verify_complete_board_return,
+    verify_complete_workstream_return,
+    verify_consumed_prior_art_proof,
+)
 from tools.review_contract import (
     can_finalize_review_obligation,
     remaining_closure_findings,
@@ -507,15 +513,37 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     "brainstorming": "workflow/BRAINSTORMING.md",
                     "definition": "workflow/DEFINITION.md",
                 }
+
+                def _read_origin_owner(role: str) -> dict | None:
+                    owned = {
+                        "intake": ("intake", validate_intake),
+                        "brainstorming": ("brainstorm", validate_brainstorm),
+                        "definition": ("definition", validate_definition),
+                    }
+                    key, validator = owned[role]
+                    if key not in workstream:
+                        return None
+                    owner = read_toml(reads.project(workstream[key]["path"]))
+                    validator(owner, workstream["workstream_id"])
+                    return owner
+
+                try:
+                    verified_target = verify_complete_workstream_return(
+                        research=research,
+                        workstream=workstream,
+                        read_owner=_read_origin_owner,
+                    )
+                except ResearchProvenanceError as exc:
+                    raise ValidationError(f"{exc}") from exc
                 reason = (
                     "Completed Research must be reconciled by its exact return owner"
                     if research["return_reconciliation"] == "pending"
                     else "Research result is already applied; return owner may only consume/clear it"
                 )
                 return result(
-                    reads, "route", research["return_target"], reason,
+                    reads, "route", verified_target, reason,
                     subject=research["origin_subject"],
-                    owner_module=owner_modules[research["return_target"]],
+                    owner_module=owner_modules[verified_target],
                 )
 
         intake = None
@@ -527,6 +555,18 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     intake["diagnosis_prior_art_subject"] == intake["repair_subject"]
                     and bool(intake["diagnosis_prior_art_result"].strip())
                 )
+                if stable_diagnosis_prior_art:
+                    try:
+                        consumed_prior_art, proof_read = verify_consumed_prior_art_proof(
+                            project_root=reads.project_root,
+                            project_repository=project["repository"],
+                            workstream_id=workstream["workstream_id"],
+                            intake=intake,
+                        )
+                    except ResearchProvenanceError as exc:
+                        raise ValidationError(f"{exc}") from exc
+                    validate_research(consumed_prior_art, workstream["workstream_id"])
+                    reads.items.append(proof_read)
                 if not stable_diagnosis_prior_art:
                     exact_diagnosis_research = (
                         research is not None
@@ -836,19 +876,16 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     subject=board_research["origin_subject"], owner_module="workflow/RESEARCH.md",
                 )
             if board_research["state"] == "complete":
-                return_target = board_research["return_target"]
-                if return_target.startswith("execution_resolution:"):
-                    obligation = "execution_resolution"
-                elif return_target.startswith("execution_prep:"):
-                    obligation = "execution_prep"
-                elif return_target.startswith("execution:"):
-                    obligation = "execution"
-                else:
-                    raise ValidationError("Task Board Research has non-execution return target")
+                try:
+                    obligation = verify_complete_board_return(
+                        research=board_research, board=board
+                    )
+                except ResearchProvenanceError as exc:
+                    raise ValidationError(f"{exc}") from exc
                 return result(
                     reads, "route", obligation,
                     "Completed implementation Research returns once to its exact durable owner before pointer cleanup",
-                    subject=return_target.split(":", 1)[1],
+                    subject=board_research["origin_subject"],
                     owner_module="workflow/RECOVERY.md" if obligation == "execution_resolution" else (
                         "workflow/EXECUTION_PREP.md" if obligation == "execution_prep" else "workflow/EXECUTION.md"
                     ),

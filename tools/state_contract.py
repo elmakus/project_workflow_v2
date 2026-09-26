@@ -111,6 +111,17 @@ except ModuleNotFoundError:  # direct script execution from tools/
     )
 
 try:
+    from tools.research_provenance import (
+        ResearchProvenanceError,
+        validate_prior_art_proof_shape,
+    )
+except ModuleNotFoundError:  # direct script execution from tools/
+    from research_provenance import (
+        ResearchProvenanceError,
+        validate_prior_art_proof_shape,
+    )
+
+try:
     from tools.definition_authority import (
         DefinitionAuthorityError,
         validate_definition_authority_key_shape,
@@ -372,12 +383,30 @@ def validate_intake(data: dict[str, Any], workstream_id: str) -> None:
                 diagnosis_prior_art_subject == repair_subject and bool(diagnosis_prior_art_result.strip()),
                 "intake: authorized issue requires exact durable diagnosis prior-art binding",
             )
+        proof = data.get("diagnosis_prior_art_proof")
+        binding_present = bool(diagnosis_prior_art_subject.strip()) or bool(diagnosis_prior_art_result.strip())
+        if binding_present:
+            _require(
+                proof is not None,
+                "intake diagnosis prior-art proof locator is required with a persisted prior-art binding",
+            )
+            try:
+                validate_prior_art_proof_shape(proof, workstream_id)
+            except ResearchProvenanceError as exc:
+                raise ValidationError(f"{exc}") from exc
+        else:
+            _require(
+                proof is None,
+                "intake diagnosis prior-art proof without a persisted prior-art binding is dangling",
+            )
     else:
         _require(alignment_state == "not_required",
                  "intake: feature/change discovery must not manufacture issue-repair alignment")
         _require(alignment_subject == "", "intake: non-issue alignment_subject must be empty")
         _require(diagnosis_prior_art_subject == "" and diagnosis_prior_art_result == "",
                  "intake: non-issue must not retain diagnosis prior-art binding")
+        _require(data.get("diagnosis_prior_art_proof") is None,
+                 "intake: non-issue must not retain diagnosis prior-art proof")
         _require(not micro_fix_candidate, "intake: micro-fix candidate is issue-only")
 
     if state == "complete" and kind == "issue":

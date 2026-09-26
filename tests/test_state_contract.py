@@ -900,6 +900,7 @@ class StateEnvelopeTests(unittest.TestCase):
         missing_prior_art = copy.deepcopy(intake)
         missing_prior_art["diagnosis_prior_art_subject"] = ""
         missing_prior_art["diagnosis_prior_art_result"] = ""
+        missing_prior_art.pop("diagnosis_prior_art_proof")
         with self.assertRaisesRegex(ValidationError, "diagnosis prior-art"):
             validate_intake(missing_prior_art, "sample-workstream")
 
@@ -933,6 +934,7 @@ class StateEnvelopeTests(unittest.TestCase):
             "alignment_subject": "",
             "micro_fix_candidate": False,
         })
+        intake.pop("diagnosis_prior_art_proof")
         validate_intake(intake, "sample-workstream")
         intake["alignment_state"] = "authorized"
         with self.assertRaisesRegex(ValidationError, "must not manufacture"):
