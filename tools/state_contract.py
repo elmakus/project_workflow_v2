@@ -1062,6 +1062,45 @@ def validate_board(
             attempt_paths.add(attempt_path)
         if status == "done":
             _require("result" in card, f"{label}: done Card requires an exact result locator")
+        # RF001: Task Board cross-field coherence. Premature/dangling bindings
+        # fail closed with an exact reason; serving boundaries reuse this table
+        # plus RF004/RF006/RF007 exact identity before any dispatch. Blocked
+        # MAY retain a result/review history preserved from prior execution;
+        # the router proves its exact identity (dangling/stale/sibling fail
+        # closed) before reaching the blocker owner, so nothing dispatches
+        # silently. Planned/ready never executed, so any result there is
+        # premature.
+        if status in {"planned", "ready"} and "result" in card:
+            raise ValidationError(
+                f"{label}: {status} Card {card_id!r} must not carry a premature "
+                "result locator; result is allowed only on in_progress/blocked/done/returned"
+            )
+        if status in {"planned", "ready"} and attempts:
+            raise ValidationError(
+                f"{label}: {status} Card {card_id!r} must not carry review "
+                "attempts without an executed result"
+            )
+        if status == "in_progress" and attempts and "result" not in card:
+            # A review-origin late-oversize return explicitly binds one review
+            # attempt as its origin evidence; that history is return
+            # provenance, not a dangling review. Full record validity is
+            # enforced by the late-oversize gate below.
+            bound_origin = False
+            returns = data.get("late_oversize_returns")
+            if isinstance(returns, list):
+                for record in returns:
+                    if not isinstance(record, dict):
+                        continue
+                    if record.get("card_id") != card_id or record.get("origin") != "review":
+                        continue
+                    if record.get("origin_attempt_path") in attempt_paths:
+                        bound_origin = True
+                        break
+            if not bound_origin:
+                raise ValidationError(
+                    f"{label}: in_progress Card {card_id!r} carries dangling review "
+                    "attempts without a result; review requires an exact executed result"
+                )
     _require(active <= 1, "task_board: more than one Project Workflow Card is in_progress")
 
     research_obligation = data.get("research_obligation")
@@ -1076,6 +1115,19 @@ def validate_board(
     for index, card in enumerate(cards):
         if card["status"] == "blocked":
             _require("blocker" in card, f"task_board.cards[{index}]: blocked Card requires blocker locator")
+        # RF001 blocker coherence: only blocked/in_progress may carry a blocker.
+        # in_progress+blocker stays shape-valid and routes blocker-first; every
+        # other status with a blocker fails closed here.
+        if card["status"] in {"planned", "ready"} and "blocker" in card:
+            raise ValidationError(
+                f"task_board.cards[{index}]: {card['status']} Card {card['id']!r} "
+                "must not carry a blocker; only blocked/in_progress may carry a blocker"
+            )
+        if card["status"] in {"done", "returned"} and "blocker" in card:
+            raise ValidationError(
+                f"task_board.cards[{index}]: terminal {card['status']} Card "
+                f"{card['id']!r} must not retain a blocker"
+            )
         if "blocker" in card:
             validate_locator(
                 card["blocker"],

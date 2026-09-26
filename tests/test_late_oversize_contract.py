@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -27,6 +28,32 @@ VALID = ROOT / "tests" / "fixtures" / "state" / "valid"
 ROUTER_FIXTURE = ROOT / "tests" / "fixtures" / "router" / "valid-project"
 ROUTER_MANIFEST = "implementation/workstreams/sample-workstream/WORKSTREAM.toml"
 ROUTER_BOARD = "implementation/workstreams/sample-workstream/TASK_BOARD.toml"
+
+
+def _exact_fixture_result(project: Path, card_id: str) -> tuple[str, str] | None:
+    """Give a present DONE fixture result a real immutable Git identity."""
+    relpath = f"implementation/workstreams/sample-workstream/results/{card_id}.md"
+    if not (project / relpath).is_file():
+        return None
+    if not (project / ".git").exists():
+        subprocess.run(["git", "init", "-q", str(project)], check=True)
+        subprocess.run(["git", "-C", str(project), "config", "user.email",
+                        "fixture@example.invalid"], check=True)
+        subprocess.run(["git", "-C", str(project), "config", "user.name",
+                        "Fixture"], check=True)
+    subprocess.run(["git", "-C", str(project), "add", relpath], check=True)
+    staged = subprocess.run(["git", "-C", str(project), "diff", "--cached",
+                             "--quiet", "--", relpath], check=False)
+    if staged.returncode != 0:
+        subprocess.run(["git", "-C", str(project), "commit", "-q", "-m",
+                        f"fixture result {card_id}", "--", relpath], check=True)
+    commit = subprocess.run(["git", "-C", str(project), "log", "-1",
+                             "--format=%H", "--", relpath], check=True,
+                            capture_output=True, text=True).stdout.strip()
+    blob = subprocess.run(["git", "-C", str(project), "rev-parse",
+                           f"{commit}:{relpath}"], check=True,
+                          capture_output=True, text=True).stdout.strip()
+    return commit, blob
 
 
 def _outcome(outcome_id: str = "residual-retry", **overrides) -> dict:
@@ -1652,6 +1679,9 @@ class TrajectoryTests(unittest.TestCase):
                     "class = \"result\"\n"
                     "path = \"implementation/workstreams/sample-workstream/results/M01-T05.md\"\n"
                 )
+                identity = _exact_fixture_result(project, "M01-T05")
+                if identity is not None:
+                    cards += f'commit = "{identity[0]}"\nblob = "{identity[1]}"\n'
         audits = self._audit_toml("M01-T04")
         if residual_status is not None:
             audits += self._audit_toml("M01-T05")
@@ -1711,6 +1741,17 @@ class TrajectoryTests(unittest.TestCase):
             authority = project / "requirements" / "REQUIREMENTS.md"
             authority.parent.mkdir(parents=True, exist_ok=True)
             authority.write_text("# Accepted authority\n")
+            # RF001/H004: a DONE residual needs a readable accepted-success
+            # result before Close. Written upfront; earlier trajectory phases
+            # do not reference it, so their routes are unchanged.
+            (base / "results" / "M01-T05.md").write_text(
+                "# Card Result\n"
+                "- Card ID: M01-T05\n"
+                "- Implementation subject: residual retry policy implementation\n"
+                "- Evidence refs: implementation/workstreams/sample-workstream/evidence/M01-T04-core.md\n"
+                "- Tests/readback summary: residual checks pass\n"
+                "- Result status: success\n"
+            )
         if attempt_id is not None:
             reviews = base / "reviews"
             reviews.mkdir(parents=True, exist_ok=True)
@@ -2087,7 +2128,7 @@ class SplitTrajectoryTests(unittest.TestCase):
             "atomicity_rationale = \"\"\n"
         )
 
-    def _card_toml(self, card_id: str, status: str,
+    def _card_toml(self, project: Path, card_id: str, status: str,
                    with_result: bool = False) -> str:
         text = (
             "[[cards]]\n"
@@ -2103,6 +2144,10 @@ class SplitTrajectoryTests(unittest.TestCase):
                 "class = \"result\"\n"
                 f"path = \"implementation/workstreams/sample-workstream/results/{card_id}.md\"\n"
             )
+            if status == "done":
+                identity = _exact_fixture_result(project, card_id)
+                if identity is not None:
+                    text += f'commit = "{identity[0]}"\nblob = "{identity[1]}"\n'
         return text
 
     def write_board(self, project: Path, *, original_status: str,
@@ -2112,12 +2157,12 @@ class SplitTrajectoryTests(unittest.TestCase):
                     handoff_trigger_state: str = "waiting",
                     jit_trigger_state: str = "waiting",
                     resolutions: list[tuple[str, str]] | None = None) -> None:
-        cards = self._card_toml("M01-T04", original_status,
+        cards = self._card_toml(project, "M01-T04", original_status,
                                 with_result=(original_status == "returned"))
         if anchor_status is not None:
-            cards += self._card_toml("M01-T05", anchor_status)
+            cards += self._card_toml(project, "M01-T05", anchor_status)
         if r3_status is not None:
-            cards += self._card_toml("M01-T07", r3_status)
+            cards += self._card_toml(project, "M01-T07", r3_status)
         audits = (
             "[[sizing_audits]]\n"
             "card_id = \"M01-T04\"\n"
@@ -2221,6 +2266,21 @@ class SplitTrajectoryTests(unittest.TestCase):
             evidence.write_text("# Preserved core evidence\n")
             self._write_card_file(project, "M01-T05", "residual retry core")
             self._write_card_file(project, "M01-T07", "residual backoff")
+            # RF001/H004: DONE residuals need readable accepted-success
+            # results before Close. Written upfront; earlier phases do not
+            # reference them, so their routes are unchanged.
+            results = base / "results"
+            results.mkdir(parents=True, exist_ok=True)
+            for card_id, subject in (("M01-T05", "residual retry core implementation"),
+                                     ("M01-T07", "residual backoff implementation")):
+                (results / f"{card_id}.md").write_text(
+                    "# Card Result\n"
+                    f"- Card ID: {card_id}\n"
+                    f"- Implementation subject: {subject}\n"
+                    "- Evidence refs: implementation/workstreams/sample-workstream/evidence/M01-T04-core.md\n"
+                    "- Tests/readback summary: residual checks pass\n"
+                    "- Result status: success\n"
+                )
             self.write_board(project, original_status="in_progress")
             routed = select_route(project, [ROUTER_MANIFEST], package_root=ROOT)
             self.assertEqual(

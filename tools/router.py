@@ -400,6 +400,24 @@ def refresh_ready_card(
     *,
     project_repository: str,
 ) -> dict:
+    # RF001/H025: a READY Card must not carry a premature result or review
+    # history. Launch refresh fails closed here so a premature binding can
+    # never launch silently, even before validator precedence is consulted.
+    if "result" in card:
+        raise ValidationError(
+            f"READY Card {card['id']} carries a premature result; "
+            "ready Cards must not carry a result locator"
+        )
+    if card.get("review_attempts"):
+        raise ValidationError(
+            f"READY Card {card['id']} carries review attempts without an "
+            "executed result; ready Cards must not carry review history"
+        )
+    if "blocker" in card:
+        raise ValidationError(
+            f"READY Card {card['id']} carries a blocker; only "
+            "blocked/in_progress may carry a blocker"
+        )
     contract_path = card["contract"]["path"]
     text = reads.project(contract_path).read_text(encoding="utf-8")
     contract = parse_task_card(text, card["id"], workstream["workstream_id"])
@@ -467,6 +485,376 @@ def refresh_ready_card(
         reads.project(technical_contract).read_text(encoding="utf-8")
 
     return contract
+
+
+def _done_result_text(reads: Reads, project_repository: str, card: dict) -> str:
+    """Read one DONE Card result with exact dangling/stale/sibling reasons.
+
+    RF001/H004 reuses the RF007 exact-locator foundation: a declared
+    (commit, blob) must resolve in Git and match current worktree bytes;
+    path-only legacy locators keep worktree existence/readback. Every
+    failure maps to an exact dangling/stale/sibling reason naming the Card.
+    """
+    ref = card["result"]
+    locator_path = ref["path"]
+    card_id = card["id"]
+    if "commit" in ref or "blob" in ref:
+        try:
+            verified = verify_exact_git_locator(
+                project_root=reads.project_root,
+                repository=project_repository,
+                expected_repository=project_repository,
+                commit=ref.get("commit"),
+                path=locator_path,
+                blob=ref.get("blob"),
+                label="done card result",
+            )
+            content = verify_worktree_freshness(
+                project_root=reads.project_root,
+                path=locator_path,
+                blob=ref.get("blob"),
+                label="done card result",
+            )
+        except ExactLocatorError as exc:
+            kind = exc.kind
+            if kind == "dangling":
+                raise ValidationError(
+                    f"DONE Card {card_id} result {locator_path!r} is dangling: {exc}"
+                ) from exc
+            if kind in {"blob_mismatch", "mutated"}:
+                raise ValidationError(
+                    f"DONE Card {card_id} result {locator_path!r} is stale: {exc}"
+                ) from exc
+            if kind in {"repository", "escape", "unsafe_path"}:
+                raise ValidationError(
+                    f"DONE Card {card_id} result {locator_path!r} is sibling: {exc}"
+                ) from exc
+            if kind in {"not_blob", "missing"}:
+                raise ValidationError(
+                    f"DONE Card {card_id} result {locator_path!r} is dangling: {exc}"
+                ) from exc
+            raise ValidationError(
+                f"DONE Card {card_id} result identity failed: {exc}"
+            ) from exc
+        reads.items.append(f"project-git:{verified.key}")
+        reads.project(locator_path)
+        try:
+            return content.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValidationError(
+                f"DONE Card {card_id} result {locator_path!r} is not UTF-8 text: {exc}"
+            ) from exc
+    try:
+        return reads.project(locator_path).read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValidationError(
+            f"DONE Card {card_id} result {locator_path!r} is not UTF-8 text: {exc}"
+        ) from exc
+    except OSError as exc:
+        raise ValidationError(
+            f"DONE Card {card_id} result {locator_path!r} is dangling: "
+            f"worktree target cannot be read back: {exc}"
+        ) from exc
+
+
+def done_close_gate(
+    reads: Reads,
+    board: dict,
+    workstream: dict,
+    project: dict,
+) -> RouteResult | None:
+    """RF001/H004: prove every DONE Card closable, else review/recovery route.
+
+    A DONE Card needs an exact accepted-success result plus, unless its Task
+    Card review requirement is none, a durable GREEN independent review bound
+    to the exact result subject and exact Task Card acceptance. This reuses
+    the RF004 acceptance-binding, RF006 history/provenance and RF007
+    exact-locator foundations identically to the in_progress serving path.
+    Path-only historical locators stay shape-valid but fail closed here with
+    an exact reason; history is never rewritten. Returns None only when every
+    DONE Card is closable; otherwise the exact review/recovery route that must
+    replace Close.
+    """
+    for card in board["cards"]:
+        if card.get("status") != "done":
+            continue
+        card_id = card.get("id", "?")
+        try:
+            card_text = reads.project(card["contract"]["path"]).read_text(encoding="utf-8")
+            contract = parse_task_card(
+                card_text, card_id, workstream["workstream_id"]
+            )
+        except (OSError, ValidationError, KeyError) as exc:
+            return recovery(reads, f"DONE Card {card_id} contract invalid: {exc}")
+        if "result" not in card:
+            return recovery(
+                reads, f"DONE Card {card_id} requires an exact result locator before Close"
+            )
+        try:
+            exact_result_subject(project["repository"], card["result"])
+        except RecoveryContractError as exc:
+            return recovery(
+                reads, f"DONE Card {card_id} requires an exact result locator before Close: {exc}"
+            )
+        try:
+            result_text = _done_result_text(reads, project["repository"], card)
+            parsed_result = parse_card_result(
+                result_text, card_id, workstream["workstream_id"]
+            )
+        except (ValidationError, ExecutionContractError, KeyError) as exc:
+            return recovery(reads, f"DONE Card {card_id} result invalid: {exc}")
+        if not is_accepted_success(parsed_result):
+            return recovery(
+                reads,
+                f"DONE Card {card_id} result is not accepted success; only structured "
+                "Result status success can authorize Close",
+            )
+        try:
+            for evidence_ref in parsed_result["evidence_refs"]:
+                reads.project(evidence_ref).read_text(encoding="utf-8")
+        except (OSError, ValidationError) as exc:
+            return recovery(
+                reads, f"DONE Card {card_id} result evidence cannot be read back: {exc}"
+            )
+        requirement = contract["review_requirement"]
+        attempt_refs = card.get("review_attempts", [])
+        if requirement == "none":
+            try:
+                for attempt_ref in attempt_refs:
+                    read_toml(reads.project(attempt_ref["path"]))
+            except (OSError, ValueError) as exc:
+                return recovery(
+                    reads, f"DONE Card {card_id} review locator unreadable: {exc}"
+                )
+            continue
+        if not attempt_refs:
+            return result(
+                reads, "route", "review_freeze",
+                f"DONE Card {card_id} has an accepted-success result but no exact "
+                "independent review attempt; freeze an exact attempt before Close",
+                subject=card_id, owner_module="workflow/REVIEW.md",
+            )
+        attempts: list[dict] = []
+        try:
+            for index, attempt_ref in enumerate(attempt_refs):
+                label = f"review_attempts[{index}]"
+                try:
+                    attempt, _, locator_read = verify_review_attempt_locator(
+                        project_root=reads.project_root,
+                        project_repository=project["repository"],
+                        workstream_id=workstream["workstream_id"],
+                        card_id=card_id,
+                        ref=attempt_ref,
+                        label=label,
+                    )
+                except ReviewAttemptProvenanceError as exc:
+                    if getattr(exc, "kind", "") == "missing":
+                        raise ValidationError(
+                            f"DONE Card {card_id} review attempt is path-only and "
+                            f"cannot prove immutable history: {exc}"
+                        ) from exc
+                    raise ValidationError(
+                        f"DONE Card {card_id} review attempt identity failed: {exc}"
+                    ) from exc
+                reads.items.append(locator_read)
+                reads.project(attempt_ref["path"])
+                if "review_kind" not in attempt and attempt.get("verdict") in {"green", "red"}:
+                    try:
+                        provenance_read = verify_legacy_migration(
+                            project_root=reads.project_root,
+                            project_repository=project["repository"],
+                            workstream_id=workstream["workstream_id"],
+                            card_id=card_id,
+                            attempt=attempt,
+                        )
+                    except ReviewAttemptProvenanceError as exc:
+                        raise ValidationError(
+                            f"DONE Card {card_id} legacy review provenance failed: {exc}"
+                        ) from exc
+                    reads.items.append(provenance_read)
+                attempts.append(attempt)
+            validate_review_history(
+                attempts,
+                expected_card_id=card_id,
+                workstream_id=workstream["workstream_id"],
+                accepted_authority_paths=set(contract["authority_refs"]),
+                exact_blob_reader=project_git_blob_reader(
+                    reads.project_root, project["repository"]
+                ),
+                expected_review_scope="card",
+            )
+            history_reads = verify_terminal_append_only_from_git(
+                project_root=reads.project_root,
+                workstream_id=workstream["workstream_id"],
+                card_id=card_id,
+                attempts=attempts,
+            )
+        except (ValidationError, ReviewAttemptProvenanceError) as exc:
+            return recovery(reads, f"DONE Card {card_id} review history invalid: {exc}")
+        reads.items.extend(history_reads)
+        try:
+            current_subject = exact_result_subject(project["repository"], card["result"])
+        except RecoveryContractError as exc:
+            return recovery(reads, f"DONE Card {card_id} result has no exact subject: {exc}")
+        try:
+            covered_subject = review_subject(attempts[-1])
+        except RecoveryContractError as exc:
+            return recovery(reads, f"DONE Card {card_id} review has no exact subject: {exc}")
+        verdict = attempts[-1]["verdict"]
+        if covered_subject != current_subject:
+            if verdict in {"pending", "in_progress"}:
+                return recovery(
+                    reads,
+                    f"DONE Card {card_id} active review attempt is stale for the current durable result",
+                )
+            return result(
+                reads, "route", "review_freeze",
+                f"DONE Card {card_id} durable result changed after terminal review history; "
+                "preserve history and freeze a new exact attempt before Close",
+                subject=card_id, owner_module="workflow/REVIEW.md",
+            )
+        selected_card_path = card["contract"]["path"]
+        reviewed_acceptance = attempts[-1].get("acceptance")
+        if not isinstance(reviewed_acceptance, dict):
+            return recovery(
+                reads, f"DONE Card {card_id} review acceptance must bind the exact Task Card"
+            )
+        reviewed_path = reviewed_acceptance.get("path")
+        if reviewed_acceptance.get("class") != "task_card" or not isinstance(reviewed_path, str):
+            return recovery(
+                reads, f"DONE Card {card_id} review acceptance must bind the exact Task Card"
+            )
+        if reviewed_path != selected_card_path:
+            if verdict in {"pending", "in_progress"}:
+                return recovery(
+                    reads,
+                    f"DONE Card {card_id} active review acceptance {reviewed_path!r} does not "
+                    f"match exact Card {selected_card_path!r}",
+                )
+            return result(
+                reads, "route", "review_freeze",
+                f"DONE Card {card_id} review acceptance {reviewed_path!r} does not match exact "
+                f"Card {selected_card_path!r}; preserve history and freeze a new exact attempt",
+                subject=card_id, owner_module="workflow/REVIEW.md",
+            )
+        acceptance_commit = reviewed_acceptance.get("commit")
+        acceptance_blob = reviewed_acceptance.get("blob")
+        if not isinstance(acceptance_commit, str) or not isinstance(acceptance_blob, str):
+            return recovery(
+                reads,
+                f"DONE Card {card_id} review acceptance requires exact commit + blob Task Card "
+                "identity; path-only acceptance cannot prove exact content",
+            )
+        try:
+            verified_acceptance = verify_exact_git_locator(
+                project_root=reads.project_root,
+                repository=project["repository"],
+                expected_repository=project["repository"],
+                commit=acceptance_commit,
+                path=reviewed_path,
+                blob=acceptance_blob,
+                label="done review acceptance",
+            )
+            verify_worktree_freshness(
+                project_root=reads.project_root,
+                path=reviewed_path,
+                blob=acceptance_blob,
+                label="done review acceptance",
+            )
+        except ExactLocatorError as exc:
+            if exc.kind == "mutated":
+                if verdict in {"pending", "in_progress"}:
+                    return recovery(
+                        reads,
+                        f"DONE Card {card_id} active review acceptance is stale for the exact "
+                        f"current Task Card: {exc}",
+                    )
+                return result(
+                    reads, "route", "review_freeze",
+                    f"DONE Card {card_id} Task Card acceptance changed after terminal review "
+                    f"history; preserve history and freeze a new exact attempt: {exc}",
+                    subject=card_id, owner_module="workflow/REVIEW.md",
+                )
+            if exc.kind == "dangling":
+                return recovery(
+                    reads, f"DONE Card {card_id} review acceptance is dangling: {exc}"
+                )
+            if exc.kind == "blob_mismatch":
+                return recovery(
+                    reads, f"DONE Card {card_id} review acceptance is stale: {exc}"
+                )
+            return recovery(
+                reads, f"DONE Card {card_id} review acceptance proof failed: {exc}"
+            )
+        try:
+            require_commit_in_head_ancestry(
+                project_root=reads.project_root,
+                commit=acceptance_commit,
+                label="done review acceptance",
+            )
+        except ReviewAttemptProvenanceError as exc:
+            return recovery(
+                reads, f"DONE Card {card_id} review acceptance HEAD ancestry failed: {exc}"
+            )
+        reads.items.append(f"project-git:{verified_acceptance.key}")
+        reads.project(reviewed_path)
+        if verdict in {"pending", "in_progress"}:
+            return result(
+                reads, "route", "review",
+                f"DONE Card {card_id} exact REQUIRED/RECOMMENDED review attempt blocks Close until GREEN",
+                subject=card_id, owner_module="workflow/REVIEW.md",
+            )
+        if verdict == "green":
+            if can_finalize_review_obligation(attempts[-1]):
+                continue
+            if review_kind(attempts[-1]) == "closure_verification":
+                source_id = attempts[-1]["source_discovery_attempt"]
+                remaining = remaining_closure_findings(attempts, source_id)
+                if remaining:
+                    return result(
+                        reads, "route", "review_freeze",
+                        f"DONE Card {card_id} has unverified known findings; freeze another "
+                        "closure-verification attempt before Close",
+                        subject=card_id, owner_module="workflow/REVIEW.md",
+                    )
+                convergence = review_convergence_state(
+                    attempts, expected_review_scope="card"
+                )
+                if convergence.convergence_required and convergence.post_convergence_attempt is None:
+                    return result(
+                        reads, "route", "review_freeze",
+                        f"DONE Card {card_id} closed known findings after a convergence threshold; "
+                        "freeze the single fresh post-convergence validation before Close",
+                        subject=card_id, owner_module="workflow/REVIEW.md",
+                    )
+                return result(
+                    reads, "route", "review_freeze",
+                    f"DONE Card {card_id} closure cannot satisfy the review obligation; freeze a "
+                    "fresh full-scope discovery attempt before Close",
+                    subject=card_id, owner_module="workflow/REVIEW.md",
+                )
+        convergence = review_convergence_state(attempts, expected_review_scope="card")
+        if attempts[-1].get("post_convergence_validation") is True:
+            return result(
+                reads, "route", "review_structural_resolution",
+                f"DONE Card {card_id} fresh post-convergence validation is RED; broader structural "
+                "classification is required instead of Close",
+                subject=card_id, owner_module="workflow/RECOVERY.md",
+            )
+        if convergence.convergence_required:
+            return result(
+                reads, "route", "review_convergence",
+                f"DONE Card {card_id} review ceiling is reached; Main convergence analysis owns "
+                "the next correction mode instead of Close",
+                subject=card_id, owner_module="workflow/RECOVERY.md",
+            )
+        return result(
+            reads, "route", "execution_resolution",
+            f"DONE Card {card_id} RED review evidence remains durable; execution resolution "
+            "classifies correction instead of Close",
+            subject=card_id, owner_module="workflow/RECOVERY.md",
+        )
+    return None
 
 
 def select_route(project_root: Path, selected_workstreams: list[str], *,
@@ -1108,6 +1496,31 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
 
     if active:
         card = active[0]
+        # RF001/H001: blocker-first. An in_progress Card carrying a blocker
+        # routes to the blocker's exact owning resolution/stop, never to
+        # execution/result/review dispatch. Missing_evidence materializes
+        # exact Task-Board-owned Research; human/runtime blockers are real
+        # stops. Any invalid blocker binding fails closed.
+        if "blocker" in card:
+            try:
+                blocker_ref = card["blocker"]
+                blocker = read_toml(reads.project(blocker_ref["path"]))
+                validate_blocker(blocker, workstream["workstream_id"], card["id"])
+                route, is_stop = classify_resolution(blocker["class"])
+            except (OSError, ValidationError, RecoveryContractError, KeyError) as exc:
+                return recovery(reads, f"in_progress Card blocker invalid: {exc}")
+            if route == "research":
+                return result(
+                    reads, "route", "research_handoff",
+                    "In_progress Card carries a blocker for missing factual evidence; "
+                    "materialize exact Task-Board-owned Research before continuing",
+                    subject=card["id"], owner_module="workflow/RECOVERY.md",
+                )
+            return result(
+                reads, "stop" if is_stop else "route", route,
+                "In_progress Card carries a blocker; classification reached an exact durable owner",
+                subject=card["id"], owner_module="workflow/RECOVERY.md",
+            )
         try:
             card_text = reads.project(card["contract"]["path"]).read_text(encoding="utf-8")
             contract = parse_task_card(
@@ -1372,6 +1785,78 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
     blocked = [card for card in board["cards"] if card["status"] == "blocked"]
     if blocked:
         card = blocked[0]
+        # RF001/H025: a blocked Card may preserve a result from prior
+        # execution, but a dangling/stale/sibling result must fail closed
+        # with an exact reason before the blocker owner is reached, so a
+        # premature binding can never dispatch silently. A present result is
+        # preserved (not reconciled) while the blocker owns the route.
+        if "result" in card:
+            ref = card["result"]
+            locator_path = ref["path"]
+            if "commit" in ref or "blob" in ref:
+                try:
+                    verified = verify_exact_git_locator(
+                        project_root=reads.project_root,
+                        repository=project["repository"],
+                        expected_repository=project["repository"],
+                        commit=ref.get("commit"),
+                        path=locator_path,
+                        blob=ref.get("blob"),
+                        label="blocked card result",
+                    )
+                    verify_worktree_freshness(
+                        project_root=reads.project_root,
+                        path=locator_path,
+                        blob=ref.get("blob"),
+                        label="blocked card result",
+                    )
+                except ExactLocatorError as exc:
+                    kind = exc.kind
+                    if kind == "dangling":
+                        return recovery(
+                            reads,
+                            f"blocked Card {card['id']} result {locator_path!r} is "
+                            f"dangling: {exc}",
+                        )
+                    if kind in {"blob_mismatch", "mutated"}:
+                        return recovery(
+                            reads,
+                            f"blocked Card {card['id']} result {locator_path!r} is "
+                            f"stale: {exc}",
+                        )
+                    if kind in {"repository", "escape", "unsafe_path"}:
+                        return recovery(
+                            reads,
+                            f"blocked Card {card['id']} result {locator_path!r} is "
+                            f"sibling: {exc}",
+                        )
+                    if kind in {"not_blob", "missing"}:
+                        return recovery(
+                            reads,
+                            f"blocked Card {card['id']} result {locator_path!r} is "
+                            f"dangling: {exc}",
+                        )
+                    return recovery(
+                        reads,
+                        f"blocked Card {card['id']} result identity failed: {exc}",
+                    )
+                reads.items.append(f"project-git:{verified.key}")
+                reads.project(locator_path)
+            else:
+                try:
+                    reads.project(locator_path).read_text(encoding="utf-8")
+                except OSError as exc:
+                    return recovery(
+                        reads,
+                        f"blocked Card {card['id']} result {locator_path!r} is "
+                        f"dangling: worktree target cannot be read back: {exc}",
+                    )
+                except ValidationError as exc:
+                    return recovery(
+                        reads,
+                        f"blocked Card {card['id']} result {locator_path!r} is "
+                        f"sibling: {exc}",
+                    )
         try:
             blocker_ref = card["blocker"]
             blocker = read_toml(reads.project(blocker_ref["path"]))
@@ -1432,6 +1917,12 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
         )
 
     if (decision := kernel.route("PWV21-K012", {"board": board})) is not None:
+        # RF001/H004: K012 is statuses-only; every DONE Card must additionally
+        # prove an exact accepted-success result plus bound GREEN review before
+        # Close. Any other state routes to its exact review/recovery owner.
+        gate = done_close_gate(reads, board, workstream, project)
+        if gate is not None:
+            return gate
         return policy_result(
             reads,
             decision,
@@ -1446,6 +1937,11 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                 reads, "route", "execution_prep", unfinished,
                 owner_module="workflow/EXECUTION_PREP.md",
             )
+        # RF001/H004 also gates mixed done/returned terminals: every DONE Card
+        # proves result+GREEN before the shared Close continuation.
+        gate = done_close_gate(reads, board, workstream, project)
+        if gate is not None:
+            return gate
         return result(
             reads, "route", "close",
             "All current Cards are terminal and every bound residual outcome "

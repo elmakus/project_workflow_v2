@@ -51,7 +51,7 @@ The registry is deliberately not an expression language. It names exact canonica
 - approved GREEN-reviewed plan with C due -> premium C stop with a human-facing recommendation to switch to a lighter/cheaper model/context before Execution Prep;
 - approved bounded `editorial_exempt` change with exact prior GREEN review + satisfied prior C -> Execution Prep identified without a new Stage-6 review;
 - C satisfied -> common Execution Prep;
-- one READY Card -> launch refresh against exact Card/authority/DONE dependency results and optional technical contract, then Execution Prep;
+- one READY Card without premature result/review/blocker -> launch refresh against exact Card/authority/DONE dependency results and optional technical contract, then Execution Prep; READY carrying a premature result, review history or blocker fails closed without launch;
 - multiple READY Cards -> Execution Prep selects deterministically from accepted plan/dependency authority;
 - no executable Card -> Execution Prep owns bounded JIT materialization/refinement;
 - satisfied JIT trigger with a pending material live finding -> owning-stage `finding_reconciliation` before the affected trigger may be consumed; unrelated, non-targeted, reconciled and speculative findings never hold materialization;
@@ -59,13 +59,14 @@ The registry is deliberately not an expression language. It names exact canonica
 - active Card with a pending late-oversize return -> Execution Prep to materialize and bind the residual Card (preserved evidence and exact review-attempt read back first);
 - active Card with a bound late-oversize return -> Execution Prep for handoff finalization into the original's `returned` non-GREEN terminal disposition;
 - all Cards `done`/`returned` with at least one `returned` -> Close only when every bound residual outcome terminates in accepted downstream Cards, else back to a concrete Execution Prep obligation (a `returned` Card alone is never accepted completion);
-- one active Card without durable result -> common Execution;
+- in_progress Card carrying a blocker -> exact blocker owner (missing evidence to Research handoff, human/runtime blockers to real stops) before any execution/result/review dispatch; blocked Card with a dangling/stale/sibling result fails closed before blocker dispatch while a present preserved result stays bound; planned Card carrying a premature result, review history or blocker fails closed;
+- one active Card without durable result and without blocker -> common Execution;
 - active Card with a valid durable semantic result -> result reconciliation without replay;
 - reviewable durable result with no attempt -> freeze exact review attempt;
 - pending/in-progress REQUIRED/RECOMMENDED attempt -> independent Review;
 - exact GREEN -> deterministic post-review finalization;
 - RED -> corrective classification while failed-attempt evidence remains durable;
-- all current Cards terminal -> Close; Card/milestone role completion is not itself a stop;
+- all Cards done -> Close only when each DONE Card proves an exact accepted-success result plus, unless review-free, a durable GREEN independent review bound to the exact result subject and exact Task Card acceptance; dangling/stale/sibling results fail closed and any other DONE state routes to its exact review/recovery owner, never Close; Card/milestone role completion is not itself a stop;
 - Close -> continue deterministic authorized obligations until durable approved-scope completion, then end-of-scope stop;
 - optional fork lineage module -> load only for an exact durably declared downstream fork-release operation with accepted upstream repo/tag/SHA;
 - invalid/missing/stale/contradictory binding must fail closed to Recovery.
