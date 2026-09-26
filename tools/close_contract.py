@@ -25,6 +25,7 @@ try:
         validate_board,
         validate_locator,
         validate_project,
+        validate_review,
         validate_review_history,
         validate_workstream,
     )
@@ -37,6 +38,7 @@ try:
     )
     from tools.review_attempt_provenance import (
         ReviewAttemptProvenanceError,
+        require_commit_in_head_ancestry,
         verify_legacy_migration,
         verify_review_attempt_locator,
         verify_terminal_append_only_from_git,
@@ -56,6 +58,7 @@ except ModuleNotFoundError:  # direct script execution from tools/
         validate_board,
         validate_locator,
         validate_project,
+        validate_review,
         validate_review_history,
         validate_workstream,
     )
@@ -68,6 +71,7 @@ except ModuleNotFoundError:  # direct script execution from tools/
     )
     from review_attempt_provenance import (
         ReviewAttemptProvenanceError,
+        require_commit_in_head_ancestry,
         verify_legacy_migration,
         verify_review_attempt_locator,
         verify_terminal_append_only_from_git,
@@ -460,11 +464,21 @@ def validate_cleanup_work(
     speculative_redesign: bool = False,
     new_product_scope: bool = False,
 ) -> str:
-    """Validate one completed bounded cleanup work before Final Integration evaluates it.
+    """Check caller-attested cleanup-work shape without authorizing completion.
 
-    Cleanup groups concrete cleanup-candidate observations into the smallest
-    meaningful work with its own exact subject, tests/evidence and independent
-    review. It is never a loophole for speculative redesign or new product scope.
+    H019 retired the success path this signature used to provide. Shape-only
+    checks (40-hex spelling, non-empty strings, caller booleans) can never
+    prove exact Git identity, durable GREEN independent review, or canonical
+    cleanup-candidate coverage, so this entry point never returns
+    ``relative_cleanup_work_complete``. The relative engine is
+    :func:`validate_cleanup_work_proved`, which proves the exact subject and
+    every tests/evidence locator through the RF007 resolver, the GREEN
+    independent review through durable RF006 attempt proof bound to that
+    subject with exact terminal evidence and package authority plus complete
+    inventory, and bounded scope against the caller-supplied relative
+    candidate set. Only
+    :func:`verify_final_observation_reconciliation_from_board` authoritatively
+    gates Final.
     """
     if not isinstance(work_id, str) or not work_id.strip():
         raise CloseContractError("cleanup work requires a non-empty work_id")
@@ -517,7 +531,849 @@ def validate_cleanup_work(
         raise CloseContractError(
             f"cleanup work {work_id!r} requires GREEN independent review before Final Integration"
         )
-    return "cleanup_work_complete"
+    raise CloseContractError(
+        f"cleanup work {work_id!r} cannot yield relative_cleanup_work_complete from "
+        "caller-attested shape alone; exact subject/tests/evidence Git identity "
+        "plus durable RF006 GREEN independent review bound to the exact subject "
+        "with exact terminal evidence, package authority and complete inventory "
+        "plus relative canonical cleanup_candidate coverage must be proved via "
+        "validate_cleanup_work_proved"
+    )
+
+
+def _h019_prove_subject(
+    *,
+    root: Path,
+    work_id: str,
+    subject: Mapping[str, object],
+    project_repository: str,
+) -> tuple[str, str, str]:
+    """Prove the cleanup subject to exact Git identity plus worktree freshness."""
+    repository = subject.get("repository")
+    path = subject.get("path")
+    commit = subject.get("commit")
+    blob = subject.get("blob")
+    label = f"cleanup work {work_id!r} subject"
+    assert isinstance(repository, str) and isinstance(path, str)
+    assert isinstance(commit, str) and isinstance(blob, str)
+    if repository != project_repository:
+        raise CloseContractError(
+            f"cleanup work {work_id!r} subject is sibling: repository "
+            f"{repository!r} does not match the exact project repository "
+            f"{project_repository!r} (belongs to another repository)"
+        )
+    try:
+        verified = verify_exact_git_locator(
+            project_root=root,
+            repository=repository,
+            expected_repository=project_repository,
+            commit=commit,
+            path=path,
+            blob=blob,
+            label=label,
+        )
+    except ExactLocatorError as exc:
+        if exc.kind == "dangling":
+            raise CloseContractError(
+                f"cleanup work {work_id!r} subject {path!r} is "
+                "fabricated/dangling: exact Git subject "
+                f"{commit}:{path} does not resolve"
+            ) from exc
+        if exc.kind == "blob_mismatch":
+            raise CloseContractError(
+                f"cleanup work {work_id!r} subject {path!r} is stale: "
+                f"declared blob {blob} does not match exact Git identity"
+            ) from exc
+        if exc.kind == "repository":
+            raise CloseContractError(
+                f"cleanup work {work_id!r} subject is sibling: {exc} "
+                "(belongs to another repository)"
+            ) from exc
+        if exc.kind in {"unsafe_path", "escape"}:
+            raise CloseContractError(
+                f"cleanup work {work_id!r} subject is sibling: path "
+                f"{path!r} is not a canonical worktree-relative target ({exc})"
+            ) from exc
+        if exc.kind == "not_blob":
+            raise CloseContractError(
+                f"cleanup work {work_id!r} subject {path!r} is dangling: "
+                "exact locator does not resolve to a Git blob"
+            ) from exc
+        if exc.kind == "git_unavailable":
+            raise CloseContractError(
+                f"cleanup work {work_id!r} subject Git readback failed: {exc}"
+            ) from exc
+        raise CloseContractError(
+            f"cleanup work {work_id!r} subject Git identity failed: {exc}"
+        ) from exc
+    try:
+        verify_worktree_freshness(
+            project_root=root, path=verified.path, blob=blob, label=label
+        )
+    except ExactLocatorError as exc:
+        if exc.kind == "mutated":
+            raise CloseContractError(
+                f"cleanup work {work_id!r} subject {verified.path!r} is stale: "
+                f"worktree bytes do not match declared blob {blob} (blob mismatch)"
+            ) from exc
+        if exc.kind == "missing":
+            raise CloseContractError(
+                f"cleanup work {work_id!r} subject {verified.path!r} is "
+                f"dangling: worktree target cannot be read back: {exc}"
+            ) from exc
+        raise CloseContractError(
+            f"cleanup work {work_id!r} subject freshness failed: {exc}"
+        ) from exc
+    try:
+        require_commit_in_head_ancestry(
+            project_root=root, commit=commit, label=label
+        )
+    except ReviewAttemptProvenanceError as exc:
+        raise CloseContractError(
+            f"cleanup work {work_id!r} subject is sibling: locator commit "
+            f"{commit} is outside HEAD ancestry: {exc}"
+        ) from exc
+    return commit, verified.path, blob
+
+
+def _h019_prove_tests_evidence(
+    *,
+    root: Path,
+    work_id: str,
+    tests_evidence: object,
+    subject_commit: str,
+    subject_repository: str,
+    project_repository: str,
+) -> None:
+    """Prove every tests/evidence locator exact and existing."""
+    if isinstance(tests_evidence, str) or not isinstance(tests_evidence, Iterable):
+        raise CloseContractError(
+            f"cleanup work {work_id!r} requires non-empty tests/evidence"
+        )
+    entries = list(tests_evidence)
+    if not entries:
+        raise CloseContractError(
+            f"cleanup work {work_id!r} requires non-empty tests/evidence"
+        )
+    for index, entry in enumerate(entries):
+        label = f"cleanup work {work_id!r} tests_evidence[{index}]"
+        if isinstance(entry, str):
+            if not entry.strip():
+                raise CloseContractError(f"{label} must be a non-empty locator")
+            try:
+                blob = resolve_blob_at_commit(
+                    project_root=root,
+                    commit=subject_commit,
+                    path=entry,
+                    label=label,
+                )
+            except ExactLocatorError as exc:
+                if exc.kind == "dangling":
+                    raise CloseContractError(
+                        f"{label} {entry!r} is dangling: exact Git subject "
+                        f"{subject_commit}:{entry} does not resolve"
+                    ) from exc
+                if exc.kind in {"unsafe_path", "escape"}:
+                    raise CloseContractError(
+                        f"{label} {entry!r} is sibling: path is not a canonical "
+                        f"worktree-relative target ({exc})"
+                    ) from exc
+                if exc.kind == "not_blob":
+                    raise CloseContractError(
+                        f"{label} {entry!r} is dangling: exact locator does not "
+                        "resolve to a Git blob"
+                    ) from exc
+                raise CloseContractError(
+                    f"{label} {entry!r} Git identity failed: {exc}"
+                ) from exc
+            try:
+                verify_worktree_freshness(
+                    project_root=root, path=entry, blob=blob, label=label
+                )
+            except ExactLocatorError as exc:
+                if exc.kind == "mutated":
+                    raise CloseContractError(
+                        f"{label} {entry!r} is stale: worktree bytes do not match "
+                        f"the exact Git blob {blob} (blob mismatch)"
+                    ) from exc
+                if exc.kind == "missing":
+                    raise CloseContractError(
+                        f"{label} {entry!r} is dangling: worktree target cannot "
+                        f"be read back: {exc}"
+                    ) from exc
+                raise CloseContractError(
+                    f"{label} {entry!r} freshness failed: {exc}"
+                ) from exc
+            continue
+        if not isinstance(entry, Mapping):
+            raise CloseContractError(
+                f"{label} must be an exact locator table or canonical path "
+                f"string, got {type(entry).__name__}"
+            )
+        path = entry.get("path")
+        commit = entry.get("commit")
+        blob = entry.get("blob")
+        repository = entry.get("repository", subject_repository)
+        if not isinstance(path, str) or not path.strip():
+            raise CloseContractError(f"{label} requires an exact locator path")
+        for field, value in (("commit", commit), ("blob", blob)):
+            if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{40}", value) is None:
+                raise CloseContractError(
+                    f"{label} requires an exact locator {field} (40-hex)"
+                )
+        assert isinstance(commit, str) and isinstance(blob, str)
+        if repository != project_repository:
+            raise CloseContractError(
+                f"{label} {path!r} is sibling: repository {repository!r} does "
+                "not match the exact project repository "
+                f"{project_repository!r} (belongs to another repository)"
+            )
+        try:
+            verify_exact_git_locator(
+                project_root=root,
+                repository=repository,
+                expected_repository=project_repository,
+                commit=commit,
+                path=path,
+                blob=blob,
+                label=label,
+            )
+        except ExactLocatorError as exc:
+            if exc.kind == "dangling":
+                raise CloseContractError(
+                    f"{label} {path!r} is dangling: exact Git subject "
+                    f"{commit}:{path} does not resolve"
+                ) from exc
+            if exc.kind == "blob_mismatch":
+                raise CloseContractError(
+                    f"{label} {path!r} is stale: declared blob {blob} does not "
+                    "match exact Git identity"
+                ) from exc
+            if exc.kind in {"unsafe_path", "escape"}:
+                raise CloseContractError(
+                    f"{label} {path!r} is sibling: path is not a canonical "
+                    f"worktree-relative target ({exc})"
+                ) from exc
+            if exc.kind == "not_blob":
+                raise CloseContractError(
+                    f"{label} {path!r} is dangling: exact locator does not "
+                    "resolve to a Git blob"
+                ) from exc
+            raise CloseContractError(
+                f"{label} {path!r} Git identity failed: {exc}"
+            ) from exc
+        try:
+            verify_worktree_freshness(
+                project_root=root, path=path, blob=blob, label=label
+            )
+        except ExactLocatorError as exc:
+            if exc.kind == "mutated":
+                raise CloseContractError(
+                    f"{label} {path!r} is stale: worktree bytes do not match "
+                    f"declared blob {blob} (blob mismatch)"
+                ) from exc
+            if exc.kind == "missing":
+                raise CloseContractError(
+                    f"{label} {path!r} is dangling: worktree target cannot be "
+                    f"read back: {exc}"
+                ) from exc
+            raise CloseContractError(
+                f"{label} {path!r} freshness failed: {exc}"
+            ) from exc
+        try:
+            require_commit_in_head_ancestry(
+                project_root=root, commit=commit, label=label
+            )
+        except ReviewAttemptProvenanceError as exc:
+            raise CloseContractError(
+                f"{label} {path!r} is sibling: locator commit {commit} is "
+                f"outside HEAD ancestry: {exc}"
+            ) from exc
+
+
+_H019_CLEANUP_AUTHORITY_PATH = "workflow/CLOSE.md"
+
+
+def _h019_product_root() -> Path:
+    """Return the package checkout owning the cleanup authority.
+
+    The applicable cleanup authority (``workflow/CLOSE.md``) lives in the
+    product/plugin checkout, never in the consumer repository. Deriving it
+    from this module's location keeps consumer Git proof separate from
+    package authority proof.
+    """
+
+    return Path(__file__).resolve().parent.parent
+
+
+def _h019_prove_review_evidence(
+    *,
+    root: Path,
+    work_id: str,
+    attempt: Mapping[str, object],
+    review_commit: str,
+    workstream_id: str,
+) -> None:
+    """Prove GREEN review terminal evidence resolves to exact workstream Git content."""
+
+    label = f"cleanup work {work_id!r} independent review evidence"
+    raw = attempt.get("evidence_path", "")
+    if not isinstance(raw, str) or not raw.strip():
+        raise CloseContractError(
+            f"cleanup work {work_id!r} independent review evidence is missing: "
+            "terminal GREEN review requires exact evidence_path"
+        )
+    path = raw.strip()
+    try:
+        rel = normalize_locator_path(path, label)
+    except ExactLocatorError as exc:
+        raise CloseContractError(
+            f"{label} {path!r} is sibling: path is not a canonical "
+            f"worktree-relative target ({exc})"
+        ) from exc
+    prefix = f"implementation/workstreams/{workstream_id}/evidence/"
+    if not (rel.startswith(prefix) and rel.endswith(".md")):
+        raise CloseContractError(
+            f"{label} {rel!r} is sibling: expected workstream-local "
+            f"{prefix}*.md (belongs to another workstream)"
+        )
+    try:
+        blob = resolve_blob_at_commit(
+            project_root=root,
+            commit=review_commit,
+            path=rel,
+            label=label,
+        )
+    except ExactLocatorError as exc:
+        if exc.kind == "dangling":
+            raise CloseContractError(
+                f"{label} {rel!r} is dangling: exact Git subject "
+                f"{review_commit}:{rel} does not resolve"
+            ) from exc
+        if exc.kind in {"unsafe_path", "escape"}:
+            raise CloseContractError(
+                f"{label} {rel!r} is sibling: path is not a canonical "
+                f"worktree-relative target ({exc})"
+            ) from exc
+        if exc.kind == "not_blob":
+            raise CloseContractError(
+                f"{label} {rel!r} is dangling: exact locator does not "
+                "resolve to a Git blob"
+            ) from exc
+        raise CloseContractError(
+            f"{label} {rel!r} Git identity failed: {exc}"
+        ) from exc
+    try:
+        verify_worktree_freshness(
+            project_root=root, path=rel, blob=blob, label=label
+        )
+    except ExactLocatorError as exc:
+        if exc.kind == "mutated":
+            raise CloseContractError(
+                f"{label} {rel!r} is stale: worktree bytes do not match "
+                f"the exact Git blob {blob} (blob mismatch)"
+            ) from exc
+        if exc.kind == "missing":
+            raise CloseContractError(
+                f"{label} {rel!r} is dangling: worktree target cannot "
+                f"be read back: {exc}"
+            ) from exc
+        if exc.kind == "escape":
+            raise CloseContractError(
+                f"{label} {rel!r} is sibling: path escapes the project "
+                f"worktree ({exc})"
+            ) from exc
+        raise CloseContractError(
+            f"{label} {rel!r} freshness failed: {exc}"
+        ) from exc
+
+
+def _h019_prove_review_acceptance(
+    *,
+    work_id: str,
+    attempt: Mapping[str, object],
+) -> None:
+    """Bind GREEN review acceptance to the exact applicable cleanup authority.
+
+    RF004/H005-style exact semantics: the acceptance must name exactly
+    ``workflow/CLOSE.md`` with exact commit+blob Git identity proved in the
+    package (product/plugin) checkout, including worktree freshness and HEAD
+    ancestry. The consumer repository is never consulted for package
+    authority; an arbitrary, path-only, dangling or stale acceptance fails
+    closed instead of authorizing cleanup.
+    """
+
+    label = f"cleanup work {work_id!r} independent review acceptance"
+    acceptance = attempt.get("acceptance")
+    if not isinstance(acceptance, Mapping):
+        raise CloseContractError(
+            f"{label} is missing: must bind the exact applicable cleanup "
+            f"authority {_H019_CLEANUP_AUTHORITY_PATH!r}"
+        )
+    acc_class = acceptance.get("class")
+    acc_path = acceptance.get("path")
+    if acc_class != "authority" or acc_path != _H019_CLEANUP_AUTHORITY_PATH:
+        raise CloseContractError(
+            f"{label} is arbitrary: must bind the exact applicable cleanup "
+            f"authority {_H019_CLEANUP_AUTHORITY_PATH!r}, got "
+            f"{acc_class!r}:{acc_path!r}"
+        )
+    commit = acceptance.get("commit")
+    blob = acceptance.get("blob")
+    if (
+        not isinstance(commit, str)
+        or re.fullmatch(r"[0-9a-f]{40}", commit) is None
+        or not isinstance(blob, str)
+        or re.fullmatch(r"[0-9a-f]{40}", blob) is None
+    ):
+        raise CloseContractError(
+            f"{label} requires exact commit + blob package-authority "
+            "identity; path-only acceptance cannot prove exact content"
+        )
+    assert isinstance(commit, str) and isinstance(blob, str)
+    try:
+        product_root = _h019_product_root()
+    except (OSError, ValueError) as exc:
+        raise CloseContractError(
+            f"{label} exact package identity is not expressible: cannot "
+            f"locate the package checkout: {exc}"
+        ) from exc
+    product_repository = _resolve_project_repository(product_root, None)
+    if product_repository is None:
+        raise CloseContractError(
+            f"{label} exact package identity is not expressible: package "
+            "PROJECT.md does not name the exact product repository"
+        )
+    try:
+        verify_exact_git_locator(
+            project_root=product_root,
+            repository=product_repository,
+            expected_repository=product_repository,
+            commit=commit,
+            path=acc_path,
+            blob=blob,
+            label=label,
+        )
+    except ExactLocatorError as exc:
+        if exc.kind == "dangling":
+            raise CloseContractError(
+                f"{label} {acc_path!r} is dangling: exact package subject "
+                f"{commit}:{acc_path} does not resolve"
+            ) from exc
+        if exc.kind == "blob_mismatch":
+            raise CloseContractError(
+                f"{label} {acc_path!r} is stale: declared blob {blob} does "
+                "not match exact package Git identity"
+            ) from exc
+        if exc.kind in {"unsafe_path", "escape", "repository", "not_blob"}:
+            raise CloseContractError(
+                f"{label} {acc_path!r} is sibling: package authority "
+                f"identity failed: {exc}"
+            ) from exc
+        if exc.kind == "git_unavailable":
+            raise CloseContractError(
+                f"{label} exact package identity is not expressible: "
+                f"package Git readback failed: {exc}"
+            ) from exc
+        raise CloseContractError(
+            f"{label} {acc_path!r} package identity failed: {exc}"
+        ) from exc
+    try:
+        verify_worktree_freshness(
+            project_root=product_root, path=acc_path, blob=blob, label=label
+        )
+    except ExactLocatorError as exc:
+        if exc.kind == "mutated":
+            raise CloseContractError(
+                f"{label} {acc_path!r} is stale: package worktree bytes do "
+                f"not match declared blob {blob} (blob mismatch)"
+            ) from exc
+        if exc.kind == "missing":
+            raise CloseContractError(
+                f"{label} {acc_path!r} is dangling: package worktree target "
+                f"cannot be read back: {exc}"
+            ) from exc
+        raise CloseContractError(
+            f"{label} {acc_path!r} package freshness failed: {exc}"
+        ) from exc
+    try:
+        require_commit_in_head_ancestry(
+            project_root=product_root, commit=commit, label=label
+        )
+    except ReviewAttemptProvenanceError as exc:
+        raise CloseContractError(
+            f"{label} {acc_path!r} is stale: package locator commit "
+            f"{commit} is outside HEAD ancestry: {exc}"
+        ) from exc
+
+
+def _h019_prove_review(
+    *,
+    root: Path,
+    work_id: str,
+    independent_review: Mapping[str, object],
+    subject: Mapping[str, object],
+    project_repository: str,
+    workstream_id: str,
+    review_attempts: Iterable[object] | None = None,
+) -> None:
+    """Prove durable RF006 GREEN independent review bound to the exact subject.
+
+    RF006 complete-inventory proof: a single GREEN locator must not hide
+    earlier durable attempts under the same cleanup work_id. When
+    ``review_attempts`` is omitted, the durable inventory for the cleanup
+    work_id must contain exactly the single supplied path; when supplied, it
+    must be the complete duplicate-free Board-style locator list covering the
+    durable inventory, with the GREEN independent review as its terminal
+    entry. The terminal GREEN attempt must bind the exact cleanup subject,
+    resolve its terminal evidence to exact workstream Git content, and bind
+    the exact applicable package cleanup authority.
+    """
+    label = f"cleanup work {work_id!r} independent review"
+
+    def _verify_single(ref_map: Mapping[str, object], ref_label: str) -> tuple[dict, str]:
+        ref = dict(ref_map)
+        try:
+            attempt, _, _ = verify_review_attempt_locator(
+                project_root=root,
+                project_repository=project_repository,
+                workstream_id=workstream_id,
+                card_id=work_id,
+                ref=ref,
+                label=ref_label,
+            )
+        except ReviewAttemptProvenanceError as exc:
+            kind = getattr(exc, "kind", "")
+            if kind == "missing":
+                raise CloseContractError(
+                    f"cleanup work {work_id!r} independent review is missing: "
+                    f"path-only locator cannot prove immutable history: {exc}"
+                ) from exc
+            raise CloseContractError(
+                f"cleanup work {work_id!r} independent review identity failed: {exc}"
+            ) from exc
+        if "review_kind" not in attempt and attempt.get("verdict") in {"green", "red"}:
+            try:
+                verify_legacy_migration(
+                    project_root=root,
+                    project_repository=project_repository,
+                    workstream_id=workstream_id,
+                    card_id=work_id,
+                    attempt=attempt,
+                    label=ref_label,
+                )
+            except ReviewAttemptProvenanceError as exc:
+                raise CloseContractError(
+                    f"cleanup work {work_id!r} independent review legacy "
+                    f"provenance failed: {exc}"
+                ) from exc
+        review_commit = ref.get("commit")
+        assert isinstance(review_commit, str)
+        return attempt, review_commit
+
+    def _check_terminal_green(
+        attempt: dict, review_commit: str
+    ) -> None:
+        try:
+            validate_review(attempt)
+        except ValidationError as exc:
+            raise CloseContractError(
+                f"cleanup work {work_id!r} independent review invalid: {exc}"
+            ) from exc
+        if attempt.get("verdict") != "green":
+            raise CloseContractError(
+                f"cleanup work {work_id!r} requires GREEN independent review before "
+                f"Final Integration, got {attempt.get('verdict')!r}"
+            )
+        review_subject = attempt.get("subject")
+        if not isinstance(review_subject, Mapping):
+            raise CloseContractError(
+                f"cleanup work {work_id!r} independent review is unbound: review "
+                "carries no exact subject"
+            )
+        for key in ("repository", "path", "commit", "blob"):
+            if review_subject.get(key) != subject.get(key):
+                raise CloseContractError(
+                    f"cleanup work {work_id!r} independent review is unbound: review "
+                    f"subject {key} {review_subject.get(key)!r} does not match the "
+                    f"exact cleanup subject {subject.get(key)!r}"
+                )
+        _h019_prove_review_evidence(
+            root=root,
+            work_id=work_id,
+            attempt=attempt,
+            review_commit=review_commit,
+            workstream_id=workstream_id,
+        )
+        _h019_prove_review_acceptance(work_id=work_id, attempt=attempt)
+
+    if review_attempts is None:
+        attempt, review_commit = _verify_single(independent_review, label)
+        _check_terminal_green(attempt, review_commit)
+        try:
+            listed_path = validate_locator(
+                independent_review, "review_attempt", label, workstream_id
+            )
+        except ValidationError as exc:
+            raise CloseContractError(
+                f"cleanup work {work_id!r} independent review locator invalid: {exc}"
+            ) from exc
+        durable = _derive_durable_review_inventory(root, workstream_id, work_id)
+        omitted = sorted(set(durable) - {listed_path})
+        if omitted:
+            raise CloseContractError(
+                f"cleanup work {work_id!r} Board omits durable review "
+                "attempt(s): " + ", ".join(omitted) + "; review history is "
+                "append-only and the complete durable inventory must be "
+                "proved via review_attempts"
+            )
+        try:
+            verify_terminal_append_only_from_git(
+                project_root=root,
+                workstream_id=workstream_id,
+                card_id=work_id,
+                attempts=[attempt],
+                label=label,
+            )
+        except ReviewAttemptProvenanceError as exc:
+            raise CloseContractError(
+                f"cleanup work {work_id!r} independent review is not durable: {exc}"
+            ) from exc
+        return
+
+    if isinstance(review_attempts, (str, Mapping)) or not isinstance(
+        review_attempts, Iterable
+    ):
+        raise CloseContractError(
+            f"cleanup work {work_id!r} review_attempts must be the complete "
+            "locator array covering the durable cleanup review inventory"
+        )
+    refs = list(review_attempts)
+    if not refs:
+        raise CloseContractError(
+            f"cleanup work {work_id!r} review_attempts must list the complete "
+            "durable cleanup review inventory"
+        )
+    listed_paths: list[str] = []
+    for index, entry in enumerate(refs):
+        entry_label = f"{label}.review_attempts[{index}]"
+        if not isinstance(entry, Mapping):
+            raise CloseContractError(
+                f"{entry_label} locator must be a table"
+            )
+        try:
+            listed_paths.append(
+                validate_locator(entry, "review_attempt", entry_label, workstream_id)
+            )
+        except ValidationError as exc:
+            raise CloseContractError(
+                f"cleanup work {work_id!r} review attempt locator invalid: {exc}"
+            ) from exc
+    if len(set(listed_paths)) != len(listed_paths):
+        dupes = sorted(
+            {path for path in listed_paths if listed_paths.count(path) > 1}
+        )
+        raise CloseContractError(
+            f"cleanup work {work_id!r} lists duplicate review attempt "
+            "locator(s): " + ", ".join(dupes)
+        )
+    durable = _derive_durable_review_inventory(root, workstream_id, work_id)
+    omitted = sorted(set(durable) - set(listed_paths))
+    if omitted:
+        raise CloseContractError(
+            f"cleanup work {work_id!r} Board omits durable review attempt(s): "
+            + ", ".join(omitted)
+            + "; review history is append-only and locators must cover the "
+            "complete durable inventory derived from worktree and Git state"
+        )
+    attempts: list[dict] = []
+    attempt_commits: list[str] = []
+    for index, entry in enumerate(refs):
+        assert isinstance(entry, Mapping)
+        entry_label = f"{label}.review_attempts[{index}]"
+        attempt, review_commit = _verify_single(entry, entry_label)
+        attempts.append(attempt)
+        attempt_commits.append(review_commit)
+    try:
+        validate_review_history(attempts, workstream_id=workstream_id)
+    except ValidationError as exc:
+        raise CloseContractError(
+            f"cleanup work {work_id!r} durable review history invalid: {exc}"
+        ) from exc
+    try:
+        verify_terminal_append_only_from_git(
+            project_root=root,
+            workstream_id=workstream_id,
+            card_id=work_id,
+            attempts=attempts,
+            label=label,
+        )
+    except ReviewAttemptProvenanceError as exc:
+        raise CloseContractError(
+            f"cleanup work {work_id!r} independent review is not durable: {exc}"
+        ) from exc
+    try:
+        indep_path = validate_locator(
+            independent_review, "review_attempt", label, workstream_id
+        )
+    except ValidationError as exc:
+        raise CloseContractError(
+            f"cleanup work {work_id!r} independent review locator invalid: {exc}"
+        ) from exc
+    if indep_path not in listed_paths:
+        raise CloseContractError(
+            f"cleanup work {work_id!r} independent review {indep_path!r} is "
+            "not in the complete review_attempts history"
+        )
+    if indep_path != listed_paths[-1]:
+        raise CloseContractError(
+            f"cleanup work {work_id!r} independent review {indep_path!r} hides "
+            f"a later durable attempt {listed_paths[-1]!r}; the GREEN review "
+            "must be terminal"
+        )
+    terminal = attempts[-1]
+    terminal_commit = attempt_commits[-1]
+    indep_commit = dict(independent_review).get("commit")
+    if indep_commit is not None and indep_commit != terminal_commit:
+        raise CloseContractError(
+            f"cleanup work {work_id!r} independent review commit does not "
+            "match the terminal complete-history commit"
+        )
+    _check_terminal_green(terminal, terminal_commit)
+
+
+def validate_cleanup_work_proved(
+    *,
+    work_id: str,
+    subject: Mapping[str, object],
+    tests_evidence: Iterable[object],
+    independent_review: Mapping[str, object] | None,
+    covers_observation_ids: Iterable[str],
+    canonical_cleanup_candidates: Iterable[str] | None,
+    project_root: Path | str | None,
+    project_repository: str | None,
+    workstream_id: str | None,
+    review_attempts: Iterable[object] | None = None,
+    speculative_redesign: bool = False,
+    new_product_scope: bool = False,
+) -> str:
+    """Check one cleanup work relative to caller-supplied canonical candidates.
+
+    H019 relative-consistency engine: the subject must resolve to exact Git
+    identity through the RF007 resolver (repository/commit/path/blob,
+    worktree freshness, HEAD ancestry); every tests/evidence locator must
+    resolve exact and existing; the independent review must be durable RF006
+    attempt proof that is GREEN, semantically independent, bound to that
+    exact subject, with terminal evidence resolving to exact workstream Git
+    content and acceptance binding the exact package cleanup authority, and
+    covering the complete durable cleanup review inventory (no hidden
+    earlier attempt under the same work_id); and ``covers_observation_ids``
+    must be a non-empty unique subset of the given
+    ``canonical_cleanup_candidates``. That candidate set is caller-supplied
+    relative input and proves nothing about completeness: only
+    :func:`verify_final_observation_reconciliation_from_board`, which derives
+    the canonical set from durable Board history, authoritatively gates Final.
+    Bare 40-hex shape, dangling strings, caller booleans, and
+    caller-supplied coverage alone fail closed with an exact reason.
+    """
+    if not isinstance(work_id, str) or not work_id.strip():
+        raise CloseContractError("cleanup work requires a non-empty work_id")
+    if not isinstance(subject, Mapping):
+        raise CloseContractError(f"cleanup work {work_id!r} requires an exact subject table")
+    repository = subject.get("repository")
+    path = subject.get("path")
+    commit = subject.get("commit")
+    blob = subject.get("blob")
+    if not isinstance(repository, str) or not repository.strip():
+        raise CloseContractError(f"cleanup work {work_id!r} requires an exact subject repository")
+    if not isinstance(path, str) or not path.strip():
+        raise CloseContractError(f"cleanup work {work_id!r} requires an exact subject path")
+    for field, value in (("commit", commit), ("blob", blob)):
+        if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{40}", value) is None:
+            raise CloseContractError(
+                f"cleanup work {work_id!r} requires an exact subject {field} (40-hex)"
+            )
+    if isinstance(covers_observation_ids, str) or not isinstance(covers_observation_ids, Iterable):
+        raise CloseContractError(
+            f"cleanup work {work_id!r} must be grounded in non-empty unique cleanup-candidate observation ids"
+        )
+    covers = list(covers_observation_ids)
+    if (
+        not covers
+        or not all(isinstance(item, str) and item.strip() for item in covers)
+        or len(set(covers)) != len(covers)
+    ):
+        raise CloseContractError(
+            f"cleanup work {work_id!r} must be grounded in non-empty unique cleanup-candidate observation ids"
+        )
+    if speculative_redesign:
+        raise CloseContractError(
+            f"cleanup work {work_id!r} must not become speculative redesign"
+        )
+    if new_product_scope:
+        raise CloseContractError(
+            f"cleanup work {work_id!r} must not introduce new product scope"
+        )
+    if not isinstance(independent_review, Mapping):
+        raise CloseContractError(
+            f"cleanup work {work_id!r} requires durable RF006 GREEN independent "
+            "review bound to the exact subject, not a bare boolean"
+        )
+    if canonical_cleanup_candidates is None:
+        raise CloseContractError(
+            f"cleanup work {work_id!r} requires the caller-supplied relative "
+            "canonical cleanup_candidate set for consistency; "
+            "caller-supplied covers alone prove nothing and only the "
+            "Board-derived Final gate authoritatively completes cleanup"
+        )
+    canonical = set(canonical_cleanup_candidates)
+    for observation_id in covers:
+        if observation_id not in canonical:
+            raise CloseContractError(
+                f"cleanup work {work_id!r} covers observation {observation_id!r} "
+                "which is not a canonical cleanup_candidate"
+            )
+    if project_root is None:
+        raise CloseContractError(
+            f"cleanup work {work_id!r} requires exact project_root for Git "
+            "identity proof; caller-attested identity proves nothing"
+        )
+    if not isinstance(project_repository, str) or not project_repository.strip():
+        raise CloseContractError(
+            f"cleanup work {work_id!r} requires the exact project repository "
+            "for Git identity proof"
+        )
+    if not isinstance(workstream_id, str) or not workstream_id.strip():
+        raise CloseContractError(
+            f"cleanup work {work_id!r} requires exact workstream identity for "
+            "durable review proof"
+        )
+    root = Path(project_root).resolve()
+    subject_commit, _, _ = _h019_prove_subject(
+        root=root,
+        work_id=work_id,
+        subject=subject,
+        project_repository=project_repository,
+    )
+    assert isinstance(repository, str)
+    _h019_prove_tests_evidence(
+        root=root,
+        work_id=work_id,
+        tests_evidence=tests_evidence,
+        subject_commit=subject_commit,
+        subject_repository=repository,
+        project_repository=project_repository,
+    )
+    _h019_prove_review(
+        root=root,
+        work_id=work_id,
+        independent_review=independent_review,
+        subject=subject,
+        project_repository=project_repository,
+        workstream_id=workstream_id,
+        review_attempts=review_attempts,
+    )
+    return "relative_cleanup_work_complete"
 
 
 def _canonical_final_dispositions(
@@ -573,16 +1429,26 @@ def verify_final_observation_reconciliation(
     derived_state: Mapping[str, object] | None = None,
     cleanup_works: Iterable[Mapping[str, object]] = (),
     further_advisory_improvement_conceivable: bool = False,
+    cleanup_proof_project_root: Path | str | None = None,
+    cleanup_proof_repository: str | None = None,
+    cleanup_proof_workstream_id: str | None = None,
 ) -> str:
-    """Check a proposed Final set against supplied canonical dispositions.
+    """Check a proposed Final set against supplied relative dispositions.
 
     This is the relative-consistency engine: the proposal must exactly match
     the given review_attempts derivation or derived_state snapshot, every
     entry must carry a terminal disposition, and every cleanup candidate must
-    be covered by a fully validated completed cleanup work. It proves nothing
-    about the completeness of its own inputs; truncation-proof completeness
-    against durable state is provided only by
-    verify_final_observation_reconciliation_from_board.
+    be covered by a completed cleanup work checked through the H019 relative
+    engine (exact subject/tests/evidence Git identity, durable RF006 GREEN
+    independent review bound to that subject with exact terminal evidence,
+    package authority and complete inventory, relative canonical
+    cleanup_candidate coverage). Caller-attested shape alone never covers a
+    candidate: without exact cleanup proof context the gate fails closed. It
+    proves nothing about the completeness of its own inputs; no
+    caller-supplied candidate set may independently authorize Final.
+    Truncation-proof completeness against durable state is provided only by
+    verify_final_observation_reconciliation_from_board, the sole authoritative
+    Final gate.
     """
 
     # Deliberately do not branch on further_advisory_improvement_conceivable.
@@ -663,12 +1529,21 @@ def verify_final_observation_reconciliation(
                     "not cleanup_candidate"
                 )
         if work.get("complete") is True:
-            validate_cleanup_work(
+            validate_cleanup_work_proved(
                 work_id=work.get("work_id", ""),
                 subject=work.get("subject", {}),
                 tests_evidence=work.get("tests_evidence", []),
-                independent_review_green=work.get("independent_review_green", False),
+                independent_review=work.get("independent_review"),
                 covers_observation_ids=covers,
+                canonical_cleanup_candidates=frozenset(
+                    observation_id
+                    for observation_id, disposition in canonical.items()
+                    if disposition == "cleanup_candidate"
+                ),
+                project_root=cleanup_proof_project_root,
+                project_repository=cleanup_proof_repository,
+                workstream_id=cleanup_proof_workstream_id,
+                review_attempts=work.get("review_attempts"),
                 speculative_redesign=work.get("speculative_redesign", False),
                 new_product_scope=work.get("new_product_scope", False),
             )
@@ -685,7 +1560,7 @@ def verify_final_observation_reconciliation(
             "completed independently reviewed cleanup work: "
             + ", ".join(sorted(pending_cleanup))
         )
-    return "final_observation_reconciliation_complete"
+    return "relative_final_observation_reconciliation_complete"
 
 
 def _read_project_toml(root: Path, raw_path: str, label: str) -> dict:
@@ -852,19 +1727,22 @@ def verify_final_observation_reconciliation_from_board(
 ) -> str:
     """Authoritatively gate Final Integration on complete durable review history.
 
-    This is the truncation-proof entry point: it derives the complete
-    review-attempt inventory from durable Git/workstream state (worktree
-    reviews directory plus required HEAD and history reads), requires
-    the Board to list every durable attempt, proves every listed
-    locator through exact RF007/T11 Git identity and legacy provenance,
-    validates the full history, freezes terminal bytes against Git
-    history, and derives the canonical observation set itself. A
-    missing Git inventory, a path-only relied-upon locator, an omitted
-    durable attempt, an omitted known observation, or a forged
-    disposition fails against durable truth. Only a workstream with a
-    Git-verified empty durable inventory may reconcile vacuously.
-    Callers must not substitute in-memory caller-supplied histories
-    when durable state is available.
+    This is the truncation-proof entry point and the sole authoritative Final
+    gate: it derives the complete review-attempt inventory from durable
+    Git/workstream state (worktree reviews directory plus required HEAD and
+    history reads), requires the Board to list every durable attempt, proves
+    every listed locator through exact RF007/T11 Git identity and legacy
+    provenance, validates the full history, freezes terminal bytes against
+    Git history, and derives the canonical observation set itself. A missing
+    Git inventory, a path-only relied-upon locator, an omitted durable
+    attempt, an omitted known observation, or a forged disposition fails
+    against durable truth. Only a workstream with a Git-verified empty
+    durable inventory may reconcile vacuously. Every completed covering
+    cleanup work is checked through the H019 relative engine against this
+    same durable state with the Board-derived canonical candidate set; no
+    caller-supplied candidate set may independently authorize Final. Callers
+    must not substitute in-memory caller-supplied histories when durable
+    state is available.
     """
     root = Path(project_root).resolve()
     try:
@@ -925,8 +1803,13 @@ def verify_final_observation_reconciliation_from_board(
             "the complete durable inventory derived from worktree and Git state"
         )
 
+    cleanup_list = list(cleanup_works)
+    needs_cleanup_proof = any(
+        isinstance(work, Mapping) and work.get("complete") is True
+        for work in cleanup_list
+    )
     repository: str | None = None
-    if refs:
+    if refs or needs_cleanup_proof:
         repository = _resolve_project_repository(root, project_repository)
         if repository is None:
             raise CloseContractError(
@@ -997,12 +1880,16 @@ def verify_final_observation_reconciliation_from_board(
                 f"Final gate durable review history is not append-only: {exc}"
             ) from exc
 
-    return verify_final_observation_reconciliation(
+    verify_final_observation_reconciliation(
         observations=observations,
         review_attempts=attempts,
-        cleanup_works=cleanup_works,
+        cleanup_works=cleanup_list,
         further_advisory_improvement_conceivable=further_advisory_improvement_conceivable,
+        cleanup_proof_project_root=root,
+        cleanup_proof_repository=repository,
+        cleanup_proof_workstream_id=workstream_id,
     )
+    return "final_observation_reconciliation_complete"
 
 
 def _h017_head_commit(root: Path) -> str:

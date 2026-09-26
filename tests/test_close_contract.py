@@ -21,6 +21,7 @@ from tools.close_contract import (
     stacked_integration_path,
     tracker_pr_linkage,
     validate_cleanup_work,
+    validate_cleanup_work_proved,
     verify_final_observation_reconciliation,
     verify_final_observation_reconciliation_from_board,
     verify_pre_mutation_target,
@@ -436,6 +437,180 @@ def _reviewed_cleanup_work(
     return work
 
 
+H019_WORK_ID = "cleanup-O2"
+H019_SUBJECT_PATH = "results/cleanup-O2.md"
+H019_EVIDENCE_PATH = "tests/test_cleanup_o2.py"
+H019_REPOSITORY = "owner/fixture"
+
+_USE_PRODUCT_AUTHORITY: object = object()
+
+
+def _h019_product_authority() -> tuple[str, str]:
+    """Return exact (commit, blob) for package workflow/CLOSE.md at product HEAD."""
+
+    from tools.close_contract import _h019_product_root
+
+    product = _h019_product_root()
+    commit = subprocess.run(
+        ["git", "-C", str(product), "rev-parse", "HEAD"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    blob = subprocess.run(
+        ["git", "-C", str(product), "rev-parse", "HEAD:workflow/CLOSE.md"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    return commit, blob
+
+
+def _h019_write_cleanup_review(
+    project: Path,
+    work_id: str,
+    subject: dict[str, str],
+    *,
+    attempt: str = "R01",
+    verdict: str = "green",
+    independent: bool = True,
+    findings: list[str] | None = None,
+    severity: str = "",
+    evidence_path: str | None = None,
+    write_evidence: bool = True,
+    acceptance_path: str = "workflow/CLOSE.md",
+    acceptance_commit: object | str | None = _USE_PRODUCT_AUTHORITY,
+    acceptance_blob: object | str | None = _USE_PRODUCT_AUTHORITY,
+) -> str:
+    review_path = (
+        f"implementation/workstreams/{BOARD_WORKSTREAM}/reviews/{work_id}-{attempt}.toml"
+    )
+    evidence = evidence_path or (
+        f"implementation/workstreams/{BOARD_WORKSTREAM}/evidence/{work_id}-review-{attempt}.md"
+    )
+    if write_evidence:
+        rel = evidence.strip()
+        unsafe = (
+            not rel
+            or rel != evidence.strip()
+            or "\\" in rel
+            or rel.startswith("/")
+            or ".." in rel.split("/")
+            or "\x00" in rel
+        )
+        if not unsafe:
+            try:
+                target = project / rel
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(
+                    f"# cleanup review {work_id} {attempt}\n\nGREEN evidence.\n",
+                    encoding="utf-8",
+                )
+            except OSError:
+                pass
+    if acceptance_commit is _USE_PRODUCT_AUTHORITY or acceptance_blob is _USE_PRODUCT_AUTHORITY:
+        product_commit, product_blob = _h019_product_authority()
+        if acceptance_commit is _USE_PRODUCT_AUTHORITY:
+            acceptance_commit = product_commit
+        if acceptance_blob is _USE_PRODUCT_AUTHORITY:
+            acceptance_blob = product_blob
+    path = project / review_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    finding_ids = findings if findings is not None else []
+    rendered = ", ".join(f'"{finding}"' for finding in finding_ids)
+    acceptance_block = (
+        "[acceptance]\n"
+        'class = "authority"\n'
+        f'path = "{acceptance_path}"\n'
+    )
+    if isinstance(acceptance_commit, str) and isinstance(acceptance_blob, str):
+        acceptance_block += (
+            f'commit = "{acceptance_commit}"\n'
+            f'blob = "{acceptance_blob}"\n'
+        )
+    path.write_text(
+        f'workstream_id = "{BOARD_WORKSTREAM}"\n'
+        f'card_id = "{work_id}"\n'
+        f'attempt = "{attempt}"\n'
+        f'verdict = "{verdict}"\n'
+        f'evidence_path = "{evidence}"\n'
+        'review_kind = "discovery"\n'
+        'source_discovery_attempt = ""\n'
+        "discovery_complete = true\n"
+        f"material_finding_ids = [{rendered}]\n"
+        + severity
+        + "[subject]\n"
+        'class = "git_blob"\n'
+        f'repository = "{subject["repository"]}"\n'
+        f'commit = "{subject["commit"]}"\n'
+        f'path = "{subject["path"]}"\n'
+        f'blob = "{subject["blob"]}"\n'
+        + acceptance_block
+        + "[independence]\n"
+        f"materially_produced_or_repaired_subject = {'false' if independent else 'true'}\n"
+        'basis = "Fresh semantic reviewer context."\n',
+        encoding="utf-8",
+    )
+    return review_path
+
+
+def _h019_proved_fixture(
+    project: Path, work_id: str = H019_WORK_ID
+) -> dict[str, object]:
+    """Commit cleanup subject/evidence, then a bound GREEN review; return proof parts."""
+    subject_file = project / H019_SUBJECT_PATH
+    subject_file.parent.mkdir(parents=True, exist_ok=True)
+    subject_file.write_text("# cleanup O2\n", encoding="utf-8")
+    evidence_file = project / H019_EVIDENCE_PATH
+    evidence_file.parent.mkdir(parents=True, exist_ok=True)
+    evidence_file.write_text(
+        "def test_cleanup_o2():\n    assert True\n", encoding="utf-8"
+    )
+    _h017_commit_all(project, "h019 cleanup subject")
+    head1 = subprocess.run(
+        ["git", "-C", str(project), "rev-parse", "HEAD"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    subject = {
+        "repository": H019_REPOSITORY,
+        "commit": head1,
+        "path": H019_SUBJECT_PATH,
+        "blob": _h017_blob_for(project, H019_SUBJECT_PATH, head1),
+    }
+    review_path = _h019_write_cleanup_review(project, work_id, subject)
+    _h017_commit_all(project, "h019 cleanup review")
+    head2 = subprocess.run(
+        ["git", "-C", str(project), "rev-parse", "HEAD"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    review_locator = {
+        "class": "review_attempt",
+        "path": review_path,
+        "commit": head2,
+        "blob": _h017_blob_for(project, review_path, head2),
+    }
+    return {
+        "subject": subject,
+        "review_locator": review_locator,
+        "subject_commit": head1,
+        "review_commit": head2,
+    }
+
+
+def _h019_proved_cleanup_work(
+    parts: dict[str, object],
+    work_id: str = H019_WORK_ID,
+    covers: tuple[str, ...] = ("O2",),
+    **overrides: object,
+) -> dict[str, object]:
+    work: dict[str, object] = {
+        "work_id": work_id,
+        "subject": dict(parts["subject"]),  # type: ignore[arg-type]
+        "tests_evidence": [H019_EVIDENCE_PATH],
+        "covers_observation_ids": list(covers),
+        "complete": True,
+        "independent_review": dict(parts["review_locator"]),  # type: ignore[arg-type]
+    }
+    work.update(overrides)
+    return work
+
+
 class FinalObservationReconciliationTests(unittest.TestCase):
     def test_pre_final_gate_accepts_only_five_terminal_dispositions(self) -> None:
         observations = [
@@ -452,19 +627,26 @@ class FinalObservationReconciliationTests(unittest.TestCase):
             "O4": "promoted",
             "O5": "tracked",
         })
-        self.assertEqual(
-            verify_final_observation_reconciliation(
-                observations=observations,
-                derived_state=derived,
-                cleanup_works=[_reviewed_cleanup_work()],
-            ),
-            "final_observation_reconciliation_complete",
-        )
+        # H019: the covering work must carry exact Git/review proof, not shape.
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            parts = _h019_proved_fixture(project)
+            self.assertEqual(
+                verify_final_observation_reconciliation(
+                    observations=observations,
+                    derived_state=derived,
+                    cleanup_works=[_h019_proved_cleanup_work(parts)],
+                    cleanup_proof_project_root=project,
+                    cleanup_proof_repository=H019_REPOSITORY,
+                    cleanup_proof_workstream_id=BOARD_WORKSTREAM,
+                ),
+                "relative_final_observation_reconciliation_complete",
+            )
         self.assertEqual(
             verify_final_observation_reconciliation(
                 observations=[], derived_state={}
             ),
-            "final_observation_reconciliation_complete",
+            "relative_final_observation_reconciliation_complete",
         )
 
     def test_pre_final_gate_blocks_unreconciled_open_observations(self) -> None:
@@ -590,16 +772,16 @@ class FinalObservationReconciliationTests(unittest.TestCase):
             "path": "results/cleanup-O2.md",
             "blob": "b" * 40,
         }
-        self.assertEqual(
+        # H019: fabricated 40-hex shape with dangling strings and a bare
+        # boolean can never yield relative_cleanup_work_complete.
+        with self.assertRaisesRegex(CloseContractError, "caller-attested"):
             validate_cleanup_work(
                 work_id="cleanup-O2",
                 subject=subject,
                 tests_evidence=["tests/test_cleanup_o2.py"],
                 independent_review_green=True,
                 covers_observation_ids=["O2"],
-            ),
-            "cleanup_work_complete",
-        )
+            )
         with self.assertRaisesRegex(CloseContractError, "exact subject"):
             validate_cleanup_work(
                 work_id="cleanup-O2",
@@ -682,7 +864,7 @@ class FinalObservationReconciliationTests(unittest.TestCase):
                 derived_state=_derived_snapshot({"O1": "resolved"}),
                 further_advisory_improvement_conceivable=True,
             ),
-            "final_observation_reconciliation_complete",
+            "relative_final_observation_reconciliation_complete",
         )
 
 
@@ -906,15 +1088,57 @@ class BoardBoundFinalGateTests(unittest.TestCase):
                 'disposition = "cleanup_candidate"\n'
                 'disposition_basis = "Safe bounded cleanup."\n',
             )
-            commit, blob = _git_identity_for(project, review)
-            _write_board_toml_exact(project, [(review, commit, blob)])
+            # H019: governing attempt plus cleanup subject/evidence share the
+            # first commit; the bound cleanup review and Board follow.
+            subject_file = project / H019_SUBJECT_PATH
+            subject_file.parent.mkdir(parents=True, exist_ok=True)
+            subject_file.write_text("# cleanup O2\n", encoding="utf-8")
+            evidence_file = project / H019_EVIDENCE_PATH
+            evidence_file.parent.mkdir(parents=True, exist_ok=True)
+            evidence_file.write_text(
+                "def test_cleanup_o2():\n    assert True\n", encoding="utf-8"
+            )
+            _h017_commit_all(project, "h019 governing attempt and cleanup subject")
+            head1 = subprocess.run(
+                ["git", "-C", str(project), "rev-parse", "HEAD"],
+                check=True, capture_output=True, text=True,
+            ).stdout.strip()
+            gov_blob = _h017_blob_for(project, review, head1)
+            subject = {
+                "repository": H019_REPOSITORY,
+                "commit": head1,
+                "path": H019_SUBJECT_PATH,
+                "blob": _h017_blob_for(project, H019_SUBJECT_PATH, head1),
+            }
+            cleanup_review = _h019_write_cleanup_review(
+                project, H019_WORK_ID, subject
+            )
+            _write_board_toml_exact(project, [(review, head1, gov_blob)])
+            _h017_commit_all(project, "h019 cleanup review and board")
+            head2 = subprocess.run(
+                ["git", "-C", str(project), "rev-parse", "HEAD"],
+                check=True, capture_output=True, text=True,
+            ).stdout.strip()
+            work = {
+                "work_id": H019_WORK_ID,
+                "subject": subject,
+                "tests_evidence": [H019_EVIDENCE_PATH],
+                "covers_observation_ids": ["O2"],
+                "complete": True,
+                "independent_review": {
+                    "class": "review_attempt",
+                    "path": cleanup_review,
+                    "commit": head2,
+                    "blob": _h017_blob_for(project, cleanup_review, head2),
+                },
+            }
             self.assertEqual(
                 verify_final_observation_reconciliation_from_board(
                     project_root=project,
                     board_path=BOARD_PATH,
                     card_id=BOARD_CARD,
                     observations=[{"id": "O2", "disposition": "cleanup_candidate"}],
-                    cleanup_works=[_reviewed_cleanup_work()],
+                    cleanup_works=[work],
                     project_repository="owner/fixture",
                 ),
                 "final_observation_reconciliation_complete",
@@ -2171,6 +2395,484 @@ class H017HandoffTests(unittest.TestCase):
                 project_repository="owner/fixture",
             )
             self.assertNotIn(H017_HANDOFF_PATH, [item.path for item in proof.locators])
+
+
+def _h019_custom_review_fixture(
+    project: Path,
+    work_id: str = H019_WORK_ID,
+    *,
+    verdict: str = "green",
+    independent: bool = True,
+    subject_override: dict[str, str] | None = None,
+    findings: list[str] | None = None,
+    severity: str = "",
+    evidence_path: str | None = None,
+    write_evidence: bool = True,
+    acceptance_path: str = "workflow/CLOSE.md",
+    acceptance_commit: object | str | None = _USE_PRODUCT_AUTHORITY,
+    acceptance_blob: object | str | None = _USE_PRODUCT_AUTHORITY,
+) -> dict[str, object]:
+    """Commit subject/evidence, then a review with the given review attributes."""
+    subject_file = project / H019_SUBJECT_PATH
+    subject_file.parent.mkdir(parents=True, exist_ok=True)
+    subject_file.write_text("# cleanup O2\n", encoding="utf-8")
+    evidence_file = project / H019_EVIDENCE_PATH
+    evidence_file.parent.mkdir(parents=True, exist_ok=True)
+    evidence_file.write_text(
+        "def test_cleanup_o2():\n    assert True\n", encoding="utf-8"
+    )
+    _h017_commit_all(project, "h019 cleanup subject")
+    head1 = subprocess.run(
+        ["git", "-C", str(project), "rev-parse", "HEAD"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    subject = {
+        "repository": H019_REPOSITORY,
+        "commit": head1,
+        "path": H019_SUBJECT_PATH,
+        "blob": _h017_blob_for(project, H019_SUBJECT_PATH, head1),
+    }
+    review_path = _h019_write_cleanup_review(
+        project,
+        work_id,
+        subject_override if subject_override is not None else subject,
+        verdict=verdict,
+        independent=independent,
+        findings=findings,
+        severity=severity,
+        evidence_path=evidence_path,
+        write_evidence=write_evidence,
+        acceptance_path=acceptance_path,
+        acceptance_commit=acceptance_commit,
+        acceptance_blob=acceptance_blob,
+    )
+    _h017_commit_all(project, "h019 cleanup review")
+    head2 = subprocess.run(
+        ["git", "-C", str(project), "rev-parse", "HEAD"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    return {
+        "subject": subject,
+        "review_locator": {
+            "class": "review_attempt",
+            "path": review_path,
+            "commit": head2,
+            "blob": _h017_blob_for(project, review_path, head2),
+        },
+        "subject_commit": head1,
+        "review_commit": head2,
+    }
+
+
+def _h019_proved_call(
+    project: Path, parts: dict[str, object], **overrides: object
+) -> str:
+    kwargs: dict[str, object] = {
+        "work_id": H019_WORK_ID,
+        "subject": dict(parts["subject"]),  # type: ignore[arg-type]
+        "tests_evidence": [H019_EVIDENCE_PATH],
+        "independent_review": dict(parts["review_locator"]),  # type: ignore[arg-type]
+        "covers_observation_ids": ["O2"],
+        "canonical_cleanup_candidates": {"O2"},
+        "project_root": project,
+        "project_repository": H019_REPOSITORY,
+        "workstream_id": BOARD_WORKSTREAM,
+    }
+    kwargs.update(overrides)
+    return validate_cleanup_work_proved(**kwargs)  # type: ignore[arg-type]
+
+
+class H019CleanupWorkProofTests(unittest.TestCase):
+    def test_exact_positive_completes_deterministically(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            parts = _h019_proved_fixture(project)
+            self.assertEqual(
+                _h019_proved_call(project, parts), "relative_cleanup_work_complete"
+            )
+            self.assertEqual(
+                _h019_proved_call(project, parts), "relative_cleanup_work_complete"
+            )
+            evidence_blob = _h017_blob_for(
+                project, H019_EVIDENCE_PATH, str(parts["subject_commit"])
+            )
+            self.assertEqual(
+                _h019_proved_call(
+                    project,
+                    parts,
+                    tests_evidence=[
+                        H019_EVIDENCE_PATH,
+                        {
+                            "repository": H019_REPOSITORY,
+                            "path": H019_EVIDENCE_PATH,
+                            "commit": parts["subject_commit"],
+                            "blob": evidence_blob,
+                        },
+                    ],
+                ),
+                "relative_cleanup_work_complete",
+            )
+
+    def test_fabricated_subject_cannot_complete(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            parts = _h019_proved_fixture(project)
+            fabricated = dict(parts["subject"])  # type: ignore[arg-type]
+            fabricated["commit"] = "a" * 40
+            fabricated["blob"] = "b" * 40
+            with self.assertRaisesRegex(CloseContractError, "fabricated/dangling"):
+                _h019_proved_call(project, parts, subject=fabricated)
+            subject = dict(parts["subject"])  # type: ignore[arg-type]
+            subject["path"] = "does/not/exist.py"
+            with self.assertRaisesRegex(CloseContractError, "dangling"):
+                _h019_proved_call(project, parts, subject=subject)
+
+    def test_stale_subject_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            parts = _h019_proved_fixture(project)
+            subject = dict(parts["subject"])  # type: ignore[arg-type]
+            subject["blob"] = "f" * 40
+            with self.assertRaisesRegex(CloseContractError, "stale"):
+                _h019_proved_call(project, parts, subject=subject)
+            (project / H019_SUBJECT_PATH).write_text(
+                "# cleanup O2 mutated\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(CloseContractError, "stale"):
+                _h019_proved_call(project, parts)
+
+    def test_sibling_subject_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            parts = _h019_proved_fixture(project)
+            subject = dict(parts["subject"])  # type: ignore[arg-type]
+            subject["repository"] = "other/repo"
+            with self.assertRaisesRegex(CloseContractError, "sibling"):
+                _h019_proved_call(project, parts, subject=subject)
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            subject_file = project / H019_SUBJECT_PATH
+            subject_file.parent.mkdir(parents=True, exist_ok=True)
+            subject_file.write_text("# cleanup O2\n", encoding="utf-8")
+            evidence_file = project / H019_EVIDENCE_PATH
+            evidence_file.parent.mkdir(parents=True, exist_ok=True)
+            evidence_file.write_text("def test_cleanup_o2():\n    assert True\n", encoding="utf-8")
+            _h017_commit_all(project, "h019 cleanup subject")
+            orphan = subprocess.run(
+                ["git", "-C", str(project), "rev-parse", "HEAD"],
+                check=True, capture_output=True, text=True,
+            ).stdout.strip()
+            subprocess.run(
+                ["git", "-C", str(project), "commit", "-q", "--amend",
+                 "-m", "h019 amended subject"],
+                check=True,
+            )
+            subject = {
+                "repository": H019_REPOSITORY,
+                "commit": orphan,
+                "path": H019_SUBJECT_PATH,
+                "blob": _h017_blob_for(project, H019_SUBJECT_PATH, orphan),
+            }
+            review_path = _h019_write_cleanup_review(project, H019_WORK_ID, subject)
+            _h017_commit_all(project, "h019 cleanup review")
+            head = subprocess.run(
+                ["git", "-C", str(project), "rev-parse", "HEAD"],
+                check=True, capture_output=True, text=True,
+            ).stdout.strip()
+            off_head = {
+                "subject": subject,
+                "review_locator": {
+                    "class": "review_attempt",
+                    "path": review_path,
+                    "commit": head,
+                    "blob": _h017_blob_for(project, review_path, head),
+                },
+            }
+            with self.assertRaisesRegex(CloseContractError, "sibling.*ancestry"):
+                _h019_proved_call(project, off_head)
+
+    def test_dangling_and_stale_evidence_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            parts = _h019_proved_fixture(project)
+            with self.assertRaisesRegex(CloseContractError, "dangling"):
+                _h019_proved_call(
+                    project, parts, tests_evidence=["no/such/test.py"]
+                )
+            evidence_blob = _h017_blob_for(
+                project, H019_EVIDENCE_PATH, str(parts["subject_commit"])
+            )
+            with self.assertRaisesRegex(CloseContractError, "dangling"):
+                _h019_proved_call(
+                    project,
+                    parts,
+                    tests_evidence=[{
+                        "repository": H019_REPOSITORY,
+                        "path": H019_EVIDENCE_PATH,
+                        "commit": "0" * 40,
+                        "blob": evidence_blob,
+                    }],
+                )
+            with self.assertRaisesRegex(CloseContractError, "stale"):
+                _h019_proved_call(
+                    project,
+                    parts,
+                    tests_evidence=[{
+                        "repository": H019_REPOSITORY,
+                        "path": H019_EVIDENCE_PATH,
+                        "commit": parts["subject_commit"],
+                        "blob": "f" * 40,
+                    }],
+                )
+            with self.assertRaisesRegex(CloseContractError, "tests/evidence"):
+                _h019_proved_call(project, parts, tests_evidence=[])
+            (project / H019_EVIDENCE_PATH).write_text(
+                "def test_cleanup_o2():\n    assert False\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(CloseContractError, "stale"):
+                _h019_proved_call(project, parts)
+
+    def test_missing_and_path_only_review_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            parts = _h019_proved_fixture(project)
+            with self.assertRaisesRegex(CloseContractError, "bare boolean"):
+                _h019_proved_call(project, parts, independent_review=None)
+            locator = dict(parts["review_locator"])  # type: ignore[arg-type]
+            path_only = {"class": "review_attempt", "path": locator["path"]}
+            with self.assertRaisesRegex(CloseContractError, "path-only"):
+                _h019_proved_call(project, parts, independent_review=path_only)
+
+    def test_non_green_review_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            review_evidence = (
+                f"implementation/workstreams/{BOARD_WORKSTREAM}/evidence/"
+                f"{H019_WORK_ID}-review-R01.md"
+            )
+            parts = _h019_custom_review_fixture(
+                project,
+                verdict="red",
+                findings=["F1"],
+                severity=(
+                    "[[finding_severity]]\n"
+                    'id = "F1"\n'
+                    'surface = "correctness"\n'
+                    f'evidence = "{review_evidence}#F1"\n'
+                ),
+            )
+            with self.assertRaisesRegex(CloseContractError, "got 'red'"):
+                _h019_proved_call(project, parts)
+
+    def test_non_independent_review_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            parts = _h019_custom_review_fixture(project, independent=False)
+            with self.assertRaisesRegex(CloseContractError, "independent"):
+                _h019_proved_call(project, parts)
+
+    def test_unbound_review_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            parts = _h019_proved_fixture(project)
+            first_locator = dict(parts["review_locator"])  # type: ignore[arg-type]
+            subject = dict(parts["subject"])  # type: ignore[arg-type]
+            rebound = dict(subject)
+            rebound["path"] = "results/other.md"
+            review_path = _h019_write_cleanup_review(
+                project, H019_WORK_ID, rebound, attempt="R02"
+            )
+            _h017_commit_all(project, "h019 unbound review")
+            head = subprocess.run(
+                ["git", "-C", str(project), "rev-parse", "HEAD"],
+                check=True, capture_output=True, text=True,
+            ).stdout.strip()
+            second_locator = {
+                "class": "review_attempt",
+                "path": review_path,
+                "commit": head,
+                "blob": _h017_blob_for(project, review_path, head),
+            }
+            parts["review_locator"] = second_locator
+            with self.assertRaisesRegex(CloseContractError, "unbound"):
+                _h019_proved_call(
+                    project, parts, review_attempts=[first_locator, second_locator]
+                )
+
+    def test_non_canonical_cover_and_missing_context_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            parts = _h019_proved_fixture(project)
+            with self.assertRaisesRegex(CloseContractError, "not a canonical"):
+                _h019_proved_call(
+                    project, parts, covers_observation_ids=["O9"]
+                )
+            with self.assertRaisesRegex(CloseContractError, "canonical"):
+                _h019_proved_call(
+                    project, parts, canonical_cleanup_candidates=None
+                )
+            with self.assertRaisesRegex(CloseContractError, "project_root"):
+                _h019_proved_call(project, parts, project_root=None)
+            with self.assertRaisesRegex(CloseContractError, "project repository"):
+                _h019_proved_call(project, parts, project_repository=None)
+            with self.assertRaisesRegex(CloseContractError, "workstream identity"):
+                _h019_proved_call(project, parts, workstream_id=None)
+
+    def test_final_gate_without_proof_context_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            parts = _h019_proved_fixture(project)
+            with self.assertRaisesRegex(CloseContractError, "project_root"):
+                verify_final_observation_reconciliation(
+                    observations=[{"id": "O2", "disposition": "cleanup_candidate"}],
+                    derived_state=_derived_snapshot({"O2": "cleanup_candidate"}),
+                    cleanup_works=[_h019_proved_cleanup_work(parts)],
+                )
+
+    def test_final_gate_rejects_non_candidate_cover(self) -> None:
+        with self.assertRaisesRegex(CloseContractError, "not cleanup_candidate"):
+            verify_final_observation_reconciliation(
+                observations=[{"id": "O1", "disposition": "resolved"}],
+                derived_state=_derived_snapshot({"O1": "resolved"}),
+                cleanup_works=[_reviewed_cleanup_work(covers=("O1",))],
+            )
+
+    def test_review_terminal_evidence_dangling_stale_sibling_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            parts = _h019_custom_review_fixture(project, write_evidence=False)
+            with self.assertRaisesRegex(CloseContractError, "dangling"):
+                _h019_proved_call(project, parts)
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            parts = _h019_proved_fixture(project)
+            review_evidence = (
+                f"implementation/workstreams/{BOARD_WORKSTREAM}/evidence/"
+                f"{H019_WORK_ID}-review-R01.md"
+            )
+            (project / review_evidence).write_text(
+                "# mutated review evidence\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(CloseContractError, "stale"):
+                _h019_proved_call(project, parts)
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            sibling = (
+                "implementation/workstreams/sibling-workstream/evidence/hack.md"
+            )
+            parts = _h019_custom_review_fixture(project, evidence_path=sibling)
+            with self.assertRaisesRegex(CloseContractError, "sibling"):
+                _h019_proved_call(project, parts)
+
+    def test_review_acceptance_arbitrary_stale_path_only_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            parts = _h019_custom_review_fixture(
+                project, acceptance_path="workflow/OTHER.md"
+            )
+            with self.assertRaisesRegex(CloseContractError, "arbitrary"):
+                _h019_proved_call(project, parts)
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            parts = _h019_custom_review_fixture(
+                project, acceptance_commit=None, acceptance_blob=None
+            )
+            with self.assertRaisesRegex(CloseContractError, "path-only"):
+                _h019_proved_call(project, parts)
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            product_commit, _ = _h019_product_authority()
+            parts = _h019_custom_review_fixture(
+                project,
+                acceptance_commit=product_commit,
+                acceptance_blob="f" * 40,
+            )
+            with self.assertRaisesRegex(CloseContractError, "stale"):
+                _h019_proved_call(project, parts)
+
+    def test_cleanup_review_inventory_omitted_duplicate_and_multi_attempt(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            subject_file = project / H019_SUBJECT_PATH
+            subject_file.parent.mkdir(parents=True, exist_ok=True)
+            subject_file.write_text("# cleanup O2\n", encoding="utf-8")
+            evidence_file = project / H019_EVIDENCE_PATH
+            evidence_file.parent.mkdir(parents=True, exist_ok=True)
+            evidence_file.write_text(
+                "def test_cleanup_o2():\n    assert True\n", encoding="utf-8"
+            )
+            _h017_commit_all(project, "h019 cleanup subject")
+            head1 = subprocess.run(
+                ["git", "-C", str(project), "rev-parse", "HEAD"],
+                check=True, capture_output=True, text=True,
+            ).stdout.strip()
+            subject = {
+                "repository": H019_REPOSITORY,
+                "commit": head1,
+                "path": H019_SUBJECT_PATH,
+                "blob": _h017_blob_for(project, H019_SUBJECT_PATH, head1),
+            }
+            first_path = _h019_write_cleanup_review(
+                project, H019_WORK_ID, subject, attempt="R01"
+            )
+            _h017_commit_all(project, "h019 cleanup review R01")
+            head2 = subprocess.run(
+                ["git", "-C", str(project), "rev-parse", "HEAD"],
+                check=True, capture_output=True, text=True,
+            ).stdout.strip()
+            first_locator = {
+                "class": "review_attempt",
+                "path": first_path,
+                "commit": head2,
+                "blob": _h017_blob_for(project, first_path, head2),
+            }
+            second_path = _h019_write_cleanup_review(
+                project, H019_WORK_ID, subject, attempt="R02"
+            )
+            _h017_commit_all(project, "h019 cleanup review R02")
+            head3 = subprocess.run(
+                ["git", "-C", str(project), "rev-parse", "HEAD"],
+                check=True, capture_output=True, text=True,
+            ).stdout.strip()
+            second_locator = {
+                "class": "review_attempt",
+                "path": second_path,
+                "commit": head3,
+                "blob": _h017_blob_for(project, second_path, head3),
+            }
+            base = {"subject": subject, "review_locator": second_locator}
+            with self.assertRaisesRegex(CloseContractError, "omits durable"):
+                _h019_proved_call(project, base)
+            with self.assertRaisesRegex(CloseContractError, "duplicate"):
+                _h019_proved_call(
+                    project, base, review_attempts=[first_locator, first_locator]
+                )
+            self.assertEqual(
+                _h019_proved_call(
+                    project, base, review_attempts=[first_locator, second_locator]
+                ),
+                "relative_cleanup_work_complete",
+            )
+
+    def test_direct_helpers_are_relative_and_board_gate_is_authoritative(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            parts = _h019_proved_fixture(project)
+            result = _h019_proved_call(project, parts)
+            self.assertEqual(result, "relative_cleanup_work_complete")
+            self.assertNotEqual(result, "cleanup_work_complete")
+            relative = verify_final_observation_reconciliation(
+                observations=[{"id": "O2", "disposition": "cleanup_candidate"}],
+                derived_state=_derived_snapshot({"O2": "cleanup_candidate"}),
+                cleanup_works=[_h019_proved_cleanup_work(parts)],
+                cleanup_proof_project_root=project,
+                cleanup_proof_repository=H019_REPOSITORY,
+                cleanup_proof_workstream_id=BOARD_WORKSTREAM,
+            )
+            self.assertEqual(
+                relative, "relative_final_observation_reconciliation_complete"
+            )
+            self.assertNotEqual(relative, "final_observation_reconciliation_complete")
 
 
 if __name__ == "__main__":
