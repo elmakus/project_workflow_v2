@@ -297,6 +297,7 @@ class RF007ServingBoundaryTests(unittest.TestCase):
             "- Implementation subject: owner/repo@commit:" + ("a" * 40) + "\n"
             f"- Evidence refs: {evidence_ref}\n"
             "- Tests/readback summary: GREEN\n"
+            "- Result status: success\n"
         )
 
     def install_ready_dependency(
@@ -398,6 +399,7 @@ class RF007ServingBoundaryTests(unittest.TestCase):
                 "- Implementation subject: mutated bytes\n"
                 f"- Evidence refs: {EVIDENCE}\n"
                 "- Tests/readback summary: GREEN\n"
+                "- Result status: success\n"
             )
             self.assert_recovery(project)
         finally:

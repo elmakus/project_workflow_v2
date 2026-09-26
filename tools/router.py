@@ -24,7 +24,7 @@ from tools.definition_authority import (
     DefinitionAuthorityError,
     verify_planning_authority_freshness,
 )
-from tools.execution_contract import ExecutionContractError, parse_card_result
+from tools.execution_contract import ExecutionContractError, is_accepted_success, parse_card_result
 from tools.recovery_contract import RecoveryContractError, classify_resolution, exact_result_subject, review_subject
 from tools.review_contract import (
     can_finalize_review_obligation,
@@ -950,7 +950,12 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
     if active:
         card = active[0]
         try:
-            reads.project(card["contract"]["path"]).read_text(encoding="utf-8")
+            card_text = reads.project(card["contract"]["path"]).read_text(encoding="utf-8")
+            contract = parse_task_card(
+                card_text,
+                card["id"],
+                workstream["workstream_id"],
+            )
             if "result" in card:
                 result_text = read_verified_card_result(
                     reads, project["repository"], card
@@ -958,6 +963,12 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                 parsed_result = parse_card_result(
                     result_text, card["id"], workstream["workstream_id"]
                 )
+                if not is_accepted_success(parsed_result):
+                    raise ValidationError(
+                        "card result is not accepted success; only structured "
+                        "Result status success can authorize reconciliation, "
+                        "review, or no-replay recovery"
+                    )
                 for evidence_ref in parsed_result["evidence_refs"]:
                     try:
                         reads.project(evidence_ref).read_text(encoding="utf-8")
@@ -965,11 +976,6 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                         raise ValidationError(
                             f"card result evidence {evidence_ref!r} cannot be read back: {exc}"
                         ) from exc
-                contract = parse_task_card(
-                    reads.project(card["contract"]["path"]).read_text(encoding="utf-8"),
-                    card["id"],
-                    workstream["workstream_id"],
-                )
                 requirement = contract["review_requirement"]
                 attempts: list[dict] = []
                 for attempt_ref in card.get("review_attempts", []):
@@ -979,7 +985,7 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                 if requirement == "none":
                     return result(
                         reads, "route", "result_reconciliation",
-                        "A valid semantic result is already durable and this Card requires no independent review; do not replay implementation",
+                        "An accepted-success semantic result is already durable and this Card requires no independent review; do not replay implementation",
                         subject=card["id"], owner_module="workflow/EXECUTION.md",
                     )
                 if not attempts:

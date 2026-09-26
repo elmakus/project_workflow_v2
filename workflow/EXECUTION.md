@@ -60,11 +60,14 @@ An accepted result is a workstream-local `results/*.md` artifact using the Card-
 - exact Card ID;
 - exact implementation subject;
 - one or more durable evidence refs;
-- concise tests/readback summary.
+- concise tests/readback summary;
+- structured result status (`success`, `failed`, or `blocked`).
+
+Only structured `success` is accepted success and can authorize result reconciliation, review, or no-replay recovery. The tests/readback summary never authorizes by presence, non-emptiness, or substring. A `success` status co-edited with the exact normative `FAILED:` Tests/readback summary prefix is contradictory and fails closed; it is never accepted success. Legacy 4-field Results without structured status parse for history inspection but are never accepted success. Recovered Execution validates the full stable Card contract before routing execution, so a Card that `parse_task_card` rejects fails closed to Recovery.
 
 It does not record runtime/provider/model/session/worker/invocation identity.
 
-Once a valid result locator is durable on the active Card, runtime/session disappearance must not cause implementation replay. Later review/finalization/recovery starts from that durable result.
+Once an accepted-success result locator is durable on the active Card, runtime/session disappearance must not cause implementation replay. Later review/finalization/recovery starts from that durable result.
 
 ## Concurrency boundary
 

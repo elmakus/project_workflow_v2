@@ -2253,6 +2253,7 @@ class RouterTests(unittest.TestCase):
             f"- Implementation subject: {subject}\n"
             "- Evidence refs: implementation/workstreams/sample-workstream/evidence/M01-T04.md\n"
             "- Tests/readback summary: GREEN\n"
+            "- Result status: success\n"
         )
 
     def install_reviewable_result(self, project: Path, review_requirement: str) -> str:
