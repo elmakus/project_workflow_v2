@@ -58,6 +58,12 @@ from tools.live_consumer_contract import (
     validate_live_consumer_gates,
     verify_live_consumer_records,
 )
+from tools.review_attempt_provenance import (
+    ReviewAttemptProvenanceError,
+    verify_legacy_migration,
+    verify_review_attempt_locator,
+    verify_terminal_append_only_from_git,
+)
 from tools.state_contract import (
     ValidationError,
     read_project,
@@ -1014,10 +1020,51 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                             f"card result evidence {evidence_ref!r} cannot be read back: {exc}"
                         ) from exc
                 requirement = contract["review_requirement"]
-                attempts: list[dict] = []
-                for attempt_ref in card.get("review_attempts", []):
-                    attempt = read_toml(reads.project(attempt_ref["path"]))
-                    attempts.append(attempt)
+                attempt_refs = card.get("review_attempts", [])
+                if requirement == "none":
+                    # Review-free Cards never rely on attempt history; still
+                    # reject malformed locators so Boards stay shape-clean.
+                    attempts: list[dict] = []
+                    for attempt_ref in attempt_refs:
+                        attempt = read_toml(reads.project(attempt_ref["path"]))
+                        attempts.append(attempt)
+                else:
+                    attempts = []
+                    for index, attempt_ref in enumerate(attempt_refs):
+                        label = f"review_attempts[{index}]"
+                        try:
+                            attempt, _, locator_read = verify_review_attempt_locator(
+                                project_root=reads.project_root,
+                                project_repository=project["repository"],
+                                workstream_id=workstream["workstream_id"],
+                                card_id=card["id"],
+                                ref=attempt_ref,
+                                label=label,
+                            )
+                        except ReviewAttemptProvenanceError as exc:
+                            raise ValidationError(
+                                f"review attempt identity failed: {exc}"
+                            ) from exc
+                        reads.items.append(locator_read)
+                        reads.project(attempt_ref["path"])
+                        if "review_kind" not in attempt and attempt.get("verdict") in {
+                            "green",
+                            "red",
+                        }:
+                            try:
+                                provenance_read = verify_legacy_migration(
+                                    project_root=reads.project_root,
+                                    project_repository=project["repository"],
+                                    workstream_id=workstream["workstream_id"],
+                                    card_id=card["id"],
+                                    attempt=attempt,
+                                )
+                            except ReviewAttemptProvenanceError as exc:
+                                raise ValidationError(
+                                    f"legacy review attempt provenance failed: {exc}"
+                                ) from exc
+                            reads.items.append(provenance_read)
+                        attempts.append(attempt)
 
                 if requirement == "none":
                     return result(
@@ -1043,6 +1090,22 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     ),
                     expected_review_scope="card",
                 )
+                # Terminal bytes freeze against actual Git history: a same-ID
+                # rewrite with a rebound Board locator still routes unless the
+                # prior durable state is re-derived here. Runs after history
+                # validation so established failure reasons keep precedence.
+                try:
+                    history_reads = verify_terminal_append_only_from_git(
+                        project_root=reads.project_root,
+                        workstream_id=workstream["workstream_id"],
+                        card_id=card["id"],
+                        attempts=attempts,
+                    )
+                except ReviewAttemptProvenanceError as exc:
+                    raise ValidationError(
+                        f"review history is not append-only: {exc}"
+                    ) from exc
+                reads.items.extend(history_reads)
                 current_subject = exact_result_subject(project["repository"], card["result"])
                 verdict = attempts[-1]["verdict"]
                 covered_subject = review_subject(attempts[-1])

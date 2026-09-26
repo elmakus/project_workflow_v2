@@ -180,6 +180,31 @@ class RouterTests(unittest.TestCase):
         )
         return commit, blob
 
+    def rebind_review_attempt(self, project: Path, review_path: str) -> tuple[str, str]:
+        """Recommit a modified review file and rebind its Board locator identity."""
+        board = project / BOARD
+        text = board.read_text()
+        # Find the locator for this path and replace its commit/blob with the
+        # new Git identity after recommitting the modified file.
+        commit, blob = self.git_identity_for(project, review_path)
+        # Locate the locator substring for this path; Board locators are inline
+        # tables with class/path/commit/blob for RF006 exact identity.
+        pattern = re.compile(
+            r'\{\s*class\s*=\s*"review_attempt",\s*path\s*=\s*"'
+            + re.escape(review_path)
+            + r'",\s*commit\s*=\s*"[0-9a-f]{40}",\s*blob\s*=\s*"[0-9a-f]{40}"\s*\}'
+        )
+        replacement = (
+            f'{{ class = "review_attempt", path = "{review_path}", '
+            f'commit = "{commit}", blob = "{blob}" }}'
+        )
+        updated, count = pattern.subn(replacement, text, count=1)
+        if count != 1:
+            # Path-only legacy locator (negative control) stays untouched.
+            return commit, blob
+        board.write_text(updated)
+        return commit, blob
+
     def install_done_predecessor(
         self, project: Path, *, path: str,
     ) -> tuple[str, str]:
@@ -2349,25 +2374,6 @@ class RouterTests(unittest.TestCase):
         subject_blob: str | None = None,
     ) -> str:
         review_path = f"implementation/workstreams/sample-workstream/reviews/M01-T04-{attempt}.toml"
-        locator = f'{{ class = "review_attempt", path = "{review_path}" }}'
-        board = project / BOARD
-        board_text = board.read_text()
-        lines = board_text.splitlines()
-        for index, line in enumerate(lines):
-            if line.startswith("review_attempts = ["):
-                existing = line.removeprefix("review_attempts = [").removesuffix("]")
-                lines[index] = f"review_attempts = [{existing}, {locator}]"
-                break
-        else:
-            board_text = board_text.replace(
-                'status = "in_progress"\n',
-                'status = "in_progress"\n'
-                f'review_attempts = [{locator}]\n',
-                1,
-            )
-            lines = board_text.splitlines()
-        board.write_text("\n".join(lines) + "\n")
-
         path = project / review_path
         path.parent.mkdir(parents=True, exist_ok=True)
         evidence = "" if verdict in {"pending", "in_progress"} else f"implementation/workstreams/sample-workstream/evidence/review-{attempt}.md"
@@ -2435,6 +2441,31 @@ class RouterTests(unittest.TestCase):
             'materially_produced_or_repaired_subject = false\n'
             'basis = "Fresh semantic reviewer context."\n'
         )
+        # RF006: Board review_attempt locators carry exact Git identity. Commit
+        # the attempt file and bind its real (commit, blob) so the router can
+        # prove immutable history through the shared RF007 resolver.
+        attempt_commit, attempt_blob = self.git_identity_for(project, review_path)
+        locator = (
+            f'{{ class = "review_attempt", path = "{review_path}", '
+            f'commit = "{attempt_commit}", blob = "{attempt_blob}" }}'
+        )
+        board = project / BOARD
+        board_text = board.read_text()
+        lines = board_text.splitlines()
+        for index, line in enumerate(lines):
+            if line.startswith("review_attempts = ["):
+                existing = line.removeprefix("review_attempts = [").removesuffix("]")
+                lines[index] = f"review_attempts = [{existing}, {locator}]"
+                break
+        else:
+            board_text = board_text.replace(
+                'status = "in_progress"\n',
+                'status = "in_progress"\n'
+                f'review_attempts = [{locator}]\n',
+                1,
+            )
+            lines = board_text.splitlines()
+        board.write_text("\n".join(lines) + "\n")
         return review_path
 
     def test_required_review_blocks_until_green_then_routes_finalization(self) -> None:
@@ -2487,6 +2518,7 @@ class RouterTests(unittest.TestCase):
                 1,
             )
             path.write_text(text)
+            self.rebind_review_attempt(project, review_path)
 
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual(
@@ -2529,6 +2561,7 @@ class RouterTests(unittest.TestCase):
                 1,
             )
             path.write_text(text)
+            self.rebind_review_attempt(project, review_path)
 
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual(
@@ -2569,6 +2602,7 @@ class RouterTests(unittest.TestCase):
                 )
                 + "\n"
             )
+            self.rebind_review_attempt(project, source_path)
 
             self.add_review_attempt(
                 project,
@@ -2611,6 +2645,7 @@ class RouterTests(unittest.TestCase):
                 1,
             )
             reset.write_text(reset_text)
+            self.rebind_review_attempt(project, reset_path)
 
             reset_blobs = {
                 ("owner/router-fixture", "c" * 40, CARD): "d" * 40,
@@ -3147,6 +3182,9 @@ class RouterTests(unittest.TestCase):
             review_path = self.add_review_attempt(project, "pending")
             attempt = project / review_path
             attempt.write_text(attempt.read_text() + "\nrevision = [\n")
+            # Commit the malformed bytes so the exact locator still proves Git
+            # identity and freshness; the verified TOML parse must then fail.
+            self.rebind_review_attempt(project, review_path)
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
             self.assertIn("current Card execution state invalid", routed.reason)

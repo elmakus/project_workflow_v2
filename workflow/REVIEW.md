@@ -42,7 +42,7 @@ Repair targets the defect class/root cause and materially adjacent sibling/negat
 
 After all known material findings from a RED discovery are closure-verified, one new fresh `discovery` attempt over the exact current subject is mandatory. A GREEN closure attempt that covers only part of the source discovery set therefore keeps the lifecycle in closure verification for the remaining known findings; only after cumulative GREEN closure covers the full frozen set does the router freeze the fresh discovery attempt. Closure can never finalize the Card. Only a GREEN discovery attempt can satisfy the review obligation.
 
-Historical terminal review attempts that predate the explicit `review_kind` fields remain valid as an initial legacy history prefix and are interpreted as discovery. A new PWv2.1 attempt begins as pending/in-progress with the explicit fields; active legacy-shaped attempts are invalid, and once explicit PWv2.1 history begins later attempts cannot return to legacy shape.
+Historical terminal review attempts that predate the explicit `review_kind` fields remain valid only as an initial legacy history prefix with explicit migration provenance, and are interpreted as discovery. Each legacy-shaped attempt carries `[legacy_migration]` binding the exact immutable source attempt (`source_repository`/`source_commit`/`source_path`/`source_blob`) plus the exact source Git/workstream state (`source_commit` plus `source_workstream`/`source_card`/`source_attempt`); the source resolves in Git, its pre-migration bytes exactly equal the current attempt without provenance, and the source Task Board at the source commit already listed the attempt path. The source bytes must already exist at the source commit's parent, so a legacy file introduced together with its Board listing in one source commit cannot self-certify historical status. File shape alone never proves historical status: newly authored legacy-shaped attempts without provenance, ambiguous provenance, and explicit attempts claiming provenance fail closed. A new PWv2.1 attempt begins as pending/in-progress with the explicit fields; active legacy-shaped attempts are invalid, and once explicit PWv2.1 history begins later attempts cannot return to legacy shape.
 
 ## Review epochs and convergence
 
@@ -90,7 +90,7 @@ Card Review owns bounded local correctness for one Card's coherent outcome; Mile
 
 ## Attempt history
 
-The selected Card owns ordered review-attempt locators in its Task Board state. Attempt files are workstream-local under `reviews/`.
+The selected Card owns ordered review-attempt locators in its Task Board state. Attempt files are workstream-local under `reviews/`. Each relied-upon locator carries exact Git identity (`commit` plus `blob` with the Card path); the router proves the locator in Git, proves the locator commit sits within HEAD ancestry, proves current worktree bytes still hash to the declared blob, and parses only the verified bytes. Missing, dangling, mismatched, sibling or bogus-identity locators fail closed, and the same attempt ID cannot silently change bytes or verdict. Terminal bytes additionally freeze against actual Git history: every historical terminal version of an attempt path must match the current attempt, so a same-ID rewrite fails even with a rebound Board locator, while pending/in-progress attempts may still finalize to terminal.
 
 At most one pending/in-progress attempt may exist and it must be the last attempt. Terminal attempts keep non-empty evidence. A later attempt never overwrites a prior GREEN/RED file.
 

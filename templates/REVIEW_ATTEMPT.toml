@@ -1,9 +1,23 @@
 # TEMPLATE ONLY — append a new file for every review attempt.
+# New/current attempts use explicit review_kind fields and an exact Board
+# locator (commit + blob). Legacy-shaped attempts (no review_kind) are valid
+# only as the initial historical prefix with explicit [legacy_migration]
+# provenance bound to the exact immutable source attempt and source
+# Git/workstream state; shape alone never proves legacy status.
 workstream_id = "example-workstream"
 card_id = "M03-T01"
 attempt = "R01"
 verdict = "pending"
 evidence_path = ""
+# Legacy-only, terminal green/red prefix attempts only; omit on explicit attempts:
+# [legacy_migration]
+# source_repository = "owner/repository"
+# source_commit = "<40-hex source commit>"
+# source_path = "implementation/workstreams/example-workstream/reviews/M03-T01-R01.toml"
+# source_blob = "<40-hex source blob>"
+# source_workstream = "example-workstream"
+# source_card = "M03-T01"
+# source_attempt = "R01"
 review_kind = "discovery"
 source_discovery_attempt = ""
 discovery_complete = false

@@ -132,6 +132,21 @@ except ModuleNotFoundError:  # direct script execution from tools/
         validate_definition_authority_key_shape,
     )
 
+try:
+    from tools.review_attempt_provenance import (
+        ReviewAttemptProvenanceError,
+        validate_legacy_migration_shape,
+        validate_review_attempt_locator_shape,
+        verify_history_append_only,
+    )
+except ModuleNotFoundError:  # direct script execution from tools/
+    from review_attempt_provenance import (
+        ReviewAttemptProvenanceError,
+        validate_legacy_migration_shape,
+        validate_review_attempt_locator_shape,
+        verify_history_append_only,
+    )
+
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 CARD_STATUSES = {"planned", "ready", "in_progress", "blocked", "done", "returned"}
 INTAKE_KINDS = {"issue", "feature", "change"}
@@ -270,9 +285,10 @@ def validate_locator(
         _require(path == expected, f"{label}: expected exact path {expected!r}")
     elif expected_class == "review_attempt":
         _require(workstream_id is not None, f"{label}: workstream binding required")
-        prefix = f"implementation/workstreams/{workstream_id}/reviews/"
-        _require(path.startswith(prefix) and path.endswith(".toml"),
-                 f"{label}: wrong review_attempt class/path")
+        try:
+            validate_review_attempt_locator_shape(ref, workstream_id, label)
+        except ReviewAttemptProvenanceError as exc:
+            raise ValidationError(str(exc)) from exc
     elif expected_class in {"evidence", "result"}:
         _require(workstream_id is not None, f"{label}: workstream binding required")
         directory = "evidence" if expected_class == "evidence" else "results"
@@ -1251,6 +1267,31 @@ def validate_review(data: dict[str, Any], *, expected_review_scope: str | None =
                 )
             except ReviewContractError as exc:
                 raise ValidationError(f"review: {exc}") from exc
+    if "legacy_migration" in data:
+        _require(
+            not explicit_v21,
+            "review: explicit PWv2.1 attempt must not claim legacy migration provenance",
+        )
+        migration_workstream = data.get("workstream_id")
+        migration_card = data.get("card_id")
+        migration_attempt = data.get("attempt")
+        _require(
+            isinstance(migration_workstream, str) and migration_workstream
+            and isinstance(migration_card, str) and migration_card
+            and isinstance(migration_attempt, str) and migration_attempt,
+            "review: legacy migration provenance requires a Card-bound workstream/card/attempt",
+        )
+        try:
+            validate_legacy_migration_shape(
+                data["legacy_migration"],
+                workstream_id=migration_workstream,
+                card_id=migration_card,
+                attempt_id=migration_attempt,
+                label="review.legacy_migration",
+            )
+        except ReviewAttemptProvenanceError as exc:
+            raise ValidationError(str(exc)) from exc
+
     convergence_aware = convergence_fields_present(data)
     _require(
         convergence_aware or not any(key in data for key in CONVERGENCE_FIELDS - {"review_epoch"}),
@@ -1366,9 +1407,15 @@ def validate_review_history(
     accepted_authority_paths: set[str] | None = None,
     exact_blob_reader: Callable[[str, str, str], str | None] | None = None,
     expected_review_scope: str | None = None,
+    prior_attempts: list[dict[str, Any]] | None = None,
 ) -> None:
     _require(isinstance(attempts, list) and attempts,
              "review_history: at least one attempt is required")
+    if prior_attempts is not None:
+        try:
+            verify_history_append_only(prior_attempts, attempts, label="review_history")
+        except ReviewAttemptProvenanceError as exc:
+            raise ValidationError(str(exc)) from exc
     if expected_review_scope is None and expected_card_id is not None:
         expected_review_scope = "card"
     if expected_review_scope is not None:
@@ -1398,11 +1445,21 @@ def validate_review_history(
 
         if explicit_v21:
             legacy_prefix = False
+            _require(
+                "legacy_migration" not in attempt,
+                "review_history: explicit PWv2.1 attempt must not claim legacy migration provenance",
+            )
         else:
             _require(legacy_prefix,
                      "review_history: legacy review attempts must form the initial historical prefix")
             _require(attempt["verdict"] in {"green", "red"},
                      "review_history: new/active review attempts require explicit review_kind")
+            _require(
+                isinstance(attempt.get("legacy_migration"), dict),
+                "review_history: legacy-shaped attempt requires explicit migration "
+                "provenance bound to the exact immutable source attempt and source "
+                "Git/workstream state; file shape alone never proves historical status",
+            )
 
         if convergence_aware:
             pre_convergence_prefix = False

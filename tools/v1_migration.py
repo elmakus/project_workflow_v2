@@ -590,6 +590,18 @@ def _normalized_review_attempts(
                 "post_convergence_validation": False,
                 "convergence_basis": "",
             })
+        else:
+            # RF006: dry-run cannot prove the immutable source attempt behind
+            # V1 terminal history (no Git readback here, and no source TOML
+            # exists in the V1 YAML source), so it must not manufacture source
+            # Git identities. Fail closed: the Card blocks until exact legacy
+            # migration proof is established at materialization time.
+            return [], [], (
+                f"review proof {attempt_id}: V1 terminal verdict {verdict!r} "
+                "cannot be reused without exact legacy migration proof bound "
+                "to the immutable source attempt; dry-run manufactures no "
+                "Git provenance"
+            )
         attempts.append(attempt)
         refs.append({
             "class": "review_attempt",

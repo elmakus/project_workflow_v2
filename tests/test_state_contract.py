@@ -38,6 +38,27 @@ def _severity(*finding_ids: str) -> list[dict[str, str]]:
     ]
 
 
+def _legacy_provenance(
+    workstream_id: str, card_id: str, attempt_id: str
+) -> dict[str, str]:
+    """Return shape-valid legacy migration provenance for history tests.
+
+    Shape-only validation never touches Git; serving-boundary tests prove the
+    exact source through the shared RF007 resolver separately.
+    """
+    return {
+        "source_repository": "owner/fixture-project",
+        "source_commit": "a" * 40,
+        "source_path": (
+            f"implementation/workstreams/{workstream_id}/reviews/{card_id}-{attempt_id}.toml"
+        ),
+        "source_blob": "b" * 40,
+        "source_workstream": workstream_id,
+        "source_card": card_id,
+        "source_attempt": attempt_id,
+    }
+
+
 class StateEnvelopeTests(unittest.TestCase):
     def setUp(self) -> None:
         self.workstream = read_toml(VALID / "WORKSTREAM.toml")
@@ -160,8 +181,15 @@ class StateEnvelopeTests(unittest.TestCase):
     def test_review_terminal_evidence_and_append_only_history(self) -> None:
         base = read_toml(VALID / "REVIEW_ATTEMPT.toml")
         validate_review(base)
+        base.update({
+            "workstream_id": "sample-workstream",
+            "card_id": "M01-T01",
+            "legacy_migration": _legacy_provenance("sample-workstream", "M01-T01", "R01"),
+        })
+        validate_review(base)
 
         pending = copy.deepcopy(base)
+        pending.pop("legacy_migration", None)
         pending["attempt"] = "R02"
         pending["verdict"] = "pending"
         pending["evidence_path"] = ""
@@ -274,7 +302,13 @@ class StateEnvelopeTests(unittest.TestCase):
             validate_review_history([legacy_active])
 
         historical = read_toml(VALID / "REVIEW_ATTEMPT.toml")
+        historical.update({
+            "workstream_id": "sample-workstream",
+            "card_id": "M01-T01",
+            "legacy_migration": _legacy_provenance("sample-workstream", "M01-T01", "R01"),
+        })
         explicit_after_history = copy.deepcopy(historical)
+        explicit_after_history.pop("legacy_migration", None)
         explicit_after_history.update({
             "attempt": "R02",
             "review_kind": "discovery",
@@ -294,6 +328,9 @@ class StateEnvelopeTests(unittest.TestCase):
 
         legacy_after_explicit = copy.deepcopy(historical)
         legacy_after_explicit["attempt"] = "R03"
+        legacy_after_explicit["legacy_migration"] = _legacy_provenance(
+            "sample-workstream", "M01-T01", "R03"
+        )
         explicit_terminal = copy.deepcopy(explicit_after_history)
         explicit_terminal.update({
             "verdict": "green",
