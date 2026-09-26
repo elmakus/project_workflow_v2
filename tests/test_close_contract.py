@@ -697,8 +697,8 @@ def _write_attempt_toml(
         f'path = "implementation/workstreams/{BOARD_WORKSTREAM}/results/{BOARD_CARD}.md"\n'
         f'blob = "{"b" * 40}"\n'
         "[acceptance]\n"
-        'class = "authority"\n'
-        'path = "requirements/PROJECT_WORKFLOW_V2.md"\n'
+        'class = "task_card"\n'
+        f'path = "implementation/workstreams/{BOARD_WORKSTREAM}/cards/{BOARD_CARD}.md"\n'
         "[independence]\n"
         "materially_produced_or_repaired_subject = false\n"
         'basis = "Fresh semantic reviewer context."\n',
@@ -1046,8 +1046,8 @@ class H018CompleteHistoryTests(unittest.TestCase):
                 f'path = "implementation/workstreams/{BOARD_WORKSTREAM}/results/{BOARD_CARD}.md"\n'
                 f'blob = "{"b" * 40}"\n'
                 "[acceptance]\n"
-                'class = "authority"\n'
-                'path = "requirements/PROJECT_WORKFLOW_V2.md"\n'
+                'class = "task_card"\n'
+                f'path = "implementation/workstreams/{BOARD_WORKSTREAM}/cards/{BOARD_CARD}.md"\n'
                 "[independence]\n"
                 "materially_produced_or_repaired_subject = false\n"
                 'basis = "Fresh semantic reviewer context."\n',

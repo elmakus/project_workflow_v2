@@ -49,6 +49,11 @@ blob = "0000000000000000000000000000000000000000"
 [acceptance]
 class = "task_card"
 path = "implementation/workstreams/example-workstream/cards/M03-T01.md"
+# H005: Card Review binds the exact selected Task Card path plus exact
+# acceptance content. Commit the Card file and record its real Git identity;
+# path-only acceptance cannot prove exact content at the serving boundary.
+commit = "0000000000000000000000000000000000000000"
+blob = "0000000000000000000000000000000000000000"
 
 [independence]
 materially_produced_or_repaired_subject = false

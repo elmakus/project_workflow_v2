@@ -334,6 +334,38 @@ class RouterProvenanceTests(unittest.TestCase):
         blob = re.search(r'blob = "([0-9a-f]{40})"', section).group(1)  # type: ignore[union-attr]
         return commit, blob
 
+    @classmethod
+    def card_acceptance_identity(cls, project: Path, relpath: str) -> tuple[str, str]:
+        """Return exact (commit, blob) for H005 Task Card acceptance binding."""
+        if not cls._card_matches_head(project, relpath):
+            cls.git_identity_for(project, relpath)
+        commit = subprocess.run(
+            ["git", "-C", str(project), "log", "--format=%H", "-1", "HEAD", "--", relpath],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        blob = subprocess.run(
+            ["git", "-C", str(project), "rev-parse", f"{commit}:{relpath}"],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        return commit, blob
+
+    @staticmethod
+    def _card_matches_head(project: Path, relpath: str) -> bool:
+        try:
+            in_head = subprocess.run(
+                ["git", "-C", str(project), "rev-parse", "--verify", f"HEAD:{relpath}"],
+                capture_output=True, text=True, check=False,
+            )
+            if in_head.returncode != 0:
+                return False
+            diff = subprocess.run(
+                ["git", "-C", str(project), "diff", "--quiet", "HEAD", "--", relpath],
+                capture_output=True, check=False,
+            )
+            return diff.returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            return False
+
     def write_legacy_file(
         self, project: Path, review_path: str, verdict: str,
         commit: str, blob: str, provenance: dict[str, str] | None,
@@ -356,6 +388,7 @@ class RouterProvenanceTests(unittest.TestCase):
                 f'source_card = "{provenance["source_card"]}"\n'
                 f'source_attempt = "{provenance["source_attempt"]}"\n'
             )
+        acceptance_commit, acceptance_blob = self.card_acceptance_identity(project, CARD)
         path.write_text(
             'workstream_id = "sample-workstream"\n'
             'card_id = "M01-T04"\n'
@@ -372,6 +405,8 @@ class RouterProvenanceTests(unittest.TestCase):
             '[acceptance]\n'
             'class = "task_card"\n'
             f'path = "{CARD}"\n'
+            f'commit = "{acceptance_commit}"\n'
+            f'blob = "{acceptance_blob}"\n'
             '[independence]\n'
             'materially_produced_or_repaired_subject = false\n'
             'basis = "Fresh semantic reviewer context."\n'
@@ -408,6 +443,7 @@ class RouterProvenanceTests(unittest.TestCase):
         is_terminal = verdict in {"green", "red"}
         findings = '["F1"]' if verdict == "red" else "[]"
         defect_classes = '["class-a"]' if verdict == "red" else "[]"
+        acceptance_commit, acceptance_blob = self.card_acceptance_identity(project, CARD)
         severity = ""
         if verdict == "red":
             severity = (
@@ -443,6 +479,8 @@ class RouterProvenanceTests(unittest.TestCase):
             '[acceptance]\n'
             'class = "task_card"\n'
             f'path = "{CARD}"\n'
+            f'commit = "{acceptance_commit}"\n'
+            f'blob = "{acceptance_blob}"\n'
             '[independence]\n'
             'materially_produced_or_repaired_subject = false\n'
             'basis = "Fresh semantic reviewer context."\n'
@@ -481,6 +519,7 @@ class RouterProvenanceTests(unittest.TestCase):
             (project / evidence).parent.mkdir(parents=True, exist_ok=True)
             (project / evidence).write_text("# Review evidence\n")
             board_commit, board_blob = self.board_result_identity(project)
+            acceptance_commit, acceptance_blob = self.card_acceptance_identity(project, CARD)
             path.write_text(
                 'workstream_id = "sample-workstream"\n'
                 'card_id = "M01-T04"\n'
@@ -507,6 +546,8 @@ class RouterProvenanceTests(unittest.TestCase):
                 '[acceptance]\n'
                 'class = "task_card"\n'
                 f'path = "{CARD}"\n'
+                f'commit = "{acceptance_commit}"\n'
+                f'blob = "{acceptance_blob}"\n'
                 '[independence]\n'
                 'materially_produced_or_repaired_subject = false\n'
                 'basis = "Fresh semantic reviewer context."\n'
@@ -623,6 +664,7 @@ class RouterProvenanceTests(unittest.TestCase):
             (project / evidence).parent.mkdir(parents=True, exist_ok=True)
             (project / evidence).write_text("# Review evidence\n")
             board_commit, board_blob = self.board_result_identity(project)
+            acceptance_commit, acceptance_blob = self.card_acceptance_identity(project, CARD)
             path.write_text(
                 'workstream_id = "sample-workstream"\n'
                 'card_id = "M01-T04"\n'
@@ -653,6 +695,8 @@ class RouterProvenanceTests(unittest.TestCase):
                 '[acceptance]\n'
                 'class = "task_card"\n'
                 f'path = "{CARD}"\n'
+                f'commit = "{acceptance_commit}"\n'
+                f'blob = "{acceptance_blob}"\n'
                 '[independence]\n'
                 'materially_produced_or_repaired_subject = false\n'
                 'basis = "Fresh semantic reviewer context."\n'
@@ -685,6 +729,7 @@ class RouterProvenanceTests(unittest.TestCase):
             (project / evidence).parent.mkdir(parents=True, exist_ok=True)
             (project / evidence).write_text("# Review evidence\n")
             board_commit, board_blob = self.board_result_identity(project)
+            acceptance_commit, acceptance_blob = self.card_acceptance_identity(project, CARD)
             path.write_text(
                 'workstream_id = "sample-workstream"\n'
                 'card_id = "M01-T04"\n'
@@ -715,6 +760,8 @@ class RouterProvenanceTests(unittest.TestCase):
                 '[acceptance]\n'
                 'class = "task_card"\n'
                 f'path = "{CARD}"\n'
+                f'commit = "{acceptance_commit}"\n'
+                f'blob = "{acceptance_blob}"\n'
                 '[independence]\n'
                 'materially_produced_or_repaired_subject = false\n'
                 'basis = "Fresh semantic reviewer context."\n'
@@ -768,6 +815,7 @@ class RouterProvenanceTests(unittest.TestCase):
             (project / evidence).parent.mkdir(parents=True, exist_ok=True)
             (project / evidence).write_text("# Review evidence\n")
             board_commit, board_blob = self.board_result_identity(project)
+            acceptance_commit, acceptance_blob = self.card_acceptance_identity(project, CARD)
             subject_stanza = (
                 '[subject]\n'
                 'class = "git_blob"\n'
@@ -778,6 +826,8 @@ class RouterProvenanceTests(unittest.TestCase):
                 '[acceptance]\n'
                 'class = "task_card"\n'
                 f'path = "{CARD}"\n'
+                f'commit = "{acceptance_commit}"\n'
+                f'blob = "{acceptance_blob}"\n'
                 '[independence]\n'
                 'materially_produced_or_repaired_subject = false\n'
                 'basis = "Fresh semantic reviewer context."\n'
@@ -909,6 +959,10 @@ class RouterProvenanceTests(unittest.TestCase):
                 check=True, capture_output=True, text=True,
             ).stdout.strip()
             subprocess.run(["git", "-C", str(project), "checkout", "-q", "-"], check=True)
+            # H005: restoring the Card after branch checkout; the alt branch
+            # commit tracked it, so returning to HEAD without it removes the file.
+            (project / CARD).parent.mkdir(parents=True, exist_ok=True)
+            (project / CARD).write_text(self.task_card_content())
             self.write_explicit_file(project, review_path, "red", board_commit, board_blob)
             self.bind_board_locator(project, review_path, red_commit, red_blob)
             red_routed = select_route(project, [MANIFEST], package_root=ROOT)
@@ -934,6 +988,8 @@ class RouterProvenanceTests(unittest.TestCase):
                 check=True, capture_output=True, text=True,
             ).stdout.strip()
             subprocess.run(["git", "-C", str(project), "checkout", "-q", "-"], check=True)
+            (project / CARD).parent.mkdir(parents=True, exist_ok=True)
+            (project / CARD).write_text(self.task_card_content())
             self.write_explicit_file(project, review_path, "green", board_commit, board_blob)
             # Rebind the locator to the alt2 commit without committing on
             # HEAD: identity resolves and worktree bytes are fresh, but the
@@ -997,6 +1053,7 @@ class RouterProvenanceTests(unittest.TestCase):
                     (project / evidence).parent.mkdir(parents=True, exist_ok=True)
                     (project / evidence).write_text("# Review evidence\n")
                     board_commit, board_blob = self.board_result_identity(project)
+                    acceptance_commit, acceptance_blob = self.card_acceptance_identity(project, CARD)
                     path.write_text(
                         'workstream_id = "sample-workstream"\n'
                         'card_id = "M01-T04"\n'
@@ -1023,6 +1080,8 @@ class RouterProvenanceTests(unittest.TestCase):
                         '[acceptance]\n'
                         'class = "task_card"\n'
                         f'path = "{CARD}"\n'
+                        f'commit = "{acceptance_commit}"\n'
+                        f'blob = "{acceptance_blob}"\n'
                         '[independence]\n'
                         'materially_produced_or_repaired_subject = false\n'
                         'basis = "Fresh semantic reviewer context."\n'
@@ -1047,6 +1106,7 @@ class RouterProvenanceTests(unittest.TestCase):
             (project / evidence).parent.mkdir(parents=True, exist_ok=True)
             (project / evidence).write_text("# Review evidence\n")
             board_commit, board_blob = self.board_result_identity(project)
+            acceptance_commit, acceptance_blob = self.card_acceptance_identity(project, CARD)
             path.write_text(
                 'workstream_id = "sample-workstream"\n'
                 'card_id = "M01-T04"\n'
@@ -1073,6 +1133,8 @@ class RouterProvenanceTests(unittest.TestCase):
                 '[acceptance]\n'
                 'class = "task_card"\n'
                 f'path = "{CARD}"\n'
+                f'commit = "{acceptance_commit}"\n'
+                f'blob = "{acceptance_blob}"\n'
                 '[independence]\n'
                 'materially_produced_or_repaired_subject = false\n'
                 'basis = "Fresh semantic reviewer context."\n'
@@ -1103,6 +1165,7 @@ class RouterProvenanceTests(unittest.TestCase):
             (project / evidence).parent.mkdir(parents=True, exist_ok=True)
             (project / evidence).write_text("# Review evidence\n")
             board_commit, board_blob = self.board_result_identity(project)
+            acceptance_commit, acceptance_blob = self.card_acceptance_identity(project, CARD)
             sibling.write_text(
                 'workstream_id = "sample-workstream"\n'
                 'card_id = "M01-T04"\n'
@@ -1129,6 +1192,8 @@ class RouterProvenanceTests(unittest.TestCase):
                 '[acceptance]\n'
                 'class = "task_card"\n'
                 f'path = "{CARD}"\n'
+                f'commit = "{acceptance_commit}"\n'
+                f'blob = "{acceptance_blob}"\n'
                 '[independence]\n'
                 'materially_produced_or_repaired_subject = false\n'
                 'basis = "Fresh semantic reviewer context."\n'
@@ -1151,6 +1216,7 @@ class RouterProvenanceTests(unittest.TestCase):
             (project / evidence).parent.mkdir(parents=True, exist_ok=True)
             (project / evidence).write_text("# Review evidence\n")
             board_commit, board_blob = self.board_result_identity(project)
+            acceptance_commit, acceptance_blob = self.card_acceptance_identity(project, CARD)
             path.write_text(
                 'workstream_id = "sample-workstream"\n'
                 'card_id = "M01-T99"\n'
@@ -1203,6 +1269,7 @@ class RouterProvenanceTests(unittest.TestCase):
             # Source commit exists but its Board never listed the attempt path.
             self.write_legacy_file(project, review_path, "red", board_commit, board_blob, None)
             source_commit, source_blob = self.git_identity_for(project, review_path)
+            acceptance_commit, acceptance_blob = self.card_acceptance_identity(project, CARD)
             attempt = {
                 "workstream_id": "sample-workstream",
                 "card_id": "M01-T04",
@@ -1216,7 +1283,12 @@ class RouterProvenanceTests(unittest.TestCase):
                     "path": "implementation/workstreams/sample-workstream/results/M01-T04.md",
                     "blob": board_blob,
                 },
-                "acceptance": {"class": "task_card", "path": CARD},
+                "acceptance": {
+                    "class": "task_card",
+                    "path": CARD,
+                    "commit": acceptance_commit,
+                    "blob": acceptance_blob,
+                },
                 "independence": {
                     "materially_produced_or_repaired_subject": False,
                     "basis": "Fresh semantic reviewer context.",

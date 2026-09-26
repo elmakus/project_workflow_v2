@@ -60,6 +60,7 @@ from tools.live_consumer_contract import (
 )
 from tools.review_attempt_provenance import (
     ReviewAttemptProvenanceError,
+    require_commit_in_head_ancestry,
     verify_legacy_migration,
     verify_review_attempt_locator,
     verify_terminal_append_only_from_git,
@@ -1117,6 +1118,74 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                         "Current durable result changed after terminal review history; preserve history and freeze a new exact attempt",
                         subject=card["id"], owner_module="workflow/REVIEW.md",
                     )
+                # H005: Card Review acceptance binding — exact selected Task Card
+                # path plus exact acceptance content. Alternate same-stem paths
+                # and same-path mutated content fail closed; stale terminal
+                # bindings freeze a new exact attempt like result mismatch.
+                selected_card_path = card["contract"]["path"]
+                reviewed_acceptance = attempts[-1].get("acceptance")
+                if not isinstance(reviewed_acceptance, dict):
+                    raise ValidationError("review acceptance must bind the exact selected Task Card")
+                reviewed_path = reviewed_acceptance.get("path")
+                if reviewed_acceptance.get("class") != "task_card" or not isinstance(reviewed_path, str):
+                    raise ValidationError("review acceptance must bind the exact selected Task Card")
+                if reviewed_path != selected_card_path:
+                    if verdict in {"pending", "in_progress"}:
+                        raise ValidationError(
+                            f"active review attempt acceptance {reviewed_path!r} does not match exact selected Card {selected_card_path!r}"
+                        )
+                    return result(
+                        reads, "route", "review_freeze",
+                        f"Review acceptance {reviewed_path!r} does not match exact selected Card {selected_card_path!r}; preserve history and freeze a new exact attempt",
+                        subject=card["id"], owner_module="workflow/REVIEW.md",
+                    )
+                acceptance_commit = reviewed_acceptance.get("commit")
+                acceptance_blob = reviewed_acceptance.get("blob")
+                if not isinstance(acceptance_commit, str) or not isinstance(acceptance_blob, str):
+                    raise ValidationError(
+                        "review acceptance requires exact commit + blob Task Card identity; path-only acceptance cannot prove exact content"
+                    )
+                try:
+                    verified_acceptance = verify_exact_git_locator(
+                        project_root=reads.project_root,
+                        repository=project["repository"],
+                        expected_repository=project["repository"],
+                        commit=acceptance_commit,
+                        path=reviewed_path,
+                        blob=acceptance_blob,
+                        label="review acceptance",
+                    )
+                    verify_worktree_freshness(
+                        project_root=reads.project_root,
+                        path=reviewed_path,
+                        blob=acceptance_blob,
+                        label="review acceptance",
+                    )
+                except ExactLocatorError as exc:
+                    if exc.kind == "mutated":
+                        if verdict in {"pending", "in_progress"}:
+                            raise ValidationError(
+                                f"active review attempt acceptance is stale for the exact current Task Card: {exc}"
+                            ) from exc
+                        return result(
+                            reads, "route", "review_freeze",
+                            "Current Task Card acceptance changed after terminal review history; "
+                            f"preserve history and freeze a new exact attempt: {exc}",
+                            subject=card["id"], owner_module="workflow/REVIEW.md",
+                        )
+                    raise ValidationError(f"review acceptance exact Task Card proof failed: {exc}") from exc
+                try:
+                    require_commit_in_head_ancestry(
+                        project_root=reads.project_root,
+                        commit=acceptance_commit,
+                        label="review acceptance",
+                    )
+                except ReviewAttemptProvenanceError as exc:
+                    raise ValidationError(
+                        f"review acceptance HEAD ancestry failed: {exc}"
+                    ) from exc
+                reads.items.append(f"project-git:{verified_acceptance.key}")
+                reads.project(reviewed_path)
                 if verdict in {"pending", "in_progress"}:
                     return result(
                         reads, "route", "review",

@@ -840,6 +840,97 @@ class StateEnvelopeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "not semantically independent"):
             validate_review(self_review)
 
+    def test_h005_task_card_acceptance_shape_is_exact(self) -> None:
+        base = {
+            "workstream_id": "sample-workstream",
+            "card_id": "M03-T03",
+            "attempt": "R01",
+            "verdict": "pending",
+            "evidence_path": "",
+            "review_kind": "discovery",
+            "source_discovery_attempt": "",
+            "discovery_complete": False,
+            "material_finding_ids": [],
+            "review_scope": "card",
+            "review_epoch": "E01",
+            "epoch_reset_basis": "",
+            "material_defect_class_ids": [],
+            "post_convergence_validation": False,
+            "convergence_basis": "",
+            "subject": {
+                "class": "git_blob",
+                "repository": "owner/repo",
+                "commit": "a" * 40,
+                "path": "workflow/STATE.md",
+                "blob": "b" * 40,
+            },
+            "acceptance": {
+                "class": "task_card",
+                "path": "implementation/workstreams/sample-workstream/cards/M03-T03.md",
+                "commit": "c" * 40,
+                "blob": "d" * 40,
+            },
+            "independence": {
+                "materially_produced_or_repaired_subject": False,
+                "basis": "Reviewer did not materially produce or repair the exact subject.",
+            },
+        }
+        validate_review(base)
+        validate_review_history(
+            [base],
+            expected_card_id="M03-T03",
+            workstream_id="sample-workstream",
+        )
+
+        # Path-only legacy shape stays shape-valid; the serving boundary
+        # requires exact identity separately.
+        legacy = copy.deepcopy(base)
+        del legacy["acceptance"]["commit"]
+        del legacy["acceptance"]["blob"]
+        validate_review(legacy)
+
+        for bad_path in (
+            "implementation/workstreams/sample-workstream/cards/archive/M03-T03.md",
+            "implementation/workstreams/sample-workstream/cards/M03-T99.md",
+        ):
+            with self.subTest(path=bad_path):
+                candidate = copy.deepcopy(base)
+                candidate["acceptance"]["path"] = bad_path
+                with self.assertRaisesRegex(ValidationError, "exact Card path"):
+                    validate_review(candidate)
+
+        unknown = copy.deepcopy(base)
+        unknown["acceptance"]["note"] = "bogus"
+        with self.assertRaisesRegex(ValidationError, "unknown field"):
+            validate_review(unknown)
+
+        half = copy.deepcopy(base)
+        del half["acceptance"]["blob"]
+        with self.assertRaisesRegex(ValidationError, "commit \\+ blob"):
+            validate_review(half)
+
+        malformed = copy.deepcopy(base)
+        malformed["acceptance"]["blob"] = "not-hex"
+        with self.assertRaisesRegex(ValidationError, "commit \\+ blob"):
+            validate_review(malformed)
+
+        authority = copy.deepcopy(base)
+        authority["acceptance"] = {"class": "authority", "path": "requirements/REQUIREMENTS.md"}
+        validate_review(authority)
+        with self.assertRaisesRegex(ValidationError, "must bind the exact selected Task Card"):
+            validate_review_history(
+                [authority],
+                expected_card_id="M03-T03",
+                workstream_id="sample-workstream",
+            )
+
+        board = read_toml(VALID / "TASK_BOARD.toml")
+        board["cards"][1]["contract"]["path"] = (
+            "implementation/workstreams/sample-workstream/cards/archive/M01-T02.md"
+        )
+        with self.assertRaisesRegex(ValidationError, "exact Card path"):
+            validate_board(board, self.workstream)
+
     def test_card_owned_history_requires_card_review_scope(self) -> None:
         review = {
             "workstream_id": "sample-workstream",

@@ -167,6 +167,44 @@ class RouterTests(unittest.TestCase):
         blob = re.search(r'blob = "([0-9a-f]{40})"', section).group(1)  # type: ignore[union-attr]
         return commit, blob
 
+    @classmethod
+    def card_acceptance_identity(cls, project: Path, relpath: str) -> tuple[str, str]:
+        """Return the exact (commit, blob) for a Task Card acceptance binding.
+
+        H005: Card Review acceptance carries exact Git identity. Commits the
+        Card when it is new or mutated; the commit is the latest commit
+        touching the Card so unrelated commits do not churn the binding and
+        repeated helper calls stay stable.
+        """
+        if not cls._card_matches_head(project, relpath):
+            cls.git_identity_for(project, relpath)
+        commit = subprocess.run(
+            ["git", "-C", str(project), "log", "--format=%H", "-1", "HEAD", "--", relpath],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        blob = subprocess.run(
+            ["git", "-C", str(project), "rev-parse", f"{commit}:{relpath}"],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        return commit, blob
+
+    @staticmethod
+    def _card_matches_head(project: Path, relpath: str) -> bool:
+        try:
+            in_head = subprocess.run(
+                ["git", "-C", str(project), "rev-parse", "--verify", f"HEAD:{relpath}"],
+                capture_output=True, text=True, check=False,
+            )
+            if in_head.returncode != 0:
+                return False
+            diff = subprocess.run(
+                ["git", "-C", str(project), "diff", "--quiet", "HEAD", "--", relpath],
+                capture_output=True, check=False,
+            )
+            return diff.returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            return False
+
     def commit_result_version(self, project: Path, result_path: str, content: str) -> tuple[str, str]:
         """Write new result bytes, commit them, and rebind the board locator."""
         old_commit, old_blob = self.board_result_identity(project)
@@ -2372,6 +2410,10 @@ class RouterTests(unittest.TestCase):
         convergence_basis: str = "",
         subject_commit: str | None = None,
         subject_blob: str | None = None,
+        acceptance_path: str = CARD,
+        acceptance_commit_override: str | None = None,
+        acceptance_blob_override: str | None = None,
+        omit_acceptance_identity: bool = False,
     ) -> str:
         review_path = f"implementation/workstreams/sample-workstream/reviews/M01-T04-{attempt}.toml"
         path = project / review_path
@@ -2384,6 +2426,11 @@ class RouterTests(unittest.TestCase):
         board_commit, board_blob = self.board_result_identity(project)
         commit = subject_commit or board_commit
         blob = subject_blob or board_blob
+        real_acceptance_commit, real_acceptance_blob = self.card_acceptance_identity(
+            project, acceptance_path
+        )
+        acceptance_commit = acceptance_commit_override or real_acceptance_commit
+        acceptance_blob = acceptance_blob_override or real_acceptance_blob
         extra = ""
         if review_kind == "discovery" and verdict in {"green", "red"}:
             discovery_complete = True
@@ -2421,6 +2468,20 @@ class RouterTests(unittest.TestCase):
                         'surface = "correctness"\n'
                         f'evidence = "{evidence}#{finding_id}"\n'
                     )
+        if omit_acceptance_identity:
+            acceptance_stanza = (
+                '[acceptance]\n'
+                'class = "task_card"\n'
+                f'path = "{acceptance_path}"\n'
+            )
+        else:
+            acceptance_stanza = (
+                '[acceptance]\n'
+                'class = "task_card"\n'
+                f'path = "{acceptance_path}"\n'
+                f'commit = "{acceptance_commit}"\n'
+                f'blob = "{acceptance_blob}"\n'
+            )
         path.write_text(
             'workstream_id = "sample-workstream"\n'
             'card_id = "M01-T04"\n'
@@ -2434,10 +2495,8 @@ class RouterTests(unittest.TestCase):
             f'commit = "{commit}"\n'
             'path = "implementation/workstreams/sample-workstream/results/M01-T04.md"\n'
             f'blob = "{blob}"\n'
-            '[acceptance]\n'
-            'class = "task_card"\n'
-            f'path = "{CARD}"\n'
-            '[independence]\n'
+            + acceptance_stanza
+            + '[independence]\n'
             'materially_produced_or_repaired_subject = false\n'
             'basis = "Fresh semantic reviewer context."\n'
         )
@@ -2982,6 +3041,211 @@ class RouterTests(unittest.TestCase):
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
             self.assertIn("stale", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_h005_exact_acceptance_green_finalizes(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            self.add_review_attempt(project, "green")
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("route", "post_review_finalization"),
+            )
+            self.assertIn("project-git:", "\n".join(routed.read_set))
+        finally:
+            temp.cleanup()
+
+    def test_h005_alternate_same_stem_acceptance_cannot_finalize(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            alternate = "implementation/workstreams/sample-workstream/cards/archive/M01-T04.md"
+            (project / alternate).parent.mkdir(parents=True, exist_ok=True)
+            (project / alternate).write_text(
+                self.task_card_content().replace(
+                    "route only after current launch inputs are valid",
+                    "ALTERNATE same-stem acceptance",
+                )
+            )
+            self.add_review_attempt(project, "green", acceptance_path=alternate)
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertNotEqual(routed.obligation, "post_review_finalization")
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("exact Card path", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_h005_same_path_mutated_acceptance_freezes_terminal(self) -> None:
+        for committed in (False, True):
+            temp, project = self.copy_fixture()
+            try:
+                with self.subTest(committed=committed):
+                    self.install_reviewable_result(project, "required")
+                    self.add_review_attempt(project, "green")
+                    (project / CARD).write_text(
+                        self.task_card_content(review_requirement="required").replace(
+                            "route only after current launch inputs are valid",
+                            "MUTATED acceptance content",
+                        )
+                    )
+                    if committed:
+                        self.git_identity_for(project, CARD)
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertNotEqual(routed.obligation, "post_review_finalization")
+                    self.assertEqual(
+                        (routed.disposition, routed.obligation),
+                        ("route", "review_freeze"),
+                    )
+                    self.assertIn("acceptance changed", routed.reason)
+            finally:
+                temp.cleanup()
+
+    def test_h005_active_stale_acceptance_fails_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            self.add_review_attempt(project, "pending")
+            (project / CARD).write_text(
+                self.task_card_content(review_requirement="required").replace(
+                    "route only after current launch inputs are valid",
+                    "MUTATED acceptance for active attempt",
+                )
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("stale", routed.reason)
+            self.assertIn("acceptance", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_h005_missing_sibling_mismatch_acceptance_fails_closed(self) -> None:
+        # Missing identity is authored without commit/blob from the start so the
+        # RF006 append-only freeze does not mask the H005 missing-identity reason.
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            self.add_review_attempt(project, "green", omit_acceptance_identity=True)
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("exact commit + blob", routed.reason)
+            self.assertNotIn("post_review_finalization", routed.obligation)
+        finally:
+            temp.cleanup()
+
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            sibling = "implementation/workstreams/sample-workstream/cards/M01-T99.md"
+            (project / sibling).write_text(
+                self.task_card_content().replace("M01-T04", "M01-T99", 1)
+            )
+            self.add_review_attempt(project, "green", acceptance_path=sibling)
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertNotEqual(routed.obligation, "post_review_finalization")
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("exact Card path", routed.reason)
+        finally:
+            temp.cleanup()
+
+        for name, kwargs, reason in (
+            ("blob_mismatch", {"acceptance_blob_override": "f" * 40}, "proof failed"),
+            ("dangling", {"acceptance_commit_override": "0" * 40}, "proof failed"),
+        ):
+            temp, project = self.copy_fixture()
+            try:
+                with self.subTest(case=name):
+                    self.install_reviewable_result(project, "required")
+                    self.add_review_attempt(project, "green", **kwargs)  # type: ignore[arg-type]
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertNotEqual(routed.obligation, "post_review_finalization")
+                    self.assertEqual(
+                        (routed.disposition, routed.obligation),
+                        ("recovery", "recovery_boundary"),
+                    )
+                    self.assertIn(reason, routed.reason)
+            finally:
+                temp.cleanup()
+
+    def test_h005_result_mismatch_freeze_preserved_with_exact_acceptance(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            result_path = self.install_reviewable_result(project, "required")
+            self.add_review_attempt(project, "green")
+            self.commit_result_version(
+                project, result_path,
+                self.result_version_content(subject="changed implementation v2"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "review_freeze"))
+            self.assertIn("Current durable result changed", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_h005_off_head_acceptance_with_identical_bytes_fails_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            _, card_blob = self.card_acceptance_identity(project, CARD)
+            subprocess.run(
+                ["git", "-C", str(project), "checkout", "-q", "-b", "h005-alt-accept"],
+                check=True,
+            )
+            (project / "unrelated-alt.txt").write_text("alt\n")
+            alt_commit, _ = self.git_identity_for(project, "unrelated-alt.txt")
+            alt_blob = subprocess.run(
+                ["git", "-C", str(project), "rev-parse", f"{alt_commit}:{CARD}"],
+                check=True, capture_output=True, text=True,
+            ).stdout.strip()
+            self.assertEqual(alt_blob, card_blob)
+            subprocess.run(["git", "-C", str(project), "checkout", "-q", "-"], check=True)
+            ancestry = subprocess.run(
+                ["git", "-C", str(project), "merge-base", "--is-ancestor", alt_commit, "HEAD"],
+                capture_output=True, check=False,
+            )
+            self.assertNotEqual(ancestry.returncode, 0)
+            self.add_review_attempt(
+                project, "green",
+                acceptance_commit_override=alt_commit,
+                acceptance_blob_override=alt_blob,
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertNotEqual(routed.obligation, "post_review_finalization")
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("HEAD ancestry", routed.reason)
+            self.assertIn("outside HEAD ancestry", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_h005_strict_ancestor_acceptance_commit_still_finalizes(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            self.add_review_attempt(project, "green")
+            (project / "unrelated-note.txt").write_text("# Unrelated note\n")
+            self.git_identity_for(project, "unrelated-note.txt")
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("route", "post_review_finalization"),
+            )
         finally:
             temp.cleanup()
 

@@ -14,6 +14,8 @@ Each review attempt binds:
 - pending/in-progress/GREEN/RED lifecycle;
 - durable verdict evidence for terminal attempts.
 
+Card Review binds the exact current selected Task Card path plus its exact acceptance content: the attempt acceptance must name the exact selected Card path with exact Git commit/blob identity, that identity must resolve in Git, the commit must be reachable from selected HEAD, and current worktree bytes must still match the declared blob. Alternate same-stem paths, sibling paths, missing identity, off-HEAD commits, and same-path mutated or stale content fail closed; a stale terminal binding freezes a new exact attempt like a changed result subject. Existing terminal M01/M02/M02R history stays valid without rewrite.
+
 A changed reviewed subject or a new verdict attempt is a new attempt. Existing terminal attempts remain immutable history.
 
 ## Discovery and finding closure

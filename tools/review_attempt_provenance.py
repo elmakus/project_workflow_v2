@@ -419,6 +419,19 @@ def _read_board_at_commit(
         ) from exc
 
 
+def require_commit_in_head_ancestry(
+    *, project_root: Path, commit: str, label: str
+) -> None:
+    """Require a relied-upon locator commit to be reachable from selected HEAD.
+
+    Shared RF006 ancestry proof, reused by H005 Card acceptance binding so an
+    off-HEAD commit carrying identical bytes cannot authorize a review.
+    """
+    _require_commit_in_head_ancestry(
+        project_root=project_root, commit=commit, label=label
+    )
+
+
 def _require_commit_in_head_ancestry(
     *, project_root: Path, commit: str, label: str
 ) -> None:

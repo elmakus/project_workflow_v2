@@ -270,6 +270,12 @@ def validate_locator(
         _require(workstream_id is not None, f"{label}: workstream binding required")
         prefix = f"implementation/workstreams/{workstream_id}/cards/"
         _require(path.startswith(prefix) and path.endswith(".md"), f"{label}: wrong Task Card class/path")
+        if "commit" in ref or "blob" in ref:
+            _require(
+                isinstance(ref.get("commit"), str) and SHA40.fullmatch(ref["commit"]) is not None
+                and isinstance(ref.get("blob"), str) and SHA40.fullmatch(ref["blob"]) is not None,
+                f"{label}: exact Task Card identity requires commit + blob 40-hex",
+            )
     elif expected_class in {"intake", "brainstorm", "research", "definition", "planning", "plan_review", "tracker"}:
         _require(workstream_id is not None, f"{label}: workstream binding required")
         filenames = {
@@ -973,7 +979,12 @@ def validate_board(
         status = card.get("status")
         _require(status in CARD_STATUSES, f"{label}: invalid status {status!r}")
         active += int(status == "in_progress")
-        validate_locator(card.get("contract"), "task_card", f"{label}.contract", workstream["workstream_id"])
+        contract_path = validate_locator(card.get("contract"), "task_card", f"{label}.contract", workstream["workstream_id"])
+        expected_contract = f"implementation/workstreams/{workstream['workstream_id']}/cards/{card_id}.md"
+        _require(
+            contract_path == expected_contract,
+            f"{label}.contract: path {contract_path!r} does not match exact Card path {expected_contract!r}",
+        )
         if "result" in card:
             validate_locator(card["result"], "result", f"{label}.result", workstream["workstream_id"])
         attempts = card.get("review_attempts", [])
@@ -1173,8 +1184,16 @@ def validate_review(data: dict[str, Any], *, expected_review_scope: str | None =
         path = validate_locator(acceptance, "task_card", "review.acceptance", workstream_id)
         card_id = data.get("card_id")
         _require(isinstance(card_id, str) and card_id, "review: task-card acceptance requires card_id")
-        _require(PurePosixPath(path).stem == card_id,
-                 "review: acceptance Task Card does not match card_id")
+        expected_path = f"implementation/workstreams/{workstream_id}/cards/{card_id}.md"
+        _require(
+            path == expected_path,
+            f"review: acceptance Task Card path {path!r} does not match exact Card path {expected_path!r}",
+        )
+        unknown_acceptance = sorted(set(acceptance) - {"class", "path", "commit", "blob"})
+        _require(
+            not unknown_acceptance,
+            f"review.acceptance: unknown field(s): {', '.join(unknown_acceptance)}",
+        )
     else:
         raise ValidationError("review: unsupported acceptance identity")
 
@@ -1549,6 +1568,11 @@ def validate_review_history(
         if expected_card_id is not None:
             _require(attempt.get("card_id") == expected_card_id,
                      "review_history: attempt belongs to another Card")
+            _require(
+                isinstance(attempt.get("acceptance"), dict)
+                and attempt["acceptance"].get("class") == "task_card",
+                "review_history: Card Review acceptance must bind the exact selected Task Card",
+            )
         if workstream_id is not None:
             _require(attempt.get("workstream_id") == workstream_id,
                      "review_history: attempt belongs to another workstream")
