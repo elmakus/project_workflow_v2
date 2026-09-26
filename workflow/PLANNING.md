@@ -27,8 +27,17 @@ The planner:
 2. maintains requirement/decision coverage and milestone/gate strategy;
 3. completes a GREEN planner audit;
 4. freezes one exact immutable Git-blob subject;
-5. sets premium B due for that exact subject;
-6. stops. The planner must not perform or internally spawn Stage-6 Plan Review.
+5. binds the deterministic exact Definition-authority key for the current GREEN Definition revision plus exact requirements/decision Git blob identities (see below);
+6. sets premium B due for that exact subject;
+7. stops. The planner must not perform or internally spawn Stage-6 Plan Review.
+
+## Definition-authority key
+
+Every frozen/approved `PLANNING.toml` binds `definition_authority_key`, a single canonical string covering the Definition revision plus exact requirements path/blob and sorted decisions path/blob identities:
+
+`rf012-v1:repository:<repo>|definition:<rev>|requirements:<path>@<blob>|decisions:<path>@<blob>,...`
+
+The key binds content blobs, never HEAD or per-file commits, so unrelated commits do not churn it. Path-only or free-text authority is not proof. Helperless derivation: read the current `DEFINITION.toml` revision plus requirements/decisions paths, hash each live file with `git hash-object <path>`, sort decisions by path, and compare the built live string with the stored key; the stored key must also equal the freeze-time snapshot string built from the `DEFINITION.toml` revision plus requirements/decisions paths read at the frozen plan subject commit with `git show <commit>:<definition-path>` and each authority blob resolved with `git rev-parse <commit>:<path>`, and the planning entry revision must match that snapshot. Keyless legacy plans derive the snapshot the same way and compare it with the live string. Stale, missing, mismatched or ambiguous bindings fail closed to Recovery and never authorize Execution Prep or execution. A new Definition revision or same-revision authority-file mutation requires a new planning cycle; updating the key without new plan content does not authorize the old subject.
 
 ## Approval and C
 

@@ -20,6 +20,10 @@ from tools.exact_locator import (
     verify_exact_git_locator,
     verify_worktree_freshness,
 )
+from tools.definition_authority import (
+    DefinitionAuthorityError,
+    verify_planning_authority_freshness,
+)
 from tools.execution_contract import ExecutionContractError, parse_card_result
 from tools.recovery_contract import RecoveryContractError, classify_resolution, exact_result_subject, review_subject
 from tools.review_contract import (
@@ -677,6 +681,19 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             if "plan_review" in workstream:
                 plan_review = read_toml(reads.project(workstream["plan_review"]["path"]))
                 validate_plan_review(plan_review, workstream["workstream_id"], planning)
+
+            try:
+                authority_reads = verify_planning_authority_freshness(
+                    project_root=reads.project_root,
+                    project_repository=project["repository"],
+                    workstream_id=workstream["workstream_id"],
+                    definition=definition,
+                    planning=planning,
+                    plan_review=plan_review,
+                )
+            except DefinitionAuthorityError as exc:
+                raise ValidationError(f"planning authority freshness failed: {exc}") from exc
+            reads.items.extend(authority_reads)
 
             subject_key = (
                 f"{planning['subject']['repository']}@{planning['subject']['commit']}:"

@@ -110,6 +110,17 @@ except ModuleNotFoundError:  # direct script execution from tools/
         validate_editorial_classification_locator,
     )
 
+try:
+    from tools.definition_authority import (
+        DefinitionAuthorityError,
+        validate_definition_authority_key_shape,
+    )
+except ModuleNotFoundError:  # direct script execution from tools/
+    from definition_authority import (
+        DefinitionAuthorityError,
+        validate_definition_authority_key_shape,
+    )
+
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 CARD_STATUSES = {"planned", "ready", "in_progress", "blocked", "done", "returned"}
 INTAKE_KINDS = {"issue", "feature", "change"}
@@ -577,6 +588,20 @@ def validate_planning(data: dict[str, Any], workstream_id: str) -> None:
         except SeamContractError as exc:
             raise ValidationError(f"{exc}") from exc
 
+    if "definition_authority_key" in data:
+        raw_key = data["definition_authority_key"]
+        _require(
+            isinstance(raw_key, str),
+            "planning: definition_authority_key must be a string",
+        )
+        if raw_key != "":
+            try:
+                validate_definition_authority_key_shape(
+                    raw_key, "planning.definition_authority_key"
+                )
+            except DefinitionAuthorityError as exc:
+                raise ValidationError(f"planning: {exc}") from exc
+
     subject = data.get("subject")
     if state == "draft":
         _require(review_mode == "independent",
@@ -646,6 +671,48 @@ def validate_plan_review(data: dict[str, Any], workstream_id: str, planning: dic
         _safe_relative_path(evidence_path, "plan_review.evidence_path")
     else:
         _require(evidence_path == "", "plan_review: pending attempt must not claim evidence")
+
+    planning_raw = planning.get("definition_authority_key", "")
+    review_raw = data.get("definition_authority_key", "")
+    if "definition_authority_key" in planning:
+        _require(
+            isinstance(planning_raw, str),
+            "plan_review: planning authority key must be a string",
+        )
+        if planning_raw != "":
+            try:
+                validate_definition_authority_key_shape(
+                    planning_raw, "plan_review.planning_authority_key"
+                )
+            except DefinitionAuthorityError as exc:
+                raise ValidationError(f"plan_review: {exc}") from exc
+    else:
+        planning_raw = ""
+    if "definition_authority_key" in data:
+        _require(
+            isinstance(review_raw, str),
+            "plan_review: definition_authority_key must be a string",
+        )
+        if review_raw != "":
+            try:
+                validate_definition_authority_key_shape(
+                    review_raw, "plan_review.definition_authority_key"
+                )
+            except DefinitionAuthorityError as exc:
+                raise ValidationError(f"plan_review: {exc}") from exc
+    else:
+        review_raw = ""
+    planning_has = isinstance(planning_raw, str) and planning_raw != ""
+    review_has = isinstance(review_raw, str) and review_raw != ""
+    _require(
+        planning_has == review_has,
+        "plan_review: Planning and Plan Review authority bindings must both be present or both absent",
+    )
+    if planning_has:
+        _require(
+            planning_raw == review_raw,
+            "plan_review: Planning and Plan Review authority keys do not match",
+        )
 
 
 def validate_tracker(data: dict[str, Any], workstream_id: str) -> None:

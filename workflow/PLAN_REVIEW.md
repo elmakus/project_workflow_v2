@@ -18,7 +18,10 @@ Each `PLAN_REVIEW.toml` attempt owns:
 - exact acceptance authority;
 - semantic independence proof;
 - pending / green / red verdict;
-- concise evidence locator when verdict is terminal.
+- concise evidence locator when verdict is terminal;
+- the same deterministic exact `definition_authority_key` bound by Planning for the reviewed frozen subject.
+
+Plan Review binds the identical key string as Planning. Helperless check: the two stored strings must be byte-identical and must equal both the live key derived from the current `DEFINITION.toml` plus `git hash-object` over each authority file and the freeze-time snapshot key derived at the frozen plan subject commit. Missing, stale, mismatched or ambiguous bindings fail closed to Recovery; GREEN on a mismatched or stale binding never authorizes Planning consumption.
 
 Any other verdict — including the generic Card Review `in_progress` state — is invalid for Plan Review and fails closed to Recovery/validation; it never routes as RED correction.
 

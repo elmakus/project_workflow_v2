@@ -116,6 +116,103 @@ class VerifiedLocator:
     key: str
 
 
+def resolve_blob_at_commit(
+    *,
+    project_root: Path,
+    commit: Any,
+    path: Any,
+    label: str,
+) -> str:
+    """Return the exact blob identity for ``<commit>:<path>`` in Git.
+
+    RF012 legacy derivation uses this to discover the Definition authority
+    snapshot bound to an immutable frozen plan subject commit. Path
+    normalization, Git timeout handling and blob-type proof match
+    :func:`verify_exact_git_locator` exactly.
+    """
+    locator_path = normalize_locator_path(path, f"{label}.path")
+    if not isinstance(commit, str) or SHA40.fullmatch(commit) is None:
+        raise _fail(label, "commit must be exact 40-hex Git identity", "identity")
+    resolved = _run_git(project_root, "rev-parse", "--verify", f"{commit}:{locator_path}")
+    if resolved.returncode != 0:
+        raise _fail(
+            label,
+            f"exact Git subject {commit}:{locator_path} does not resolve",
+            "dangling",
+        )
+    actual_blob = resolved.stdout.strip()
+    if SHA40.fullmatch(actual_blob) is None:
+        raise _fail(
+            label,
+            f"exact Git subject {commit}:{locator_path} does not resolve to a blob identity",
+            "dangling",
+        )
+    kind = _run_git(project_root, "cat-file", "-t", actual_blob)
+    if kind.returncode != 0 or kind.stdout.strip() != "blob":
+        raise _fail(
+            label,
+            f"exact locator {locator_path!r} does not resolve to a Git blob",
+            "not_blob",
+        )
+    return actual_blob
+
+
+def read_confined_worktree_bytes(
+    *,
+    project_root: Path,
+    path: Any,
+    label: str,
+) -> bytes:
+    """Return current worktree bytes at ``path`` after rooted confinement proof.
+
+    RF012 current-authority derivation uses this to hash live authority bytes
+    without a declared blob. Confinement, missing-file and unsafe-path
+    behavior match :func:`verify_worktree_freshness` exactly.
+    """
+    locator_path = normalize_locator_path(path, f"{label}.path")
+    root = project_root.resolve()
+    candidate = (root / Path(*PurePosixPath(locator_path).parts)).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError as exc:
+        raise _fail(
+            label, f"path escapes the declared root: {locator_path!r}", "escape"
+        ) from exc
+    try:
+        return candidate.read_bytes()
+    except OSError as exc:
+        raise _fail(
+            label, f"declared target {locator_path!r} cannot be read back: {exc}", "missing"
+        ) from exc
+
+
+def read_git_blob_bytes(
+    *,
+    project_root: Path,
+    blob: Any,
+    label: str,
+) -> bytes:
+    """Return the exact content bytes for a Git blob identity.
+
+    RF012 legacy derivation uses this to read the snapshot Definition record
+    bound to an immutable frozen plan subject commit.
+    """
+    if not isinstance(blob, str) or SHA40.fullmatch(blob) is None:
+        raise _fail(label, "blob must be exact 40-hex Git identity", "identity")
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(project_root), "cat-file", "-p", blob],
+            capture_output=True,
+            check=False,
+            timeout=_GIT_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise _fail("git", f"Git readback failed: {exc}", "git_unavailable") from exc
+    if completed.returncode != 0:
+        raise _fail(label, f"exact Git blob {blob} does not resolve", "dangling")
+    return bytes(completed.stdout)
+
+
 def verify_exact_git_locator(
     *,
     project_root: Path,

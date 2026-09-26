@@ -5,6 +5,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -16,6 +17,23 @@ FIXTURE = ROOT / "tests" / "fixtures" / "router" / "valid-project"
 MANIFEST = "implementation/workstreams/sample-workstream/WORKSTREAM.toml"
 BOARD = "implementation/workstreams/sample-workstream/TASK_BOARD.toml"
 CARD = "implementation/workstreams/sample-workstream/cards/M01-T04.md"
+
+# RF012 fixture authority: deterministic blobs for "# Accepted authority\n" and
+# "# Accepted decision\n" via git_blob_sha; key binds R1 plus exact identities.
+RF012_REQ_PATH = "requirements/REQUIREMENTS.md"
+RF012_REQ_CONTENT = "# Accepted authority\n"
+RF012_REQ_BLOB = "6ba7e7db1e09b041d121590adebdd9fa68e9a5bd"
+RF012_DEC_PATH = "decisions/ADR-001.md"
+RF012_DEC_CONTENT = "# Accepted decision\n"
+RF012_DEC_BLOB = "f8b3e92564546b7f0192f648013c4c0951f45309"
+RF012_REPOSITORY = "owner/router-fixture"
+RF012_KEY = (
+    f"rf012-v1:repository:{RF012_REPOSITORY}|definition:R1|"
+    f"requirements:{RF012_REQ_PATH}@{RF012_REQ_BLOB}|"
+    f"decisions:{RF012_DEC_PATH}@{RF012_DEC_BLOB}"
+)
+RF012_PLAN_PATH = "planning/MASTER_PLAN.md"
+RF012_PLAN_CONTENT = "# Master plan\n"
 
 
 class RouterTests(unittest.TestCase):
@@ -250,6 +268,192 @@ class RouterTests(unittest.TestCase):
         )
         record = project / f"implementation/workstreams/sample-workstream/{filename}"
         record.write_text(content)
+        if key == "definition" and 'state = "green"' in content:
+            req = project / RF012_REQ_PATH
+            req.parent.mkdir(parents=True, exist_ok=True)
+            if not req.exists():
+                req.write_text(RF012_REQ_CONTENT)
+            dec = project / RF012_DEC_PATH
+            dec.parent.mkdir(parents=True, exist_ok=True)
+            if not dec.exists():
+                dec.write_text(RF012_DEC_CONTENT)
+        if key == "planning":
+            self._fixup_planning_snapshot(project)
+        elif key == "plan_review":
+            self._fixup_review_snapshot(project)
+
+    @staticmethod
+    def _ensure_git_repo(project: Path) -> None:
+        if not (project / ".git").exists():
+            subprocess.run(["git", "init", "-q", str(project)], check=True)
+            subprocess.run(
+                ["git", "-C", str(project), "config", "user.email", "fixture@example.invalid"],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(project), "config", "user.name", "Fixture"], check=True
+            )
+
+    def _fixup_planning_snapshot(self, project: Path) -> None:
+        """Bind frozen/approved fixture planning to a real Git snapshot.
+
+        Existing routing fixtures use fake a*40 subjects with no Git history.
+        RF012 explicit keys must match the freeze-time snapshot at the immutable
+        subject commit, so materialize that snapshot (authority files +
+        DEFINITION + plan) and rewrite the fake subject to the real commit/blob.
+        Independent premiums follow the new subject; editorial premiums/base
+        stay bound to the prior reviewed base. Draft and malformed records pass
+        through because the router never proves them here.
+        """
+        path = project / "implementation/workstreams/sample-workstream/PLANNING.toml"
+        try:
+            data = tomllib.loads(path.read_bytes().decode("utf-8"))
+        except (OSError, ValueError):
+            return
+        if data.get("state") not in {"frozen", "approved"}:
+            return
+        subject = data.get("subject")
+        if not isinstance(subject, dict) or subject.get("commit") != "a" * 40:
+            return
+        definition_path = project / "implementation/workstreams/sample-workstream/DEFINITION.toml"
+        if not definition_path.is_file():
+            return
+        old_blob = subject.get("blob", "")
+        old_key = f"owner/repo@{'a' * 40}:planning/MASTER_PLAN.md@{old_blob}"
+        self._ensure_git_repo(project)
+        for rel, content in (
+            (RF012_REQ_PATH, RF012_REQ_CONTENT),
+            (RF012_DEC_PATH, RF012_DEC_CONTENT),
+            (RF012_PLAN_PATH, RF012_PLAN_CONTENT),
+        ):
+            target = project / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if not target.exists():
+                target.write_text(content)
+        definition_rel = "implementation/workstreams/sample-workstream/DEFINITION.toml"
+        subprocess.run(["git", "-C", str(project), "add",
+                        RF012_REQ_PATH, RF012_DEC_PATH, RF012_PLAN_PATH, definition_rel],
+                       check=True)
+        subprocess.run(["git", "-C", str(project), "commit", "-q", "-m", "rf012 planning snapshot"],
+                       check=False, capture_output=True)
+        commit = subprocess.run(["git", "-C", str(project), "rev-parse", "HEAD"],
+                                check=True, capture_output=True, text=True).stdout.strip()
+        blob = subprocess.run(["git", "-C", str(project), "rev-parse", f"HEAD:{RF012_PLAN_PATH}"],
+                              check=True, capture_output=True, text=True).stdout.strip()
+        new_key = f"{RF012_REPOSITORY}@{commit}:{RF012_PLAN_PATH}@{blob}"
+        text = path.read_text()
+        text = text.replace('repository = "owner/repo"', f'repository = "{RF012_REPOSITORY}"', 1)
+        text = text.replace(f'commit = "{"a" * 40}"', f'commit = "{commit}"', 1)
+        if isinstance(old_blob, str) and old_blob:
+            text = text.replace(f'blob = "{old_blob}"', f'blob = "{blob}"', 1)
+        if data.get("review_mode") != "editorial_exempt" and isinstance(old_blob, str) and old_blob:
+            text = text.replace(old_key, new_key)
+        path.write_text(text)
+        if data.get("review_mode") == "editorial_exempt":
+            self._fixup_editorial_classification(project, commit, blob, old_blob, data)
+
+    def _fixup_editorial_classification(self, project: Path, commit: str, blob: str,
+                                          old_blob: object, data: dict) -> None:
+        """Rebind fixture editorial proof changed_subject to the fixed plan subject.
+
+        The proof base stays bound to the prior fake reviewed base; only the
+        changed side follows the new real subject, with the locator refreshed
+        to the recommitted proof. Intentionally corrupted locators (negative
+        controls) and missing proofs pass through for the router to reject.
+        """
+        locator = data.get("review_exemption_classification")
+        if not isinstance(locator, dict):
+            return
+        loc_path = locator.get("path")
+        loc_commit = locator.get("commit")
+        loc_blob = locator.get("blob")
+        if not isinstance(loc_path, str) or not loc_path:
+            return
+        target = project / loc_path
+        if not target.is_file():
+            return
+        if isinstance(loc_commit, str) and isinstance(loc_blob, str):
+            try:
+                actual = subprocess.run(
+                    ["git", "-C", str(project), "rev-parse", "--verify",
+                     f"{loc_commit}:{loc_path}"],
+                    capture_output=True, text=True, check=False, timeout=5,
+                )
+                if actual.returncode != 0 or actual.stdout.strip() != loc_blob:
+                    return
+            except (OSError, subprocess.SubprocessError):
+                return
+        try:
+            text = target.read_text()
+        except OSError:
+            return
+        parts = text.split("[changed_subject]\n", 1)
+        if len(parts) != 2:
+            return
+        head, tail = parts
+        tail = tail.replace('repository = "owner/repo"',
+                            f'repository = "{RF012_REPOSITORY}"', 1)
+        tail = tail.replace(f'commit = "{"a" * 40}"', f'commit = "{commit}"', 1)
+        if isinstance(old_blob, str) and old_blob:
+            tail = tail.replace(f'blob = "{old_blob}"', f'blob = "{blob}"', 1)
+        target.write_text(head + "[changed_subject]\n" + tail)
+        subprocess.run(["git", "-C", str(project), "add", loc_path], check=True)
+        subprocess.run(["git", "-C", str(project), "commit", "-q", "-m",
+                        "rf012 editorial proof rebind"], check=False, capture_output=True)
+        new_commit = subprocess.run(
+            ["git", "-C", str(project), "rev-parse", "HEAD"],
+            check=True, capture_output=True, text=True).stdout.strip()
+        new_blob = subprocess.run(
+            ["git", "-C", str(project), "rev-parse", f"HEAD:{loc_path}"],
+            check=True, capture_output=True, text=True).stdout.strip()
+        planning_path = project / "implementation/workstreams/sample-workstream/PLANNING.toml"
+        try:
+            planning_text = planning_path.read_text()
+        except OSError:
+            return
+        pieces = planning_text.split("[review_exemption_classification]\n", 1)
+        if len(pieces) != 2:
+            return
+        phead, ptail = pieces
+        if isinstance(loc_commit, str) and loc_commit:
+            ptail = ptail.replace(f'commit = "{loc_commit}"', f'commit = "{new_commit}"', 1)
+        if isinstance(loc_blob, str) and loc_blob:
+            ptail = ptail.replace(f'blob = "{loc_blob}"', f'blob = "{new_blob}"', 1)
+        planning_path.write_text(phead + "[review_exemption_classification]\n" + ptail)
+
+    def _fixup_review_snapshot(self, project: Path) -> None:
+        """Align default fixture review subjects with the fixed planning subject.
+
+        Only the default fake a*40/b*40 independent subject is rewritten; an
+        intentionally mismatched blob (negative control) and editorial base
+        subjects pass through untouched.
+        """
+        path = project / "implementation/workstreams/sample-workstream/PLAN_REVIEW.toml"
+        try:
+            data = tomllib.loads(path.read_bytes().decode("utf-8"))
+        except (OSError, ValueError):
+            return
+        subject = data.get("subject")
+        if not isinstance(subject, dict):
+            return
+        if subject.get("commit") != "a" * 40 or subject.get("blob") != "b" * 40:
+            return
+        planning_path = project / "implementation/workstreams/sample-workstream/PLANNING.toml"
+        try:
+            planning = tomllib.loads(planning_path.read_bytes().decode("utf-8"))
+        except (OSError, ValueError):
+            return
+        if planning.get("review_mode") == "editorial_exempt":
+            return
+        planned = planning.get("subject")
+        if not isinstance(planned, dict):
+            return
+        text = path.read_text()
+        text = text.replace('repository = "owner/repo"',
+                            f'repository = "{planned.get("repository", RF012_REPOSITORY)}"', 1)
+        text = text.replace(f'commit = "{"a" * 40}"', f'commit = "{planned.get("commit", "")}"', 1)
+        text = text.replace(f'blob = "{"b" * 40}"', f'blob = "{planned.get("blob", "")}"', 1)
+        path.write_text(text)
 
 
     def install_green_definition(self, project: Path) -> None:
@@ -281,12 +485,18 @@ class RouterTests(unittest.TestCase):
         review_mode: str = "independent", exemption_basis: str = "",
         exemption_base_subject: str = "",
         exemption_classification: tuple[str, str, str, str] | None = None,
+        include_authority_key: bool = True, authority_key: str = RF012_KEY,
     ) -> str:
         blob = blob or ("b" * 40)
         premium_a_subject = premium_a_subject or f"definition:R1|planning-cycle:{cycle}"
         key = f"owner/repo@{'a' * 40}:planning/MASTER_PLAN.md@{blob}"
         gate_key = gate_subject or key
         frozen = state in {"frozen", "approved"}
+        authority_line = (
+            f'definition_authority_key = "{authority_key}"\n'
+            if include_authority_key
+            else ""
+        )
         return (
             'workstream_id = "sample-workstream"\n'
             f'cycle = {cycle}\n'
@@ -304,6 +514,7 @@ class RouterTests(unittest.TestCase):
             f'premium_b_subject = "{gate_key if premium_b != "not_due" else ""}"\n'
             f'premium_c = "{premium_c}"\n'
             f'premium_c_subject = "{gate_key if premium_c != "not_due" else ""}"\n'
+            f'{authority_line}'
             '[subject]\n'
             f'repository = "{"owner/repo" if frozen else ""}"\n'
             f'commit = "{"a" * 40 if frozen else ""}"\n'
@@ -326,10 +537,16 @@ class RouterTests(unittest.TestCase):
     def plan_review_content(
         self, verdict: str = "pending", *, blob: str | None = None,
         cycle: int = 1, revision: str = "P1", evidence: str | None = None,
+        include_authority_key: bool = True, authority_key: str = RF012_KEY,
     ) -> str:
         blob = blob or ("b" * 40)
         if evidence is None:
             evidence = "" if verdict == "pending" else "evidence/plan-review-R01.md"
+        authority_line = (
+            f'definition_authority_key = "{authority_key}"\n'
+            if include_authority_key
+            else ""
+        )
         return (
             'workstream_id = "sample-workstream"\n'
             f'plan_revision = "{revision}"\n'
@@ -337,6 +554,7 @@ class RouterTests(unittest.TestCase):
             'attempt = "R01"\n'
             f'verdict = "{verdict}"\n'
             f'evidence_path = "{evidence}"\n'
+            f'{authority_line}'
             '[subject]\n'
             'class = "git_blob"\n'
             'repository = "owner/repo"\n'
@@ -1475,6 +1693,7 @@ class RouterTests(unittest.TestCase):
                     premium_a="satisfied", premium_b="due",
                 )
             )
+            self._fixup_planning_snapshot(project)
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_B"))
             self.assertIn("package:workflow/USER_STOP.md", routed.read_set)
@@ -1485,6 +1704,7 @@ class RouterTests(unittest.TestCase):
                     premium_a="satisfied", premium_b="satisfied",
                 )
             )
+            self._fixup_planning_snapshot(project)
             self.install_state_record(
                 project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
                 self.plan_review_content("green", cycle=2, revision="P2"),
@@ -1499,6 +1719,7 @@ class RouterTests(unittest.TestCase):
                     premium_a="satisfied", premium_b="satisfied", premium_c="due",
                 )
             )
+            self._fixup_planning_snapshot(project)
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_C"))
             self.assertIn("package:workflow/USER_STOP.md", routed.read_set)
@@ -1509,6 +1730,7 @@ class RouterTests(unittest.TestCase):
                     premium_a="satisfied", premium_b="satisfied", premium_c="satisfied",
                 )
             )
+            self._fixup_planning_snapshot(project)
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             # Co-bound live Board preempts plan JIT; M01-T04 is in_progress.
             self.assertEqual((routed.disposition, routed.obligation), ("route", "execution"))
@@ -1528,6 +1750,7 @@ class RouterTests(unittest.TestCase):
                     exemption_classification=exemption_classification,
                 )
             )
+            self._fixup_planning_snapshot(project)
             review_path.write_text(self.plan_review_content("green", cycle=2, revision="P2"))
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             # Valid editorial exemption still dispatches the co-bound live Board.

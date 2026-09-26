@@ -42,6 +42,7 @@ The registry is deliberately not an expression language. It names exact canonica
 - A satisfied and no plan -> Planning;
 - draft replan cycle with exact premium A due -> premium A stop with the same best-available-context recommendation;
 - draft plan with exact premium A satisfied -> Planning;
+- frozen/approved plan with stale, missing, mismatched or ambiguous Definition-authority key versus live Definition plus current authority bytes -> Recovery before any premium B/C, review, Execution Prep or Board dispatch;
 - frozen plan with B due -> premium B fresh independent best-available-context stop;
 - B satisfied + exact pending Plan Review -> independent Plan Review;
 - GREEN/RED Plan Review -> Planning consumption/correction;
