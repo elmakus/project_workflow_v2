@@ -54,6 +54,10 @@ try:
         LiveConsumerError,
         validate_live_consumer_gates,
     )
+    from tools.jit_terminality_contract import (
+        JitTerminalityError,
+        validate_trigger_consumed_proof,
+    )
 except ModuleNotFoundError:  # direct script execution from tools/
     from exact_locator import ExactLocatorError, normalize_locator_path
     from review_contract import (
@@ -97,6 +101,10 @@ except ModuleNotFoundError:  # direct script execution from tools/
     from live_consumer_contract import (
         LiveConsumerError,
         validate_live_consumer_gates,
+    )
+    from jit_terminality_contract import (
+        JitTerminalityError,
+        validate_trigger_consumed_proof,
     )
 
 try:
@@ -1168,6 +1176,14 @@ def validate_board(
                     "result or a bound late-oversize handoff for the exact "
                     "residual trigger"
                 )
+        # RF014: consumed-proof shape plus Board-order/handoff coherence.
+        # Presence is optional here so historic prose-only triggers stay
+        # shape-valid (REQ-125); the terminality serving boundary requires
+        # presence plus Git identity plus the consumer edge.
+        try:
+            validate_trigger_consumed_proof(trigger, data, label)
+        except JitTerminalityError as exc:
+            raise ValidationError(f"{exc}") from exc
 
     if planning_seams:
         _require(

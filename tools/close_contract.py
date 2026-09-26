@@ -44,6 +44,10 @@ try:
         verify_terminal_append_only_from_git,
     )
     from tools.execution_contract import ExecutionContractError, parse_card_result
+    from tools.jit_terminality_contract import (
+        JitTerminalityError,
+        verify_consumed_trigger,
+    )
 except ModuleNotFoundError:  # direct script execution from tools/
     from review_contract import (
         OBSERVATION_DISPOSITIONS,
@@ -77,6 +81,10 @@ except ModuleNotFoundError:  # direct script execution from tools/
         verify_terminal_append_only_from_git,
     )
     from execution_contract import ExecutionContractError, parse_card_result
+    from jit_terminality_contract import (
+        JitTerminalityError,
+        verify_consumed_trigger,
+    )
 
 
 class CloseContractError(ValueError):
@@ -3070,6 +3078,72 @@ def cleanup_branch_action_from_board(
         cleanup_state=cleanup_state,
         verified_head=verified_head,
     )
+
+
+def verify_terminal_jit_completeness_from_board(
+    *,
+    project_root: Path | str,
+    workstream_path: str,
+    board_path: str,
+    project_repository: str | None = None,
+) -> str:
+    """Prove JIT terminal completeness plus exact consumed proof for Close.
+
+    Authoritative Close-side backstop to the router JIT gate: every
+    waiting/satisfied trigger is an unconsumed obligation that fails closed,
+    and every consumed trigger must bind exact downstream Card/contract/
+    Git-identity proof verified through the RF007 resolver. Missing/
+    dangling/stale/sibling/unproved/forged bindings fail closed with exact
+    reasons. Prose-only historical triggers stay valid only as immutable
+    history; at this serving boundary proof is required. Returns
+    ``jit_terminal`` only when every trigger is consumed with exact proof
+    (or no triggers exist).
+    """
+    root = Path(project_root).resolve()
+    workstream = _read_project_toml(root, workstream_path, "workstream")
+    board = _read_project_toml(root, board_path, "task board")
+    try:
+        validate_workstream(workstream)
+    except ValidationError as exc:
+        raise CloseContractError(f"workstream invalid: {exc}") from exc
+    try:
+        validate_board(board, workstream)
+    except ValidationError as exc:
+        raise CloseContractError(f"task board invalid: {exc}") from exc
+    triggers = board.get("jit_triggers", []) or []
+    if not triggers:
+        return "jit_terminal"
+    repository = _resolve_project_repository(root, project_repository)
+    if repository is None:
+        raise CloseContractError(
+            "JIT terminality requires the exact project repository from PROJECT.md"
+        )
+    for index, trigger in enumerate(triggers):
+        if not isinstance(trigger, dict):
+            continue
+        label = f"task_board.jit_triggers[{index}]"
+        state = trigger.get("state")
+        if state in {"waiting", "satisfied"}:
+            raise CloseContractError(
+                f"unconsumed JIT trigger {trigger.get('id', '?')!r} ({state} after "
+                f"{trigger.get('after_card', '?')}) blocks Close; Execution Prep owns "
+                "downstream materialization and exact consumed binding"
+            )
+        if state != "consumed":
+            continue
+        try:
+            verify_consumed_trigger(
+                project_root=root,
+                project_repository=repository,
+                board=board,
+                trigger=trigger,
+                label=label,
+            )
+        except JitTerminalityError as exc:
+            raise CloseContractError(
+                f"consumed JIT trigger {trigger.get('id', '?')!r} invalid: {exc}"
+            ) from exc
+    return "jit_terminal"
 
 
 def close_continuation(

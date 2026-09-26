@@ -58,6 +58,10 @@ from tools.live_consumer_contract import (
     validate_live_consumer_gates,
     verify_live_consumer_records,
 )
+from tools.jit_terminality_contract import (
+    JitTerminalityError,
+    verify_consumed_trigger,
+)
 from tools.review_attempt_provenance import (
     ReviewAttemptProvenanceError,
     require_commit_in_head_ancestry,
@@ -853,6 +857,143 @@ def done_close_gate(
             f"DONE Card {card_id} RED review evidence remains durable; execution resolution "
             "classifies correction instead of Close",
             subject=card_id, owner_module="workflow/RECOVERY.md",
+        )
+    return None
+
+
+def jit_terminality_gate(
+    reads: Reads,
+    board: dict,
+    workstream: dict,
+    project: dict,
+) -> RouteResult | None:
+    """RF014/H026: prove JIT terminality before Close, else Prep/hold/recovery.
+
+    An all-terminal Board with a waiting/satisfied trigger cannot Close:
+    satisfied triggers held by a pending material live finding route to
+    finding_reconciliation, satisfied intentional live-consumer triggers with
+    pending readiness route to live_consumer_readiness, and any other
+    waiting/satisfied trigger routes to Execution Prep for downstream
+    materialization. A consumed trigger must bind exact downstream
+    Card/contract/Git-identity proof; missing/dangling/stale/sibling/
+    unproved/forged bindings fail closed to Recovery. Returns None only when
+    every trigger is consumed with exact proof (or no triggers exist).
+    """
+    triggers = board.get("jit_triggers", []) or []
+    if not triggers:
+        return None
+    for index, trigger in enumerate(triggers):
+        if not isinstance(trigger, dict) or trigger.get("state") != "consumed":
+            continue
+        label = f"task_board.jit_triggers[{index}]"
+        try:
+            proof = verify_consumed_trigger(
+                project_root=reads.project_root,
+                project_repository=project["repository"],
+                board=board,
+                trigger=trigger,
+                label=label,
+            )
+        except JitTerminalityError as exc:
+            trigger_id = trigger.get("id", "?")
+            return recovery(reads, f"consumed JIT trigger {trigger_id!r} invalid: {exc}")
+        reads.items.append(
+            f"project-git:{project['repository']}@{proof['commit']}:"
+            f"{proof['path']}@{proof['blob']}"
+        )
+        try:
+            reads.project(proof["path"])
+        except (OSError, ValidationError):
+            pass
+    # Satisfied holds keep their owning routes ahead of generic Prep.
+    if board.get("live_findings") and board.get("jit_triggers"):
+        try:
+            validated = validate_live_findings(
+                board.get("live_findings"), workstream["workstream_id"]
+            )
+            holds = validate_finding_trigger_gates(validated, board["jit_triggers"])
+        except LiveFindingError as exc:
+            return recovery(reads, f"affected-JIT gate invalid: {exc}")
+        states = {
+            trigger["id"]: trigger.get("state")
+            for trigger in board["jit_triggers"]
+            if isinstance(trigger, dict) and isinstance(trigger.get("id"), str)
+        }
+        held = sorted(
+            trigger_id for trigger_id in holds if states.get(trigger_id) == "satisfied"
+        )
+        if held:
+            parts = []
+            for trigger_id in held:
+                owners = sorted({
+                    str(validated[finding_id].get("owner_stage"))
+                    for finding_id in holds[trigger_id]
+                })
+                parts.append(
+                    f"{trigger_id} (finding(s) "
+                    f"{', '.join(holds[trigger_id])} @ {', '.join(owners)})"
+                )
+            first_finding = holds[held[0]][0]
+            first_owner = str(validated[first_finding].get("owner_stage"))
+            try:
+                owner_module = live_finding_owner_module(first_owner)
+            except LiveFindingError as exc:
+                return recovery(reads, f"affected-JIT gate invalid: {exc}")
+            return result(
+                reads, "route", "finding_reconciliation",
+                "Satisfied JIT trigger(s) "
+                + "; ".join(parts)
+                + " held by pending material live finding(s); owning-stage "
+                "reconciliation must be accepted and read back before "
+                "Execution Prep consumes the affected trigger",
+                subject=held[0], owner_module=owner_module,
+            )
+    if board.get("jit_triggers"):
+        try:
+            consumer_holds = validate_live_consumer_gates(
+                board["jit_triggers"], workstream["workstream_id"]
+            )
+        except LiveConsumerError as exc:
+            return recovery(reads, f"live-consumer gate invalid: {exc}")
+        states = {
+            trigger["id"]: trigger.get("state")
+            for trigger in board["jit_triggers"]
+            if isinstance(trigger, dict) and isinstance(trigger.get("id"), str)
+        }
+        consumer_held = sorted(
+            trigger_id
+            for trigger_id in consumer_holds
+            if states.get(trigger_id) == "satisfied"
+        )
+        if consumer_held:
+            return result(
+                reads, "route", "live_consumer_readiness",
+                "Satisfied intentional live-consumer trigger(s) "
+                + ", ".join(consumer_held)
+                + " held by pending readiness; verified corrected authority "
+                "and every required Definition, Planning, review, predecessor "
+                "and Milestone gate must be complete and read back before "
+                "Execution Prep consumes the intended consumer",
+                subject=consumer_held[0],
+                owner_module="workflow/EXECUTION_PREP.md",
+            )
+    pending = [
+        trigger for trigger in triggers
+        if isinstance(trigger, dict) and trigger.get("state") in {"waiting", "satisfied"}
+    ]
+    if pending:
+        details = "; ".join(
+            f"{trigger.get('id', '?')} ({trigger.get('state')} after "
+            f"{trigger.get('after_card', '?')})"
+            for trigger in pending
+        )
+        first_id = pending[0].get("id") if isinstance(pending[0].get("id"), str) else None
+        return result(
+            reads, "route", "execution_prep",
+            f"JIT trigger(s) {details} remain unconsumed with no proved "
+            "downstream materialization; Execution Prep owns downstream "
+            "materialization and exact consumed binding before Close",
+            subject=first_id, owner_module="workflow/EXECUTION_PREP.md",
         )
     return None
 
@@ -1923,6 +2064,10 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
         gate = done_close_gate(reads, board, workstream, project)
         if gate is not None:
             return gate
+        # RF014/H026: pending/satisfied JIT blocks Close; consumed needs proof.
+        jit_gate = jit_terminality_gate(reads, board, workstream, project)
+        if jit_gate is not None:
+            return jit_gate
         return policy_result(
             reads,
             decision,
@@ -1942,6 +2087,10 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
         gate = done_close_gate(reads, board, workstream, project)
         if gate is not None:
             return gate
+        # RF014/H026: JIT terminality also gates mixed terminals.
+        jit_gate = jit_terminality_gate(reads, board, workstream, project)
+        if jit_gate is not None:
+            return jit_gate
         return result(
             reads, "route", "close",
             "All current Cards are terminal and every bound residual outcome "

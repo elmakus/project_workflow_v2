@@ -30,6 +30,32 @@ ROUTER_MANIFEST = "implementation/workstreams/sample-workstream/WORKSTREAM.toml"
 ROUTER_BOARD = "implementation/workstreams/sample-workstream/TASK_BOARD.toml"
 
 
+def _exact_fixture_contract(project: Path, card_id: str) -> tuple[str, str] | None:
+    """Give a present fixture Task Card a real immutable Git identity."""
+    relpath = f"implementation/workstreams/sample-workstream/cards/{card_id}.md"
+    if not (project / relpath).is_file():
+        return None
+    if not (project / ".git").exists():
+        subprocess.run(["git", "init", "-q", str(project)], check=True)
+        subprocess.run(["git", "-C", str(project), "config", "user.email",
+                        "fixture@example.invalid"], check=True)
+        subprocess.run(["git", "-C", str(project), "config", "user.name",
+                        "Fixture"], check=True)
+    subprocess.run(["git", "-C", str(project), "add", relpath], check=True)
+    staged = subprocess.run(["git", "-C", str(project), "diff", "--cached",
+                             "--quiet", "--", relpath], check=False)
+    if staged.returncode != 0:
+        subprocess.run(["git", "-C", str(project), "commit", "-q", "-m",
+                        f"fixture contract {card_id}", "--", relpath], check=True)
+    commit = subprocess.run(["git", "-C", str(project), "log", "-1",
+                             "--format=%H", "--", relpath], check=True,
+                            capture_output=True, text=True).stdout.strip()
+    blob = subprocess.run(["git", "-C", str(project), "rev-parse",
+                           f"{commit}:{relpath}"], check=True,
+                          capture_output=True, text=True).stdout.strip()
+    return commit, blob
+
+
 def _exact_fixture_result(project: Path, card_id: str) -> tuple[str, str] | None:
     """Give a present DONE fixture result a real immutable Git identity."""
     relpath = f"implementation/workstreams/sample-workstream/results/{card_id}.md"
@@ -1692,6 +1718,16 @@ class TrajectoryTests(unittest.TestCase):
             f"state = \"{trigger_state}\"\n"
             "condition = \"Residual late-oversize scope awaits re-decomposition.\"\n"
         )
+        # RF014: consumed handoff triggers bind exact downstream proof.
+        if trigger_state == "consumed" and residual_status is not None:
+            identity = _exact_fixture_contract(project, "M01-T05")
+            if identity is not None:
+                trigger += (
+                    "[jit_triggers.consumed_proof]\n"
+                    'card = "M01-T05"\n'
+                    'path = "implementation/workstreams/sample-workstream/cards/M01-T05.md"\n'
+                    f'commit = "{identity[0]}"\nblob = "{identity[1]}"\n'
+                )
         returns = ""
         if return_state is not None:
             returns = self._return_toml(
@@ -2207,6 +2243,16 @@ class SplitTrajectoryTests(unittest.TestCase):
             f"state = \"{handoff_trigger_state}\"\n"
             "condition = \"Residual late-oversize scope awaits re-decomposition.\"\n"
         )
+        # RF014: consumed triggers bind exact downstream proof.
+        if handoff_trigger_state == "consumed" and anchor_status is not None:
+            identity = _exact_fixture_contract(project, "M01-T05")
+            if identity is not None:
+                triggers += (
+                    "[jit_triggers.consumed_proof]\n"
+                    'card = "M01-T05"\n'
+                    'path = "implementation/workstreams/sample-workstream/cards/M01-T05.md"\n'
+                    f'commit = "{identity[0]}"\nblob = "{identity[1]}"\n'
+                )
         if anchor_status is not None:
             triggers += (
                 "[[jit_triggers]]\n"
@@ -2215,6 +2261,15 @@ class SplitTrajectoryTests(unittest.TestCase):
                 f"state = \"{jit_trigger_state}\"\n"
                 "condition = \"Backoff outcome awaits its own Card.\"\n"
             )
+            if jit_trigger_state == "consumed" and r3_status is not None:
+                identity = _exact_fixture_contract(project, "M01-T07")
+                if identity is not None:
+                    triggers += (
+                        "[jit_triggers.consumed_proof]\n"
+                        'card = "M01-T07"\n'
+                        'path = "implementation/workstreams/sample-workstream/cards/M01-T07.md"\n'
+                        f'commit = "{identity[0]}"\nblob = "{identity[1]}"\n'
+                    )
         outcomes = "".join(
             self._outcome_toml(outcome,
                                table="late_oversize_returns.residual_outcomes")

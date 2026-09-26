@@ -58,7 +58,7 @@ The registry is deliberately not an expression language. It names exact canonica
 - satisfied intentional live-consumer JIT trigger with pending readiness -> Execution Prep `live_consumer_readiness` before the intended consumer may be consumed; undeclared ordinary triggers never hold, verified admission releases through normal materialization, and the affected-finding hold routes first when both apply;
 - active Card with a pending late-oversize return -> Execution Prep to materialize and bind the residual Card (preserved evidence and exact review-attempt read back first);
 - active Card with a bound late-oversize return -> Execution Prep for handoff finalization into the original's `returned` non-GREEN terminal disposition;
-- all Cards `done`/`returned` with at least one `returned` -> Close only when every bound residual outcome terminates in accepted downstream Cards, else back to a concrete Execution Prep obligation (a `returned` Card alone is never accepted completion);
+- all Cards `done`/`returned` with at least one `returned` -> Close only when every bound residual outcome terminates in accepted downstream Cards and every JIT trigger is consumed with exact downstream proof, else back to a concrete Execution Prep obligation (a `returned` Card alone is never accepted completion);
 - in_progress Card carrying a blocker -> exact blocker owner (missing evidence to Research handoff, human/runtime blockers to real stops) before any execution/result/review dispatch; blocked Card with a dangling/stale/sibling result fails closed before blocker dispatch while a present preserved result stays bound; planned Card carrying a premature result, review history or blocker fails closed;
 - one active Card without durable result and without blocker -> common Execution;
 - active Card with a valid durable semantic result -> result reconciliation without replay;
@@ -66,7 +66,8 @@ The registry is deliberately not an expression language. It names exact canonica
 - pending/in-progress REQUIRED/RECOMMENDED attempt -> independent Review;
 - exact GREEN -> deterministic post-review finalization;
 - RED -> corrective classification while failed-attempt evidence remains durable;
-- all Cards done -> Close only when each DONE Card proves an exact accepted-success result plus, unless review-free, a durable GREEN independent review bound to the exact result subject and exact Task Card acceptance; dangling/stale/sibling results fail closed and any other DONE state routes to its exact review/recovery owner, never Close; Card/milestone role completion is not itself a stop;
+- all Cards done -> Close only when each DONE Card proves an exact accepted-success result plus, unless review-free, a durable GREEN independent review bound to the exact result subject and exact Task Card acceptance, and every JIT trigger is consumed with exact downstream Card/contract/Git-identity proof; dangling/stale/sibling results fail closed and any other DONE state routes to its exact review/recovery owner, never Close; Card/milestone role completion is not itself a stop;
+- waiting/satisfied JIT trigger on an all-terminal Board -> Execution Prep for downstream materialization and exact consumed binding (or the owning finding/live-consumer reconciliation when the satisfied trigger is held); consumed trigger without exact downstream proof -> Recovery with a missing/dangling/stale/sibling/unproved/forged reason;
 - Close -> continue deterministic authorized obligations until durable approved-scope completion, then end-of-scope stop;
 - optional fork lineage module -> load only for an exact durably declared downstream fork-release operation with accepted upstream repo/tag/SHA;
 - invalid/missing/stale/contradictory binding must fail closed to Recovery.

@@ -19,3 +19,9 @@ id = "after-M01-T01"
 after_card = "M01-T01"
 state = "waiting"
 condition = "Material predecessor result determines the next stable Card boundary."
+# When consumed, bind exact downstream proof (no prose/path-only):
+# [jit_triggers.consumed_proof]
+# card = "M01-T02"
+# path = "implementation/workstreams/example-workstream/cards/M01-T02.md"
+# commit = "<40-hex>"
+# blob = "<40-hex>"

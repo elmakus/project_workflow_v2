@@ -24,6 +24,12 @@ Production deterministic helper: tools/close_contract.py.
 
 A `returned` Card is a non-GREEN late-oversize handoff disposition, never accepted completion. When the board is all-terminal with at least one `returned` Card, the router walks every bound residual outcome through anchor sizing-audit allocations, JIT-trigger resolutions, and chained handoffs: Close is reached only when each outcome terminates in an accepted (`done`) downstream Card. Any gap — uncovered or changed outcome, unmaterialized or unbound trigger, dropped chained scope, or circular handoff — routes back to a concrete Execution Prep obligation instead. A `returned` Card alone, or beside one arbitrary `done` Card, never completes approved scope.
 
+## JIT terminality and exact consumed proof
+
+Close requires JIT terminal completeness plus exact downstream proof on every trigger. A `waiting`/`satisfied` trigger is an unconsumed obligation that blocks Close until Execution Prep materializes the downstream Card (held satisfied triggers complete their owning finding/live-consumer reconciliation first). A `consumed` trigger must bind `jit_triggers.consumed_proof` (`card`/`path`/`commit`/`blob` for the materialized downstream Card contract) proved through the shared exact-locator readback plus canonical Task Card parsing and the consumer edge (bound residual Card, recorded trigger resolution, or exact predecessor-result dependency); missing/dangling/stale/sibling/unproved/forged bindings fail closed with exact reasons, and prose/path-only proof — or an unrelated later Card — never suffices. Prose-only historical triggers remain valid only as immutable history; at Close proof is required and migration is append-only.
+
+Production deterministic helper: `tools/close_contract.py` (`verify_terminal_jit_completeness_from_board`).
+
 ## Stacked workstreams
 
 Stacking exists only for a genuine unmerged parent-only dependency.

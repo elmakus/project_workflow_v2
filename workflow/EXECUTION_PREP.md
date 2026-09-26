@@ -34,7 +34,7 @@ Missing/stale authority, dependency or technical-contract input fails closed bef
 
 Materialize Cards only when their stable contract is currently knowable. When a downstream Card boundary depends on a predecessor result, retain a bounded Task Board JIT trigger instead of creating a placeholder Card.
 
-JIT trigger lifecycle is `waiting -> satisfied -> consumed`. A satisfied trigger requires its predecessor Card to be DONE with a durable result before the downstream contract is materialized.
+JIT trigger lifecycle is `waiting -> satisfied -> consumed`. A satisfied trigger requires its predecessor Card to be DONE with a durable result before the downstream contract is materialized. Consuming the trigger binds exact downstream proof (`jit_triggers.consumed_proof` with the materialized Card id plus its contract path and exact Git commit/blob, verified by readback); prose/path-only consumption never suffices, and the downstream must be causally bound to the trigger (Board order after the predecessor plus the bound residual Card, a recorded trigger resolution, or an exact predecessor-result dependency) — an unrelated later Card is not proof. Pending/satisfied triggers participate in terminal completeness and block Close until consumed with proof; held triggers complete their owning reconciliation first. Historical prose-only consumed bindings stay immutable history only; current Boards migrate append-only by adding the proof table.
 
 ## Refinement / escalation
 
