@@ -175,7 +175,7 @@ class StateEnvelopeTests(unittest.TestCase):
         )
         wrong_contract["review_acceptance_migrations"] = [proof]
         with self.assertRaisesRegex(
-            ValidationError, "acceptance_path does not match selected Card contract"
+            ValidationError, "does not match exact Card path"
         ):
             validate_board(wrong_contract, self.workstream)
 
