@@ -222,8 +222,45 @@ def verify_legacy_result_migration(
     source_ref = source_card.get("result")
     if not isinstance(source_ref, Mapping) or source_ref.get("path") != p["source_path"]:
         raise _fail(label, "source Board does not list the proved Result path", "ambiguous")
-    if source_ref.get("blob") != p["source_blob"] or not isinstance(source_ref.get("commit"), str):
+    source_result_commit = source_ref.get("commit")
+    if (
+        source_ref.get("blob") != p["source_blob"]
+        or not isinstance(source_result_commit, str)
+        or SHA40.fullmatch(source_result_commit) is None
+    ):
         raise _fail(label, "source Board does not carry exact matching Result identity", "ambiguous")
+    try:
+        verified_source_board_result = verify_exact_git_locator(
+            project_root=root,
+            repository=p["source_repository"],
+            expected_repository=project_repository,
+            commit=source_result_commit,
+            path=p["source_path"],
+            blob=p["source_blob"],
+            label=f"{label}.source_board_result",
+        )
+    except ExactLocatorError as exc:
+        raise _fail(label, f"source Board Result identity failed: {exc}", exc.kind) from exc
+    try:
+        ancestry = subprocess.run(
+            [
+                "git", "-C", str(root), "merge-base", "--is-ancestor",
+                source_result_commit, p["source_commit"],
+            ],
+            capture_output=True, check=False, timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise _fail(
+            label,
+            f"source Board Result ancestry check failed: {exc}",
+            "git_unavailable",
+        ) from exc
+    if ancestry.returncode != 0:
+        raise _fail(
+            label,
+            "source Board Result commit is not an ancestor of the source Board snapshot",
+            "stale",
+        )
     _require_prior_durability(root, p["source_commit"], p["source_path"], p["source_blob"], label)
     adapted = dict(parsed)
     adapted["evidence_refs"] = _normalise_legacy_evidence(parsed, workstream_id, label)
@@ -257,3 +294,5 @@ def derive_path_only_review_acceptance(
     except ExactLocatorError as exc:
         raise _fail(label, str(exc), exc.kind) from exc
     return f"project-git:{project_repository}@{commit}:{current_card_path}@{blob}"
+
+[executed on device: Tower (256a948c-39fa-427e-874b-d2662172d16a)]

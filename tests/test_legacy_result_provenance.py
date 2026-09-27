@@ -123,6 +123,41 @@ class LegacyResultProvenanceTests(unittest.TestCase):
         finally:
             temp.cleanup()
 
+    def test_source_board_result_commit_must_be_exact_and_ancestral(self) -> None:
+        for case in ("dangling", "off_history"):
+            with self.subTest(case=case):
+                temp, root, card, proof = self.fixture()
+                try:
+                    board = root / BOARD
+                    original = card["result"]["commit"]
+                    if case == "dangling":
+                        bad_commit = "f" * 40
+                    else:
+                        self.git(root, "checkout", "-q", "-b", "off-history", original)
+                        marker = root / "off-history.txt"
+                        marker.write_text("sibling\n")
+                        self.git(root, "add", marker.name)
+                        self.git(root, "commit", "-q", "-m", "off-history sibling")
+                        bad_commit = self.git(root, "rev-parse", "HEAD")
+                        self.git(root, "checkout", "-q", "-")
+                    board.write_text(
+                        board.read_text().replace(original, bad_commit, 1)
+                    )
+                    self.git(root, "add", BOARD)
+                    self.git(root, "commit", "-q", "-m", f"source board {case} result commit")
+                    bad_proof = dict(proof)
+                    bad_proof["source_commit"] = self.git(root, "rev-parse", "HEAD")
+                    with self.assertRaises(LegacyResultProvenanceError):
+                        verify_legacy_result_migration(
+                            project_root=root,
+                            project_repository=REPO,
+                            workstream_id=WS,
+                            card=card,
+                            proof=bad_proof,
+                        )
+                finally:
+                    temp.cleanup()
+
     def test_source_board_must_prove_done_card(self) -> None:
         temp, root, card, proof = self.fixture()
         try:
@@ -182,3 +217,5 @@ class LegacyResultProvenanceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+[executed on device: Tower (256a948c-39fa-427e-874b-d2662172d16a)]
