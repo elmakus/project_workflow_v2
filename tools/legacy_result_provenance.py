@@ -230,7 +230,7 @@ def verify_legacy_result_migration(
     ):
         raise _fail(label, "source Board does not carry exact matching Result identity", "ambiguous")
     try:
-        verified_source_board_result = verify_exact_git_locator(
+        verify_exact_git_locator(
             project_root=root,
             repository=p["source_repository"],
             expected_repository=project_repository,
@@ -294,5 +294,3 @@ def derive_path_only_review_acceptance(
     except ExactLocatorError as exc:
         raise _fail(label, str(exc), exc.kind) from exc
     return f"project-git:{project_repository}@{commit}:{current_card_path}@{blob}"
-
-[executed on device: Tower (256a948c-39fa-427e-874b-d2662172d16a)]

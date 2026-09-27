@@ -140,9 +140,7 @@ class LegacyResultProvenanceTests(unittest.TestCase):
                         self.git(root, "commit", "-q", "-m", "off-history sibling")
                         bad_commit = self.git(root, "rev-parse", "HEAD")
                         self.git(root, "checkout", "-q", "-")
-                    board.write_text(
-                        board.read_text().replace(original, bad_commit, 1)
-                    )
+                    board.write_text(board.read_text().replace(original, bad_commit, 1))
                     self.git(root, "add", BOARD)
                     self.git(root, "commit", "-q", "-m", f"source board {case} result commit")
                     bad_proof = dict(proof)
@@ -217,5 +215,3 @@ class LegacyResultProvenanceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-[executed on device: Tower (256a948c-39fa-427e-874b-d2662172d16a)]
