@@ -75,6 +75,27 @@ def _fail(label: str, detail: str, kind: str) -> ReviewAttemptProvenanceError:
     return ReviewAttemptProvenanceError(f"{label}: {detail}", kind=kind)
 
 
+def _attempt_identity_paths(
+    workstream_id: str, card_id: str, attempt_id: str
+) -> tuple[str, str | None]:
+    """Return canonical path plus the narrowly allowed historical full-ID path."""
+
+    canonical = (
+        f"implementation/workstreams/{workstream_id}/reviews/"
+        f"{card_id}-{attempt_id}.toml"
+    )
+    legacy = None
+    card_prefix = f"{card_id}-"
+    if attempt_id.startswith(card_prefix):
+        suffix = attempt_id[len(card_prefix):]
+        if re.fullmatch(r"R[0-9]+", suffix) is not None:
+            legacy = (
+                f"implementation/workstreams/{workstream_id}/reviews/"
+                f"{attempt_id}.toml"
+            )
+    return canonical, legacy
+
+
 def validate_review_attempt_locator_shape(
     ref: Any,
     workstream_id: str,
@@ -162,11 +183,18 @@ def validate_legacy_migration_shape(
     prefix = f"implementation/workstreams/{workstream_id}/reviews/"
     if not (path.startswith(prefix) and path.endswith(".toml")):
         raise _fail(label, "source_path must be the exact workstream-local reviews TOML", "shape")
-    expected_path = f"implementation/workstreams/{workstream_id}/reviews/{card_id}-{attempt_id}.toml"
-    if path != expected_path:
+    expected_path, legacy_full_id_path = _attempt_identity_paths(
+        workstream_id, card_id, attempt_id
+    )
+    allowed_paths = {expected_path}
+    if legacy_full_id_path is not None:
+        allowed_paths.add(legacy_full_id_path)
+    if path not in allowed_paths:
+        expected = ", ".join(repr(item) for item in sorted(allowed_paths))
         raise _fail(
             label,
-            f"source_path {path!r} does not match the exact current attempt path {expected_path!r}",
+            f"source_path {path!r} does not match an exact current attempt path "
+            f"({expected})",
             "shape",
         )
     for field, expected in (
@@ -528,13 +556,33 @@ def verify_review_attempt_locator(
     attempt_id = parsed.get("attempt")
     if not isinstance(attempt_id, str) or not attempt_id:
         raise _fail(label, "review attempt has no exact attempt identity", "mismatch")
-    expected_path = f"implementation/workstreams/{workstream_id}/reviews/{card_id}-{attempt_id}.toml"
+    expected_path, legacy_full_id_path = _attempt_identity_paths(
+        workstream_id, card_id, attempt_id
+    )
     if shape["path"] != expected_path:
-        raise _fail(
-            label,
-            f"locator path {shape['path']!r} does not match the exact attempt "
-            f"identity path {expected_path!r}",
-            "mismatch",
+        legacy_compatible = (
+            legacy_full_id_path is not None
+            and shape["path"] == legacy_full_id_path
+            and "review_kind" not in parsed
+            and parsed.get("verdict") in {"green", "red"}
+            and isinstance(parsed.get("legacy_migration"), dict)
+        )
+        if not legacy_compatible:
+            raise _fail(
+                label,
+                f"locator path {shape['path']!r} does not match the exact attempt "
+                f"identity path {expected_path!r}",
+                "mismatch",
+            )
+        # The alternate path is historical compatibility only. Prove exact
+        # legacy provenance here before allowing the locator to rely on it.
+        verify_legacy_migration(
+            project_root=project_root,
+            project_repository=project_repository,
+            workstream_id=workstream_id,
+            card_id=card_id,
+            attempt=parsed,
+            label=f"{label}.legacy_full_attempt_id",
         )
     return parsed, content, f"project-git:{verified.key}"
 

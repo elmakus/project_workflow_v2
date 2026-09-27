@@ -369,6 +369,7 @@ class RouterProvenanceTests(unittest.TestCase):
     def write_legacy_file(
         self, project: Path, review_path: str, verdict: str,
         commit: str, blob: str, provenance: dict[str, str] | None,
+        attempt_id: str = "R01",
     ) -> None:
         path = project / review_path
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -392,7 +393,7 @@ class RouterProvenanceTests(unittest.TestCase):
         path.write_text(
             'workstream_id = "sample-workstream"\n'
             'card_id = "M01-T04"\n'
-            'attempt = "R01"\n'
+            f'attempt = "{attempt_id}"\n'
             f'verdict = "{verdict}"\n'
             f'evidence_path = "{evidence}"\n'
             + provenance_stanza
@@ -622,6 +623,154 @@ class RouterProvenanceTests(unittest.TestCase):
             routed = select_route(project, [MANIFEST], package_root=ROOT)
             # Terminal RED legacy stays inspectable as RED correction, without flipping to GREEN.
             self.assertEqual((routed.disposition, routed.obligation), ("route", "execution_resolution"))
+        finally:
+            temp.cleanup()
+
+    def test_legacy_full_attempt_id_path_is_accepted_only_with_provenance(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project)
+            review_path = "implementation/workstreams/sample-workstream/reviews/M01-T04-R01.toml"
+            full_attempt = "M01-T04-R01"
+            board_commit, board_blob = self.board_result_identity(project)
+            self.write_legacy_file(
+                project, review_path, "red", board_commit, board_blob, None,
+                attempt_id=full_attempt,
+            )
+            board = project / BOARD
+            board.write_text(board.read_text().replace(
+                'status = "in_progress"\n',
+                'status = "in_progress"\n'
+                f'review_attempts = [{{ class = "review_attempt", path = "{review_path}" }}]\n',
+                1,
+            ))
+            _, source_blob = self.git_identity_for(project, review_path)
+            subprocess.run(["git", "-C", str(project), "add", BOARD], check=True)
+            subprocess.run(
+                ["git", "-C", str(project), "commit", "-q", "-m", "source full-id board"],
+                check=True,
+            )
+            source_commit = subprocess.run(
+                ["git", "-C", str(project), "rev-parse", "HEAD"],
+                check=True, capture_output=True, text=True,
+            ).stdout.strip()
+            provenance = {
+                "source_repository": REPOSITORY,
+                "source_commit": source_commit,
+                "source_path": review_path,
+                "source_blob": source_blob,
+                "source_workstream": "sample-workstream",
+                "source_card": "M01-T04",
+                "source_attempt": full_attempt,
+            }
+            self.write_legacy_file(
+                project, review_path, "red", board_commit, board_blob, provenance,
+                attempt_id=full_attempt,
+            )
+            current_commit, current_blob = self.git_identity_for(project, review_path)
+            board.write_text(board.read_text().replace(
+                f'{{ class = "review_attempt", path = "{review_path}" }}',
+                f'{{ class = "review_attempt", path = "{review_path}", '
+                f'commit = "{current_commit}", blob = "{current_blob}" }}',
+                1,
+            ))
+            ref = {
+                "class": "review_attempt", "path": review_path,
+                "commit": current_commit, "blob": current_blob,
+            }
+            attempt, _, _ = verify_review_attempt_locator(
+                project_root=project, project_repository=REPOSITORY,
+                workstream_id="sample-workstream", card_id="M01-T04",
+                ref=ref, label="full-id legacy",
+            )
+            self.assertEqual(attempt["attempt"], full_attempt)
+            self.assertEqual(
+                verify_legacy_migration(
+                    project_root=project, project_repository=REPOSITORY,
+                    workstream_id="sample-workstream", card_id="M01-T04",
+                    attempt=attempt,
+                ).split(":", 1)[0],
+                "project-git",
+            )
+        finally:
+            temp.cleanup()
+
+    def test_legacy_full_attempt_id_without_provenance_is_rejected(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project)
+            review_path = "implementation/workstreams/sample-workstream/reviews/M01-T04-R01.toml"
+            board_commit, board_blob = self.board_result_identity(project)
+            self.write_legacy_file(
+                project, review_path, "red", board_commit, board_blob, None,
+                attempt_id="M01-T04-R01",
+            )
+            commit, blob = self.git_identity_for(project, review_path)
+            with self.assertRaisesRegex(ReviewAttemptProvenanceError, "exact attempt identity"):
+                verify_review_attempt_locator(
+                    project_root=project, project_repository=REPOSITORY,
+                    workstream_id="sample-workstream", card_id="M01-T04",
+                    ref={"class": "review_attempt", "path": review_path,
+                         "commit": commit, "blob": blob},
+                    label="full-id no provenance",
+                )
+        finally:
+            temp.cleanup()
+
+    def test_current_schema_full_attempt_id_path_is_rejected(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project)
+            review_path = "implementation/workstreams/sample-workstream/reviews/M01-T04-R01.toml"
+            path = project / review_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            evidence = "implementation/workstreams/sample-workstream/evidence/review-R01.md"
+            (project / evidence).write_text("# Review evidence\n")
+            board_commit, board_blob = self.board_result_identity(project)
+            acceptance_commit, acceptance_blob = self.card_acceptance_identity(project, CARD)
+            path.write_text(
+                'workstream_id = "sample-workstream"\n'
+                'card_id = "M01-T04"\n'
+                'attempt = "M01-T04-R01"\n'
+                'verdict = "green"\n'
+                f'evidence_path = "{evidence}"\n'
+                'review_kind = "discovery"\n'
+                'source_discovery_attempt = ""\n'
+                'discovery_complete = true\n'
+                'material_finding_ids = []\n'
+                'review_scope = "card"\n'
+                'review_epoch = "E01"\n'
+                'epoch_reset_basis = ""\n'
+                'material_defect_class_ids = []\n'
+                'failed_material_defect_class_ids = []\n'
+                'post_convergence_validation = false\n'
+                'convergence_basis = ""\n'
+                '[subject]\n'
+                'class = "git_blob"\n'
+                f'repository = "{REPOSITORY}"\n'
+                f'commit = "{board_commit}"\n'
+                'path = "implementation/workstreams/sample-workstream/results/M01-T04.md"\n'
+                f'blob = "{board_blob}"\n'
+                '[acceptance]\n'
+                'class = "task_card"\n'
+                f'path = "{CARD}"\n'
+                f'commit = "{acceptance_commit}"\n'
+                f'blob = "{acceptance_blob}"\n'
+                '[independence]\n'
+                'materially_produced_or_repaired_subject = false\n'
+                'basis = "Fresh semantic reviewer context."\n'
+            )
+            commit, blob = self.git_identity_for(project, review_path)
+            with self.assertRaisesRegex(
+                ReviewAttemptProvenanceError, "exact attempt identity"
+            ):
+                verify_review_attempt_locator(
+                    project_root=project, project_repository=REPOSITORY,
+                    workstream_id="sample-workstream", card_id="M01-T04",
+                    ref={"class": "review_attempt", "path": review_path,
+                         "commit": commit, "blob": blob},
+                    label="current full-id",
+                )
         finally:
             temp.cleanup()
 
