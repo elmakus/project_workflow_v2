@@ -4170,6 +4170,57 @@ class RouterTests(unittest.TestCase):
         finally:
             temp.cleanup()
 
+    def test_statusless_done_result_cannot_use_structured_review_acceptance_migration(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            result_path = self.install_reviewable_result(project, "required")
+            result_file = project / result_path
+            result_file.write_text(
+                result_file.read_text().replace("- Result status: success\n", "")
+            )
+            result_commit, result_blob = self.git_identity_for(project, result_path)
+            board = project / BOARD
+            old = tomllib.loads(board.read_text())["cards"][0]["result"]
+            board.write_text(
+                board.read_text()
+                .replace(f'commit = "{old["commit"]}"', f'commit = "{result_commit}"', 1)
+                .replace(f'blob = "{old["blob"]}"', f'blob = "{result_blob}"', 1)
+            )
+            review_path = self.add_review_attempt(
+                project, "green", omit_acceptance_identity=True
+            )
+            board.write_text(
+                board.read_text().replace('status = "in_progress"', 'status = "done"', 1)
+            )
+            data = tomllib.loads(board.read_text())
+            ref = data["cards"][0]["review_attempts"][-1]
+            acceptance_blob = subprocess.run(
+                ["git", "-C", str(project), "rev-parse", f"{ref['commit']}:{CARD}"],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+            board.write_text(
+                board.read_text()
+                + "\n[[review_acceptance_migrations]]\n"
+                + 'card_id = "M01-T04"\n'
+                + 'attempt_id = "R01"\n'
+                + 'source_repository = "owner/router-fixture"\n'
+                + f'source_commit = "{ref["commit"]}"\n'
+                + f'source_path = "{review_path}"\n'
+                + f'source_blob = "{ref["blob"]}"\n'
+                + 'source_workstream = "sample-workstream"\n'
+                + 'source_card = "M01-T04"\n'
+                + f'acceptance_path = "{CARD}"\n'
+                + f'acceptance_blob = "{acceptance_blob}"\n'
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("not accepted success", routed.reason)
+        finally:
+            temp.cleanup()
+
     def test_all_terminal_cards_route_to_close_not_directly_to_stop(self) -> None:
         temp, project = self.copy_fixture()
         try:
