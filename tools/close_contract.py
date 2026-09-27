@@ -997,7 +997,8 @@ def _h019_prove_review_acceptance(
     except ExactLocatorError as exc:
         if exc.kind == "mutated":
             raise CloseContractError(
-                f"{label} {acc_path!r} is stale: package worktree bytes do "                f"not match declared blob {blob} (blob mismatch)"
+                f"{label} {acc_path!r} is stale: package worktree bytes do "
+                f"not match declared blob {blob} (blob mismatch)"
             ) from exc
         if exc.kind == "missing":
             raise CloseContractError(
@@ -1996,7 +1997,8 @@ def _h017_inventory_for_subdir(
         for line in completed.stdout.splitlines():
             candidate = line.strip()
             if candidate.startswith(rel_dir + "/") and candidate.endswith(suffix):
-                inventory.add(candidate)    return sorted(inventory)
+                inventory.add(candidate)
+    return sorted(inventory)
 
 
 def _h017_durable_package_inventory(root: Path, workstream_id: str) -> dict[str, list[str]]:
@@ -2995,7 +2997,8 @@ def _verify_postmerge_evidence(
 
 def verify_target_side_recovery_from_board(
     *,
-    project_root: Path | str,    workstream_path: str,
+    project_root: Path | str,
+    workstream_path: str,
     board_path: str,
     source_branch: str,
     source_head: str,
