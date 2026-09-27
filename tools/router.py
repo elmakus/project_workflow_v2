@@ -62,6 +62,11 @@ from tools.jit_terminality_contract import (
     JitTerminalityError,
     verify_consumed_trigger,
 )
+from tools.close_contract import (
+    CloseContractError,
+    close_continuation,
+    verify_durable_close_completion_from_state,
+)
 from tools.review_attempt_provenance import (
     ReviewAttemptProvenanceError,
     require_commit_in_head_ancestry,
@@ -996,6 +1001,59 @@ def jit_terminality_gate(
             subject=first_id, owner_module="workflow/EXECUTION_PREP.md",
         )
     return None
+
+
+def durable_close_completion_stop(
+    reads: Reads,
+    *,
+    manifest_rel: str,
+    workstream: dict,
+    board: dict,
+    project: dict,
+) -> RouteResult | None:
+    """RF015/H027: compose exact durable Close completion with the stop oracle.
+
+    Absence is ordinary Close continuation. Presence is authoritative only
+    after the workstream-local completion record and its exact terminal Board
+    binding verify through the shared RF007 foundation. The DONE and JIT gates
+    run before this helper, so a verified completion has no remaining
+    authorized in-scope obligation at this selector boundary.
+    """
+    if "close_completion" not in workstream:
+        return None
+    try:
+        proof = verify_durable_close_completion_from_state(
+            project_root=reads.project_root,
+            workstream_path=manifest_rel,
+            board_path=workstream["task_board"]["path"],
+            project_repository=project["repository"],
+        )
+    except (CloseContractError, KeyError) as exc:
+        return recovery(reads, f"durable Close completion invalid: {exc}")
+    if proof != "approved_scope_durably_complete":
+        return recovery(
+            reads,
+            f"durable Close completion returned unexpected proof state {proof!r}",
+        )
+    action = close_continuation(
+        approved_scope_durably_complete=True,
+        next_authorized_obligation=False,
+        explicit_authorization_gate_due=False,
+    )
+    if action != "end_of_scope_stop":
+        return recovery(
+            reads,
+            f"durable Close completion produced unexpected continuation {action!r}",
+        )
+    return result(
+        reads,
+        "stop",
+        "end_of_scope_stop",
+        "Exact durable Close completion proves approved scope complete after "
+        "DONE/review and JIT terminality readback; end of approved scope is the "
+        "next real stop",
+        owner_module="workflow/CLOSE.md",
+    )
 
 
 def select_route(project_root: Path, selected_workstreams: list[str], *,
@@ -2068,6 +2126,18 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
         jit_gate = jit_terminality_gate(reads, board, workstream, project)
         if jit_gate is not None:
             return jit_gate
+        # RF015/H027: first entry and re-entry without durable completion still
+        # route Close. Only exact durable completion readback may compose the
+        # oracle into a true USER_STOP-formatted end_of_scope_stop.
+        terminal_stop = durable_close_completion_stop(
+            reads,
+            manifest_rel=manifest_rel,
+            workstream=workstream,
+            board=board,
+            project=project,
+        )
+        if terminal_stop is not None:
+            return terminal_stop
         return policy_result(
             reads,
             decision,

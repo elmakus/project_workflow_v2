@@ -15,7 +15,7 @@ SESSION_START = ROOT / "hooks" / "session-start.py"
 ROUTER = ROOT / "workflow" / "ROUTER.md"
 MANIFEST = ROOT / ".codex-plugin" / "router-integrity.json"
 
-EXPECTED_BLOB = "2d1734524ca989ab34cfb1e080f032ee8de35be6"
+EXPECTED_BLOB = "84f99949bfc4d0fc5aaf633a93653bf68fd77d75"
 BLOCKING = "BLOCKING Project Workflow V2 plugin-package error"
 
 TWO_MARKER_ONLY = "# Project Workflow V2 Router\n\nProduction selector: `tools/router.py`.\n"

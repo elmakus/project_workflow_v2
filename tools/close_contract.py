@@ -3146,6 +3146,168 @@ def verify_terminal_jit_completeness_from_board(
     return "jit_terminal"
 
 
+def verify_durable_close_completion_from_state(
+    *,
+    project_root: Path | str,
+    workstream_path: str,
+    board_path: str,
+    project_repository: str | None = None,
+) -> str:
+    """Prove approved-scope Close completion from exact durable Git state.
+
+    The completion input is a structured workstream locator, never a caller
+    boolean, free text, path-only hint or empty-queue inference. The selected
+    workstream must point at one exact committed completion record; that record
+    in turn binds the exact current terminal Task Board. RF001/RF007/RF014
+    remain the serving foundations: all Cards must be DONE and JIT terminality
+    must still verify from the exact Board before completion can be accepted.
+    """
+    root = Path(project_root).resolve()
+    workstream = _read_project_toml(root, workstream_path, "workstream")
+    board = _read_project_toml(root, board_path, "task board")
+    try:
+        validate_workstream(workstream)
+        validate_board(board, workstream)
+    except ValidationError as exc:
+        raise CloseContractError(f"Close completion state invalid: {exc}") from exc
+
+    ref = workstream.get("close_completion")
+    if not isinstance(ref, dict):
+        raise CloseContractError(
+            "durable Close completion is absent; workstream.close_completion "
+            "must be one exact Git locator"
+        )
+    if set(ref) != {"class", "path", "commit", "blob"}:
+        raise CloseContractError(
+            "durable Close completion locator requires exactly "
+            "class/path/commit/blob; caller-attested or path-only proof is forbidden"
+        )
+    if ref.get("class") != "close_completion":
+        raise CloseContractError(
+            "durable Close completion locator must use class 'close_completion'"
+        )
+    try:
+        completion_path = normalize_locator_path(
+            ref.get("path"), "close completion locator"
+        )
+    except ExactLocatorError as exc:
+        raise CloseContractError(f"Close completion locator invalid: {exc}") from exc
+    expected_prefix = f"implementation/workstreams/{workstream['workstream_id']}/close/"
+    if not completion_path.startswith(expected_prefix) or not completion_path.endswith(".toml"):
+        raise CloseContractError(
+            "Close completion locator is a sibling/unowned path; completion "
+            "must be workstream-local under close/*.toml"
+        )
+
+    repository = _resolve_project_repository(root, project_repository)
+    if repository is None:
+        raise CloseContractError(
+            "Close completion requires the exact project repository from PROJECT.md"
+        )
+    try:
+        verified_completion = verify_exact_git_locator(
+            project_root=root,
+            repository=repository,
+            expected_repository=repository,
+            commit=ref.get("commit"),
+            path=completion_path,
+            blob=ref.get("blob"),
+            label="close completion",
+        )
+        verify_worktree_freshness(
+            project_root=root,
+            path=completion_path,
+            blob=ref.get("blob"),
+            label="close completion",
+        )
+        require_commit_in_head_ancestry(
+            project_root=root,
+            commit=verified_completion.commit,
+            label="close completion",
+        )
+    except (ExactLocatorError, ReviewAttemptProvenanceError) as exc:
+        raise CloseContractError(f"Close completion exact proof failed: {exc}") from exc
+
+    completion = _read_project_toml(root, completion_path, "close completion")
+    if set(completion) != {"version", "workstream_id", "state", "terminal_board"}:
+        raise CloseContractError(
+            "Close completion record has unsupported or missing fields; expected "
+            "version/workstream_id/state/terminal_board only"
+        )
+    if completion.get("version") != 1:
+        raise CloseContractError("Close completion version must be 1")
+    if completion.get("workstream_id") != workstream["workstream_id"]:
+        raise CloseContractError("Close completion is forged for a sibling workstream")
+    if completion.get("state") != "complete":
+        raise CloseContractError(
+            "Close completion record is not durably complete"
+        )
+
+    terminal = completion.get("terminal_board")
+    if not isinstance(terminal, dict) or set(terminal) != {
+        "class", "repository", "commit", "path", "blob"
+    }:
+        raise CloseContractError(
+            "Close completion terminal_board requires exact "
+            "class/repository/commit/path/blob proof"
+        )
+    if terminal.get("class") != "task_board":
+        raise CloseContractError("Close completion terminal_board must be task_board")
+    if terminal.get("repository") != repository:
+        raise CloseContractError("Close completion terminal_board names a sibling repository")
+    try:
+        terminal_path = normalize_locator_path(
+            terminal.get("path"), "close completion terminal board"
+        )
+    except ExactLocatorError as exc:
+        raise CloseContractError(f"Close completion terminal Board invalid: {exc}") from exc
+    if terminal_path != board_path:
+        raise CloseContractError(
+            "Close completion terminal_board does not bind the selected Task Board"
+        )
+    try:
+        verified_board = verify_exact_git_locator(
+            project_root=root,
+            repository=repository,
+            expected_repository=repository,
+            commit=terminal.get("commit"),
+            path=terminal_path,
+            blob=terminal.get("blob"),
+            label="close completion terminal board",
+        )
+        verify_worktree_freshness(
+            project_root=root,
+            path=terminal_path,
+            blob=terminal.get("blob"),
+            label="close completion terminal board",
+        )
+        require_commit_in_head_ancestry(
+            project_root=root,
+            commit=verified_board.commit,
+            label="close completion terminal board",
+        )
+    except (ExactLocatorError, ReviewAttemptProvenanceError) as exc:
+        raise CloseContractError(
+            f"Close completion terminal Board exact proof failed: {exc}"
+        ) from exc
+
+    if not board.get("cards") or any(
+        not isinstance(card, dict) or card.get("status") != "done"
+        for card in board["cards"]
+    ):
+        raise CloseContractError(
+            "Close completion cannot stop while any Card is not exact DONE"
+        )
+
+    verify_terminal_jit_completeness_from_board(
+        project_root=root,
+        workstream_path=workstream_path,
+        board_path=board_path,
+        project_repository=repository,
+    )
+    return "approved_scope_durably_complete"
+
+
 def close_continuation(
     *,
     approved_scope_durably_complete: bool,

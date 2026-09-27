@@ -4059,6 +4059,148 @@ class RouterTests(unittest.TestCase):
         finally:
             temp.cleanup()
 
+    def install_close_completion(self, project: Path) -> None:
+        board_commit, board_blob = self.git_identity_for(project, BOARD)
+        completion_path = "implementation/workstreams/sample-workstream/close/COMPLETION.toml"
+        completion = project / completion_path
+        completion.parent.mkdir(parents=True, exist_ok=True)
+        completion.write_text(
+            'version = 1\n'
+            'workstream_id = "sample-workstream"\n'
+            'state = "complete"\n\n'
+            '[terminal_board]\n'
+            'class = "task_board"\n'
+            f'repository = "{RF012_REPOSITORY}"\n'
+            f'commit = "{board_commit}"\n'
+            f'path = "{BOARD}"\n'
+            f'blob = "{board_blob}"\n'
+        )
+        completion_commit, completion_blob = self.git_identity_for(project, completion_path)
+        workstream = project / MANIFEST
+        workstream.write_text(
+            workstream.read_text()
+            + '\n[close_completion]\n'
+            + 'class = "close_completion"\n'
+            + f'path = "{completion_path}"\n'
+            + f'commit = "{completion_commit}"\n'
+            + f'blob = "{completion_blob}"\n'
+        )
+        self.git_identity_for(project, MANIFEST)
+
+    def test_h027_close_reentry_requires_durable_completion_before_stop(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "none")
+            board = project / BOARD
+            board.write_text(
+                board.read_text().replace('status = "in_progress"', 'status = "done"', 1)
+            )
+
+            first = select_route(project, [MANIFEST], package_root=ROOT)
+            second = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((first.disposition, first.obligation), ("route", "close"))
+            self.assertEqual((second.disposition, second.obligation), ("route", "close"))
+
+            self.install_close_completion(project)
+            stopped = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (stopped.disposition, stopped.obligation),
+                ("stop", "end_of_scope_stop"),
+            )
+            self.assertIn("package:workflow/USER_STOP.md", stopped.read_set)
+        finally:
+            temp.cleanup()
+
+    def test_h027_inexact_or_forged_completion_never_stops(self) -> None:
+        cases = ("path_only", "dangling", "stale", "sibling", "forged")
+        for case in cases:
+            with self.subTest(case=case):
+                temp, project = self.copy_fixture()
+                try:
+                    self.install_reviewable_result(project, "none")
+                    board = project / BOARD
+                    board.write_text(
+                        board.read_text().replace(
+                            'status = "in_progress"', 'status = "done"', 1
+                        )
+                    )
+                    if case == "path_only":
+                        completion_path = (
+                            "implementation/workstreams/sample-workstream/"
+                            "close/COMPLETION.toml"
+                        )
+                        workstream = project / MANIFEST
+                        workstream.write_text(
+                            workstream.read_text()
+                            + '\n[close_completion]\n'
+                            + 'class = "close_completion"\n'
+                            + f'path = "{completion_path}"\n'
+                        )
+                    else:
+                        self.install_close_completion(project)
+                        workstream = project / MANIFEST
+                        completion = project / (
+                            "implementation/workstreams/sample-workstream/"
+                            "close/COMPLETION.toml"
+                        )
+                        if case == "dangling":
+                            workstream.write_text(
+                                workstream.read_text().replace(
+                                    "close/COMPLETION.toml",
+                                    "close/MISSING.toml",
+                                )
+                            )
+                        elif case == "stale":
+                            completion.write_text(
+                                completion.read_text().replace(
+                                    'state = "complete"', 'state = "pending"'
+                                )
+                            )
+                        elif case == "sibling":
+                            workstream.write_text(
+                                workstream.read_text().replace(
+                                    "implementation/workstreams/sample-workstream/close/COMPLETION.toml",
+                                    "implementation/workstreams/other-workstream/close/COMPLETION.toml",
+                                )
+                            )
+                        elif case == "forged":
+                            completion.write_text(
+                                completion.read_text().replace(
+                                    'workstream_id = "sample-workstream"',
+                                    'workstream_id = "other-workstream"',
+                                )
+                            )
+                            commit, blob = self.git_identity_for(
+                                project,
+                                "implementation/workstreams/sample-workstream/close/COMPLETION.toml",
+                            )
+                            text = workstream.read_text()
+                            section, suffix = text.split("[close_completion]", 1)
+                            suffix = re.sub(
+                                r'commit = "[0-9a-f]{40}"',
+                                f'commit = "{commit}"',
+                                suffix,
+                                count=1,
+                            )
+                            suffix = re.sub(
+                                r'blob = "[0-9a-f]{40}"',
+                                f'blob = "{blob}"',
+                                suffix,
+                                count=1,
+                            )
+                            workstream.write_text(section + "[close_completion]" + suffix)
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertNotEqual(
+                        (routed.disposition, routed.obligation),
+                        ("stop", "end_of_scope_stop"),
+                    )
+                    self.assertEqual(
+                        (routed.disposition, routed.obligation),
+                        ("recovery", "recovery_boundary"),
+                    )
+                finally:
+                    temp.cleanup()
+
     def test_priority_and_real_stop_foundations_are_runtime_neutral(self) -> None:
         self.assertEqual(
             PRIORITY_FOUNDATION,
