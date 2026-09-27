@@ -152,6 +152,18 @@ class StateEnvelopeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "duplicate migration"):
             validate_board(duplicate, self.workstream)
 
+        duplicate_locator_wrong_attempt = copy.deepcopy(base)
+        wrong_attempt_proof = copy.deepcopy(proof)
+        wrong_attempt_proof["attempt_id"] = "R99"
+        duplicate_locator_wrong_attempt["review_acceptance_migrations"] = [
+            proof,
+            wrong_attempt_proof,
+        ]
+        with self.assertRaisesRegex(
+            ValidationError, "source_path does not match claimed Card/attempt identity"
+        ):
+            validate_board(duplicate_locator_wrong_attempt, self.workstream)
+
         unknown_owner = copy.deepcopy(base)
         unknown_proof = copy.deepcopy(proof)
         unknown_proof["card_id"] = "M99-T99"
