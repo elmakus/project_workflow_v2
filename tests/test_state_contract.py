@@ -171,6 +171,9 @@ class StateEnvelopeTests(unittest.TestCase):
         unknown_proof["acceptance_path"] = (
             "implementation/workstreams/sample-workstream/cards/M99-T99.md"
         )
+        unknown_proof["source_path"] = (
+            "implementation/workstreams/sample-workstream/reviews/M99-T99-R01.toml"
+        )
         unknown_owner["review_acceptance_migrations"] = [unknown_proof]
         with self.assertRaisesRegex(ValidationError, "unknown Card"):
             validate_board(unknown_owner, self.workstream)
