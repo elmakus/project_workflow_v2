@@ -58,6 +58,10 @@ try:
         JitTerminalityError,
         validate_trigger_consumed_proof,
     )
+    from tools.legacy_result_provenance import (
+        LegacyResultProvenanceError,
+        validate_legacy_result_migration_shape,
+    )
 except ModuleNotFoundError:  # direct script execution from tools/
     from exact_locator import ExactLocatorError, normalize_locator_path
     from review_contract import (
@@ -105,6 +109,10 @@ except ModuleNotFoundError:  # direct script execution from tools/
     from jit_terminality_contract import (
         JitTerminalityError,
         validate_trigger_consumed_proof,
+    )
+    from legacy_result_provenance import (
+        LegacyResultProvenanceError,
+        validate_legacy_result_migration_shape,
     )
 
 try:
@@ -1110,6 +1118,46 @@ def validate_board(
                     "attempts without a result; review requires an exact executed result"
                 )
     _require(active <= 1, "task_board: more than one Project Workflow Card is in_progress")
+
+    legacy_result_migrations = data.get("legacy_result_migrations", [])
+    _require(
+        isinstance(legacy_result_migrations, list),
+        "task_board: legacy_result_migrations must be an array",
+    )
+    cards_by_id = {
+        card["id"]: card for card in cards
+        if isinstance(card, dict) and isinstance(card.get("id"), str)
+    }
+    migrated_cards: set[str] = set()
+    for index, raw in enumerate(legacy_result_migrations):
+        label = f"task_board.legacy_result_migrations[{index}]"
+        try:
+            proof = validate_legacy_result_migration_shape(
+                raw, workstream_id=workstream["workstream_id"], label=label
+            )
+        except LegacyResultProvenanceError as exc:
+            raise ValidationError(str(exc)) from exc
+        card_id = proof["card_id"]
+        _require(
+            card_id not in migrated_cards,
+            f"{label}: duplicate legacy Result migration for Card {card_id!r}",
+        )
+        migrated_cards.add(card_id)
+        owner = cards_by_id.get(card_id)
+        _require(owner is not None, f"{label}: unknown Card {card_id!r}")
+        _require(
+            owner.get("status") == "done",
+            f"{label}: legacy Result migration requires DONE Card {card_id!r}",
+        )
+        result_ref = owner.get("result")
+        _require(
+            isinstance(result_ref, dict) and result_ref.get("class") == "result",
+            f"{label}: DONE Card {card_id!r} lacks Result locator",
+        )
+        _require(
+            result_ref.get("path") == proof["source_path"],
+            f"{label}: source_path does not match Card {card_id!r} Result path",
+        )
 
     research_obligation = data.get("research_obligation")
     if research_obligation is not None:

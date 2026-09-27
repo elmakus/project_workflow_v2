@@ -4045,6 +4045,81 @@ class RouterTests(unittest.TestCase):
             finally:
                 temp.cleanup()
 
+
+    def test_legacy_result_proof_adapts_statusless_semicolon_and_path_only_acceptance(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            result_path = self.install_reviewable_result(project, "required")
+            result_file = project / result_path
+            extra_evidence = "implementation/workstreams/sample-workstream/evidence/M01-T04-extra.md"
+            (project / extra_evidence).write_text("# Extra legacy evidence\n")
+            text = result_file.read_text()
+            text = text.replace(
+                "implementation/workstreams/sample-workstream/evidence/M01-T04.md",
+                "implementation/workstreams/sample-workstream/evidence/M01-T04.md; "
+                + extra_evidence,
+            ).replace("- Result status: success\n", "")
+            result_file.write_text(text)
+            result_commit, result_blob = self.git_identity_for(project, result_path)
+            board = project / BOARD
+            board_data = tomllib.loads(board.read_text())
+            old = board_data["cards"][0]["result"]
+            board.write_text(
+                board.read_text()
+                .replace(f'commit = "{old["commit"]}"', f'commit = "{result_commit}"', 1)
+                .replace(f'blob = "{old["blob"]}"', f'blob = "{result_blob}"', 1)
+            )
+            self.add_review_attempt(
+                project, "green", omit_acceptance_identity=True
+            )
+            board.write_text(
+                board.read_text().replace('status = "in_progress"', 'status = "done"', 1)
+            )
+            source_commit, _ = self.git_identity_for(project, BOARD)
+            board.write_text(
+                board.read_text()
+                + "\n[[legacy_result_migrations]]\n"
+                + 'card_id = "M01-T04"\n'
+                + 'source_repository = "owner/router-fixture"\n'
+                + f'source_commit = "{source_commit}"\n'
+                + f'source_path = "{result_path}"\n'
+                + f'source_blob = "{result_blob}"\n'
+                + 'source_workstream = "sample-workstream"\n'
+                + 'source_card = "M01-T04"\n'
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation), ("route", "close")
+            )
+        finally:
+            temp.cleanup()
+
+    def test_statusless_done_result_without_legacy_proof_still_fails_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            result_path = self.install_reviewable_result(project, "required")
+            result_file = project / result_path
+            result_file.write_text(
+                result_file.read_text().replace("- Result status: success\n", "")
+            )
+            result_commit, result_blob = self.git_identity_for(project, result_path)
+            board = project / BOARD
+            old = tomllib.loads(board.read_text())["cards"][0]["result"]
+            board.write_text(
+                board.read_text()
+                .replace(f'commit = "{old["commit"]}"', f'commit = "{result_commit}"', 1)
+                .replace(f'blob = "{old["blob"]}"', f'blob = "{result_blob}"', 1)
+                .replace('status = "in_progress"', 'status = "done"', 1)
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("not accepted success", routed.reason)
+        finally:
+            temp.cleanup()
+
     def test_all_terminal_cards_route_to_close_not_directly_to_stop(self) -> None:
         temp, project = self.copy_fixture()
         try:

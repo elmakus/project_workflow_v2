@@ -25,6 +25,12 @@ from tools.definition_authority import (
     verify_planning_authority_freshness,
 )
 from tools.execution_contract import ExecutionContractError, is_accepted_success, parse_card_result
+from tools.legacy_result_provenance import (
+    LegacyResultProvenanceError,
+    derive_path_only_review_acceptance,
+    migration_for_card,
+    verify_legacy_result_migration,
+)
 from tools.recovery_contract import RecoveryContractError, classify_resolution, exact_result_subject, review_subject
 from tools.research_provenance import (
     ResearchProvenanceError,
@@ -612,12 +618,37 @@ def done_close_gate(
             )
         except (ValidationError, ExecutionContractError, KeyError) as exc:
             return recovery(reads, f"DONE Card {card_id} result invalid: {exc}")
+        legacy_result_compatibility = False
         if not is_accepted_success(parsed_result):
-            return recovery(
-                reads,
-                f"DONE Card {card_id} result is not accepted success; only structured "
-                "Result status success can authorize Close",
-            )
+            if parsed_result.get("result_status") is not None:
+                return recovery(
+                    reads,
+                    f"DONE Card {card_id} result is not accepted success; only structured "
+                    "Result status success or an explicitly proved legacy Result can authorize Close",
+                )
+            try:
+                migration = migration_for_card(board, card_id)
+            except LegacyResultProvenanceError as exc:
+                return recovery(reads, f"DONE Card {card_id} legacy Result proof invalid: {exc}")
+            if migration is None:
+                return recovery(
+                    reads,
+                    f"DONE Card {card_id} result is not accepted success; only structured "
+                    "Result status success or an explicitly proved legacy Result can authorize Close",
+                )
+            try:
+                parsed_result, provenance_reads = verify_legacy_result_migration(
+                    project_root=reads.project_root,
+                    project_repository=project["repository"],
+                    workstream_id=workstream["workstream_id"],
+                    card=card,
+                    proof=migration,
+                    label=f"DONE Card {card_id} legacy Result proof",
+                )
+            except LegacyResultProvenanceError as exc:
+                return recovery(reads, f"DONE Card {card_id} legacy Result proof invalid: {exc}")
+            reads.items.extend(provenance_reads)
+            legacy_result_compatibility = True
         try:
             for evidence_ref in parsed_result["evidence_refs"]:
                 reads.project(evidence_ref).read_text(encoding="utf-8")
@@ -628,6 +659,12 @@ def done_close_gate(
         requirement = contract["review_requirement"]
         attempt_refs = card.get("review_attempts", [])
         if requirement == "none":
+            if legacy_result_compatibility:
+                return recovery(
+                    reads,
+                    f"DONE Card {card_id} legacy Result compatibility requires an exact "
+                    "independent GREEN review; review requirement none cannot prove success",
+                )
             try:
                 for attempt_ref in attempt_refs:
                     read_toml(reads.project(attempt_ref["path"]))
@@ -749,64 +786,87 @@ def done_close_gate(
         acceptance_commit = reviewed_acceptance.get("commit")
         acceptance_blob = reviewed_acceptance.get("blob")
         if not isinstance(acceptance_commit, str) or not isinstance(acceptance_blob, str):
-            return recovery(
-                reads,
-                f"DONE Card {card_id} review acceptance requires exact commit + blob Task Card "
-                "identity; path-only acceptance cannot prove exact content",
-            )
-        try:
-            verified_acceptance = verify_exact_git_locator(
-                project_root=reads.project_root,
-                repository=project["repository"],
-                expected_repository=project["repository"],
-                commit=acceptance_commit,
-                path=reviewed_path,
-                blob=acceptance_blob,
-                label="done review acceptance",
-            )
-            verify_worktree_freshness(
-                project_root=reads.project_root,
-                path=reviewed_path,
-                blob=acceptance_blob,
-                label="done review acceptance",
-            )
-        except ExactLocatorError as exc:
-            if exc.kind == "mutated":
-                if verdict in {"pending", "in_progress"}:
+            if (
+                legacy_result_compatibility
+                and acceptance_commit is None
+                and acceptance_blob is None
+            ):
+                try:
+                    derived_read = derive_path_only_review_acceptance(
+                        project_root=reads.project_root,
+                        project_repository=project["repository"],
+                        attempt_ref=attempt_refs[-1],
+                        acceptance=reviewed_acceptance,
+                        current_card_path=selected_card_path,
+                        label=f"DONE Card {card_id} legacy review acceptance",
+                    )
+                except LegacyResultProvenanceError as exc:
                     return recovery(
                         reads,
-                        f"DONE Card {card_id} active review acceptance is stale for the exact "
-                        f"current Task Card: {exc}",
+                        f"DONE Card {card_id} legacy review acceptance proof failed: {exc}",
                     )
-                return result(
-                    reads, "route", "review_freeze",
-                    f"DONE Card {card_id} Task Card acceptance changed after terminal review "
-                    f"history; preserve history and freeze a new exact attempt: {exc}",
-                    subject=card_id, owner_module="workflow/REVIEW.md",
-                )
-            if exc.kind == "dangling":
+                reads.items.append(derived_read)
+                reads.project(reviewed_path)
+            else:
                 return recovery(
-                    reads, f"DONE Card {card_id} review acceptance is dangling: {exc}"
+                    reads,
+                    f"DONE Card {card_id} review acceptance requires exact commit + blob Task Card "
+                    "identity; path-only acceptance cannot prove exact content",
                 )
-            if exc.kind == "blob_mismatch":
+        else:
+            try:
+                verified_acceptance = verify_exact_git_locator(
+                    project_root=reads.project_root,
+                    repository=project["repository"],
+                    expected_repository=project["repository"],
+                    commit=acceptance_commit,
+                    path=reviewed_path,
+                    blob=acceptance_blob,
+                    label="done review acceptance",
+                )
+                verify_worktree_freshness(
+                    project_root=reads.project_root,
+                    path=reviewed_path,
+                    blob=acceptance_blob,
+                    label="done review acceptance",
+                )
+            except ExactLocatorError as exc:
+                if exc.kind == "mutated":
+                    if verdict in {"pending", "in_progress"}:
+                        return recovery(
+                            reads,
+                            f"DONE Card {card_id} active review acceptance is stale for the exact "
+                            f"current Task Card: {exc}",
+                        )
+                    return result(
+                        reads, "route", "review_freeze",
+                        f"DONE Card {card_id} Task Card acceptance changed after terminal review "
+                        f"history; preserve history and freeze a new exact attempt: {exc}",
+                        subject=card_id, owner_module="workflow/REVIEW.md",
+                    )
+                if exc.kind == "dangling":
+                    return recovery(
+                        reads, f"DONE Card {card_id} review acceptance is dangling: {exc}"
+                    )
+                if exc.kind == "blob_mismatch":
+                    return recovery(
+                        reads, f"DONE Card {card_id} review acceptance is stale: {exc}"
+                    )
                 return recovery(
-                    reads, f"DONE Card {card_id} review acceptance is stale: {exc}"
+                    reads, f"DONE Card {card_id} review acceptance proof failed: {exc}"
                 )
-            return recovery(
-                reads, f"DONE Card {card_id} review acceptance proof failed: {exc}"
-            )
-        try:
-            require_commit_in_head_ancestry(
-                project_root=reads.project_root,
-                commit=acceptance_commit,
-                label="done review acceptance",
-            )
-        except ReviewAttemptProvenanceError as exc:
-            return recovery(
-                reads, f"DONE Card {card_id} review acceptance HEAD ancestry failed: {exc}"
-            )
-        reads.items.append(f"project-git:{verified_acceptance.key}")
-        reads.project(reviewed_path)
+            try:
+                require_commit_in_head_ancestry(
+                    project_root=reads.project_root,
+                    commit=acceptance_commit,
+                    label="done review acceptance",
+                )
+            except ReviewAttemptProvenanceError as exc:
+                return recovery(
+                    reads, f"DONE Card {card_id} review acceptance HEAD ancestry failed: {exc}"
+                )
+            reads.items.append(f"project-git:{verified_acceptance.key}")
+            reads.project(reviewed_path)
         if verdict in {"pending", "in_progress"}:
             return result(
                 reads, "route", "review",
