@@ -213,5 +213,156 @@ class LegacyResultProvenanceTests(unittest.TestCase):
             temp.cleanup()
 
 
+    def test_current_result_commit_must_match_source_board_identity(self) -> None:
+        temp, root, card, proof = self.fixture()
+        try:
+            marker = root / "later.txt"
+            marker.write_text("same Result bytes, later commit\n")
+            self.git(root, "add", marker.name)
+            self.git(root, "commit", "-q", "-m", "later same-result commit")
+            card["result"]["commit"] = self.git(root, "rev-parse", "HEAD")
+            with self.assertRaisesRegex(LegacyResultProvenanceError, "current Result commit differs"):
+                verify_legacy_result_migration(
+                    project_root=root, project_repository=REPO,
+                    workstream_id=WS, card=card, proof=proof,
+                )
+        finally:
+            temp.cleanup()
+
+    def test_source_board_semantics_must_be_unambiguous(self) -> None:
+        for case in ("wrong_workstream", "wrong_class", "duplicate_card"):
+            with self.subTest(case=case):
+                temp, root, card, proof = self.fixture()
+                try:
+                    board = root / BOARD
+                    text = board.read_text()
+                    if case == "wrong_workstream":
+                        text = text.replace(
+                            f'workstream_id = "{WS}"',
+                            'workstream_id = "other-workstream"',
+                            1,
+                        )
+                    elif case == "wrong_class":
+                        text = text.replace('class = "result"', 'class = "authority"', 1)
+                    else:
+                        text += (
+                            '\n[[cards]]\n'
+                            'id = "M01-T01"\n'
+                            'status = "in_progress"\n'
+                        )
+                    board.write_text(text)
+                    self.git(root, "add", BOARD)
+                    self.git(root, "commit", "-q", "-m", f"ambiguous source board {case}")
+                    proof["source_commit"] = self.git(root, "rev-parse", "HEAD")
+                    with self.assertRaises(LegacyResultProvenanceError):
+                        verify_legacy_result_migration(
+                            project_root=root, project_repository=REPO,
+                            workstream_id=WS, card=card, proof=proof,
+                        )
+                finally:
+                    temp.cleanup()
+
+    def test_source_result_must_predate_source_board_snapshot(self) -> None:
+        temp, root, card, proof = self.fixture()
+        try:
+            result = root / RESULT
+            original = result.read_text()
+            result.write_text(
+                original.replace(
+                    "- Tests/readback summary: GREEN",
+                    "- Tests/readback summary: OTHER",
+                )
+            )
+            self.git(root, "add", RESULT)
+            self.git(root, "commit", "-q", "-m", "intervening Result bytes")
+            result.write_text(original)
+            self.git(root, "add", RESULT)
+            self.git(root, "commit", "-q", "-m", "restore Result in source snapshot")
+            proof["source_commit"] = self.git(root, "rev-parse", "HEAD")
+            with self.assertRaisesRegex(LegacyResultProvenanceError, "source Result bytes changed"):
+                verify_legacy_result_migration(
+                    project_root=root, project_repository=REPO,
+                    workstream_id=WS, card=card, proof=proof,
+                )
+        finally:
+            temp.cleanup()
+
+    def test_current_result_worktree_mutation_fails_closed(self) -> None:
+        temp, root, card, proof = self.fixture()
+        try:
+            (root / RESULT).write_text((root / RESULT).read_text() + "\nmutated\n")
+            with self.assertRaises(LegacyResultProvenanceError):
+                verify_legacy_result_migration(
+                    project_root=root, project_repository=REPO,
+                    workstream_id=WS, card=card, proof=proof,
+                )
+        finally:
+            temp.cleanup()
+
+    def test_semicolon_adapter_rejects_cross_workstream_evidence(self) -> None:
+        temp, root, card, proof = self.fixture()
+        try:
+            result = root / RESULT
+            text = result.read_text().replace(
+                f"implementation/workstreams/{WS}/evidence/a.md; "
+                f"implementation/workstreams/{WS}/evidence/b.md",
+                f"implementation/workstreams/{WS}/evidence/a.md; "
+                "implementation/workstreams/other/evidence/x.md",
+            )
+            result.write_text(text)
+            self.git(root, "add", RESULT)
+            self.git(root, "commit", "-q", "-m", "legacy malformed evidence")
+            new_result_commit = self.git(root, "rev-parse", "HEAD")
+            new_blob = git_blob_sha(result.read_bytes())
+            board = root / BOARD
+            old_commit = card["result"]["commit"]
+            old_blob = card["result"]["blob"]
+            board.write_text(
+                board.read_text()
+                .replace(old_commit, new_result_commit, 1)
+                .replace(old_blob, new_blob, 1)
+            )
+            self.git(root, "add", BOARD)
+            self.git(root, "commit", "-q", "-m", "source board malformed evidence")
+            proof["source_commit"] = self.git(root, "rev-parse", "HEAD")
+            proof["source_blob"] = new_blob
+            card["result"]["commit"] = new_result_commit
+            card["result"]["blob"] = new_blob
+            with self.assertRaisesRegex(LegacyResultProvenanceError, "outside workstream evidence"):
+                verify_legacy_result_migration(
+                    project_root=root, project_repository=REPO,
+                    workstream_id=WS, card=card, proof=proof,
+                )
+        finally:
+            temp.cleanup()
+
+    def test_path_only_acceptance_rejects_other_card_and_partial_identity(self) -> None:
+        temp, root, card, proof = self.fixture()
+        try:
+            with self.assertRaises(LegacyResultProvenanceError):
+                derive_path_only_review_acceptance(
+                    project_root=root, project_repository=REPO,
+                    attempt_ref={"commit": proof["source_commit"]},
+                    acceptance={
+                        "class": "task_card",
+                        "path": CARD.replace("M01-T01", "M01-T99"),
+                    },
+                    current_card_path=CARD,
+                )
+            with self.assertRaisesRegex(LegacyResultProvenanceError, "partially exact"):
+                derive_path_only_review_acceptance(
+                    project_root=root, project_repository=REPO,
+                    attempt_ref={"commit": proof["source_commit"]},
+                    acceptance={
+                        "class": "task_card",
+                        "path": CARD,
+                        "commit": proof["source_commit"],
+                    },
+                    current_card_path=CARD,
+                )
+        finally:
+            temp.cleanup()
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -213,15 +213,31 @@ def verify_legacy_result_migration(
         source_board = tomllib.loads(_git_show(root, f"{p['source_commit']}:{board_path}", label).decode("utf-8"))
     except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
         raise _fail(label, f"source Board is invalid: {exc}", "mismatch") from exc
-    source_card = next(
-        (x for x in source_board.get("cards", []) if isinstance(x, Mapping) and x.get("id") == card_id),
-        None,
-    )
-    if source_card is None or source_card.get("status") != "done":
+    if source_board.get("workstream_id") != workstream_id:
+        raise _fail(label, "source Board workstream_id does not match proved workstream", "ambiguous")
+    source_cards = source_board.get("cards")
+    if not isinstance(source_cards, list):
+        raise _fail(label, "source Board has no unambiguous Card array", "ambiguous")
+    matches = [
+        x for x in source_cards
+        if isinstance(x, Mapping) and x.get("id") == card_id
+    ]
+    if len(matches) != 1:
+        raise _fail(
+            label,
+            f"source Board must contain exactly one Card {card_id!r}; found {len(matches)}",
+            "ambiguous",
+        )
+    source_card = matches[0]
+    if source_card.get("status") != "done":
         raise _fail(label, "source Board does not prove the Card already DONE", "ambiguous")
     source_ref = source_card.get("result")
-    if not isinstance(source_ref, Mapping) or source_ref.get("path") != p["source_path"]:
-        raise _fail(label, "source Board does not list the proved Result path", "ambiguous")
+    if (
+        not isinstance(source_ref, Mapping)
+        or source_ref.get("class") != "result"
+        or source_ref.get("path") != p["source_path"]
+    ):
+        raise _fail(label, "source Board does not list the proved Result locator", "ambiguous")
     source_result_commit = source_ref.get("commit")
     if (
         source_ref.get("blob") != p["source_blob"]
@@ -241,6 +257,12 @@ def verify_legacy_result_migration(
         )
     except ExactLocatorError as exc:
         raise _fail(label, f"source Board Result identity failed: {exc}", exc.kind) from exc
+    if current_commit != source_result_commit:
+        raise _fail(
+            label,
+            "current Result commit differs from immutable source Board Result identity",
+            "stale",
+        )
     try:
         ancestry = subprocess.run(
             [

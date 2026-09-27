@@ -6,6 +6,7 @@ from tools.execution_contract import (
     ExecutionContractError,
     choose_realization,
     classify_return,
+    is_accepted_success,
     parse_card_result,
 )
 
@@ -50,6 +51,31 @@ class ExecutionContractTests(unittest.TestCase):
                 "M03-T02",
                 "sample-workstream",
             )
+
+    def test_structured_result_status_matrix_is_fail_closed(self) -> None:
+        for status, accepted in (
+            ("success", True),
+            ("failed", False),
+            ("blocked", False),
+        ):
+            with self.subTest(status=status):
+                parsed = parse_card_result(
+                    self.result_text() + f"- Result status: {status}\n",
+                    "M03-T02",
+                    "sample-workstream",
+                )
+                self.assertEqual(is_accepted_success(parsed), accepted)
+
+        contradictory = parse_card_result(
+            self.result_text().replace(
+                "- Tests/readback summary: implementation and verification GREEN",
+                "- Tests/readback summary: FAILED: contradictory success",
+            )
+            + "- Result status: success\n",
+            "M03-T02",
+            "sample-workstream",
+        )
+        self.assertFalse(is_accepted_success(contradictory))
 
     def test_result_is_semantic_and_does_not_require_worker_count(self) -> None:
         parsed = parse_card_result(self.result_text(), "M03-T02", "sample-workstream")

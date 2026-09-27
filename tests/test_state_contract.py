@@ -87,6 +87,36 @@ class StateEnvelopeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "more than one"):
             validate_board(read_toml(INVALID / "two-active-board.toml"), self.workstream)
 
+    def test_legacy_result_migration_rejects_duplicate_and_unknown_cards(self) -> None:
+        base = read_toml(VALID / "TASK_BOARD.toml")
+        proof = {
+            "card_id": "M01-T01",
+            "source_repository": "owner/fixture-project",
+            "source_commit": "a" * 40,
+            "source_path": (
+                "implementation/workstreams/sample-workstream/results/M01-T01.md"
+            ),
+            "source_blob": "b" * 40,
+            "source_workstream": "sample-workstream",
+            "source_card": "M01-T01",
+        }
+
+        duplicate = copy.deepcopy(base)
+        duplicate["legacy_result_migrations"] = [proof, copy.deepcopy(proof)]
+        with self.assertRaisesRegex(ValidationError, "duplicate legacy Result migration"):
+            validate_board(duplicate, self.workstream)
+
+        unknown = copy.deepcopy(base)
+        unknown_proof = copy.deepcopy(proof)
+        unknown_proof["card_id"] = "M01-T99"
+        unknown_proof["source_card"] = "M01-T99"
+        unknown_proof["source_path"] = (
+            "implementation/workstreams/sample-workstream/results/M01-T99.md"
+        )
+        unknown["legacy_result_migrations"] = [unknown_proof]
+        with self.assertRaisesRegex(ValidationError, "unknown Card"):
+            validate_board(unknown, self.workstream)
+
     def test_task_card_parser_requires_complete_stable_launch_contract(self) -> None:
         text = (
             "# Task Card\n"
