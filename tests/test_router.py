@@ -4740,5 +4740,49 @@ class RouterTests(unittest.TestCase):
             temp.cleanup()
 
 
+
+    def test_structured_path_only_review_acceptance_requires_exact_migration(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "required")
+            review_path = self.add_review_attempt(
+                project, "green", omit_acceptance_identity=True
+            )
+            board = project / BOARD
+            board.write_text(
+                board.read_text().replace('status = "in_progress"', 'status = "done"', 1)
+            )
+            blocked = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (blocked.disposition, blocked.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertIn("path-only acceptance cannot prove exact content", blocked.reason)
+
+            data = tomllib.loads(board.read_text())
+            ref = data["cards"][0]["review_attempts"][-1]
+            acceptance_blob = subprocess.run(
+                ["git", "-C", str(project), "rev-parse", f"{ref['commit']}:{CARD}"],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+            board.write_text(
+                board.read_text()
+                + "\n[[review_acceptance_migrations]]\n"
+                + 'card_id = "M01-T04"\n'
+                + 'attempt_id = "R01"\n'
+                + 'source_repository = "owner/router-fixture"\n'
+                + f'source_commit = "{ref["commit"]}"\n'
+                + f'source_path = "{review_path}"\n'
+                + f'source_blob = "{ref["blob"]}"\n'
+                + 'source_workstream = "sample-workstream"\n'
+                + 'source_card = "M01-T04"\n'
+                + f'acceptance_path = "{CARD}"\n'
+                + f'acceptance_blob = "{acceptance_blob}"\n'
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "close"))
+        finally:
+            temp.cleanup()
+
 if __name__ == "__main__":
     unittest.main()
