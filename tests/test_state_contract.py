@@ -164,7 +164,7 @@ class StateEnvelopeTests(unittest.TestCase):
             validate_board(unknown_owner, self.workstream)
 
         non_done_owner = copy.deepcopy(base)
-        non_done_owner["cards"][0]["status"] = "planned"
+        non_done_owner["cards"][0]["status"] = "returned"
         non_done_owner["review_acceptance_migrations"] = [proof]
         with self.assertRaisesRegex(ValidationError, "requires DONE Card"):
             validate_board(non_done_owner, self.workstream)
