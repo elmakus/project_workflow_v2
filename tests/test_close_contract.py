@@ -2359,6 +2359,65 @@ class H017ProofIntegrityTests(unittest.TestCase):
                     verified_head="same-head",
                 )
 
+    def test_legacy_statusless_result_uses_verified_adapter_for_evidence_closure(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _h017_complete_fixture(project)
+            raw_parsed = {
+                "result_status": None,
+                "evidence_refs": [H017_EVIDENCE_PATH + "; dangling.md"],
+            }
+            adapted = dict(raw_parsed)
+            adapted["evidence_refs"] = [H017_EVIDENCE_PATH]
+            with (
+                patch("tools.close_contract.parse_card_result", return_value=raw_parsed),
+                patch("tools.close_contract.migration_for_card", return_value={"card_id": BOARD_CARD}),
+                patch(
+                    "tools.close_contract.verify_legacy_result_migration",
+                    return_value=(adapted, []),
+                ) as verify_legacy,
+            ):
+                proof = derive_recovery_package_from_board(
+                    project_root=project,
+                    workstream_path=H017_WORKSTREAM_PATH,
+                    board_path=BOARD_PATH,
+                    source_branch="work/h017-fixture",
+                    project_repository="owner/fixture",
+                )
+            verify_legacy.assert_called_once()
+            self.assertIn(H017_EVIDENCE_PATH, [item.path for item in proof.locators])
+            self.assertNotIn(
+                H017_EVIDENCE_PATH + "; dangling.md",
+                [item.path for item in proof.locators],
+            )
+
+    def test_legacy_statusless_result_invalid_adapter_fails_close_derivation(self) -> None:
+        from tools.legacy_result_provenance import LegacyResultProvenanceError
+
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            _h017_complete_fixture(project)
+            raw_parsed = {
+                "result_status": None,
+                "evidence_refs": [H017_EVIDENCE_PATH + "; dangling.md"],
+            }
+            with (
+                patch("tools.close_contract.parse_card_result", return_value=raw_parsed),
+                patch("tools.close_contract.migration_for_card", return_value={"card_id": BOARD_CARD}),
+                patch(
+                    "tools.close_contract.verify_legacy_result_migration",
+                    side_effect=LegacyResultProvenanceError("stale proof", kind="stale"),
+                ),
+            ):
+                with self.assertRaisesRegex(CloseContractError, "legacy Result proof invalid"):
+                    derive_recovery_package_from_board(
+                        project_root=project,
+                        workstream_path=H017_WORKSTREAM_PATH,
+                        board_path=BOARD_PATH,
+                        source_branch="work/h017-fixture",
+                        project_repository="owner/fixture",
+                    )
+
     def test_tampered_proof_cannot_authorize_cleanup(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             project = Path(raw)
