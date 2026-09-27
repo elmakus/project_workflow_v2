@@ -117,6 +117,64 @@ class StateEnvelopeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "unknown Card"):
             validate_board(unknown, self.workstream)
 
+    def test_review_acceptance_migration_rejects_duplicate_and_incoherent_board_state(self) -> None:
+        base = read_toml(VALID / "TASK_BOARD.toml")
+        review_path = (
+            "implementation/workstreams/sample-workstream/reviews/M01-T01-R01.toml"
+        )
+        base["cards"][0]["review_attempts"] = [{
+            "class": "review_attempt",
+            "path": review_path,
+            "commit": "a" * 40,
+            "blob": "b" * 40,
+        }]
+        proof = {
+            "card_id": "M01-T01",
+            "attempt_id": "R01",
+            "source_repository": "owner/fixture-project",
+            "source_commit": "a" * 40,
+            "source_path": review_path,
+            "source_blob": "b" * 40,
+            "source_workstream": "sample-workstream",
+            "source_card": "M01-T01",
+            "acceptance_path": (
+                "implementation/workstreams/sample-workstream/cards/M01-T01.md"
+            ),
+            "acceptance_blob": "c" * 40,
+        }
+
+        valid = copy.deepcopy(base)
+        valid["review_acceptance_migrations"] = [proof]
+        validate_board(valid, self.workstream)
+
+        duplicate = copy.deepcopy(base)
+        duplicate["review_acceptance_migrations"] = [proof, copy.deepcopy(proof)]
+        with self.assertRaisesRegex(ValidationError, "duplicate migration"):
+            validate_board(duplicate, self.workstream)
+
+        wrong_locator = copy.deepcopy(base)
+        wrong_proof = copy.deepcopy(proof)
+        wrong_proof["source_blob"] = "d" * 40
+        wrong_locator["review_acceptance_migrations"] = [wrong_proof]
+        with self.assertRaisesRegex(ValidationError, "source Review identity"):
+            validate_board(wrong_locator, self.workstream)
+
+        legacy_overlap = copy.deepcopy(base)
+        legacy_overlap["legacy_result_migrations"] = [{
+            "card_id": "M01-T01",
+            "source_repository": "owner/fixture-project",
+            "source_commit": "d" * 40,
+            "source_path": (
+                "implementation/workstreams/sample-workstream/results/M01-T01.md"
+            ),
+            "source_blob": "e" * 40,
+            "source_workstream": "sample-workstream",
+            "source_card": "M01-T01",
+        }]
+        legacy_overlap["review_acceptance_migrations"] = [proof]
+        with self.assertRaisesRegex(ValidationError, "must not overlap legacy Result migration"):
+            validate_board(legacy_overlap, self.workstream)
+
     def test_task_card_parser_requires_complete_stable_launch_contract(self) -> None:
         text = (
             "# Task Card\n"
