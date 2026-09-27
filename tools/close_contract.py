@@ -50,6 +50,11 @@ try:
         JitTerminalityError,
         verify_consumed_trigger,
     )
+    from tools.legacy_result_provenance import (
+        LegacyResultProvenanceError,
+        migration_for_card,
+        verify_legacy_result_migration,
+    )
 except ModuleNotFoundError:  # direct script execution from tools/
     from review_contract import (
         OBSERVATION_DISPOSITIONS,
@@ -88,6 +93,11 @@ except ModuleNotFoundError:  # direct script execution from tools/
     from jit_terminality_contract import (
         JitTerminalityError,
         verify_consumed_trigger,
+    )
+    from legacy_result_provenance import (
+        LegacyResultProvenanceError,
+        migration_for_card,
+        verify_legacy_result_migration,
     )
 
 
@@ -2719,6 +2729,27 @@ def derive_recovery_package_from_board(
                 raise CloseContractError(
                     f"recovery package Card {card_id!r} result invalid: {exc}"
                 ) from exc
+            if parsed_result.get("result_status") is None:
+                try:
+                    migration = migration_for_card(board, card_id)
+                except LegacyResultProvenanceError as exc:
+                    raise CloseContractError(
+                        f"recovery package Card {card_id!r} legacy Result proof invalid: {exc}"
+                    ) from exc
+                if migration is not None:
+                    try:
+                        parsed_result, _ = verify_legacy_result_migration(
+                            project_root=root,
+                            project_repository=repository,
+                            workstream_id=workstream_id,
+                            card=card,
+                            proof=migration,
+                            label=f"recovery package Card {card_id} legacy Result proof",
+                        )
+                    except LegacyResultProvenanceError as exc:
+                        raise CloseContractError(
+                            f"recovery package Card {card_id!r} legacy Result proof invalid: {exc}"
+                        ) from exc
             refs = parsed_result.get("evidence_refs", [])
             if len(set(refs)) != len(refs):
                 dupes = sorted({item for item in refs if refs.count(item) > 1})
