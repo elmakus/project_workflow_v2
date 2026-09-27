@@ -1901,6 +1901,96 @@ def verify_final_observation_reconciliation_from_board(
         cleanup_proof_repository=repository,
         cleanup_proof_workstream_id=workstream_id,
     )
+
+    # OBL-M02Q-01: H019 can prove one cleanup work semantically, but Final
+    # must not accept that work unless its recovery-critical Review/evidence
+    # are also members of the H017 package derived from this exact Board.
+    # This composes the two independently valid gates without allowing a
+    # caller-only cleanup proof to create target-side recovery authority.
+    if cleanup_list:
+        execution_ref = board.get("execution_ref")
+        source_branch = (
+            execution_ref.get("branch")
+            if isinstance(execution_ref, Mapping)
+            else None
+        )
+        if not isinstance(source_branch, str) or not source_branch.strip():
+            raise CloseContractError(
+                "Final cleanup/package composition requires exact Board execution_ref.branch"
+            )
+        recovery = derive_recovery_package_from_board(
+            project_root=root,
+            workstream_path=(
+                f"implementation/workstreams/{workstream_id}/WORKSTREAM.toml"
+            ),
+            board_path=board_path,
+            source_branch=source_branch,
+            project_repository=repository,
+        )
+        package_exact = {
+            (item.path, item.commit, item.blob) for item in recovery.locators
+        }
+        package_paths = {item.path for item in recovery.locators}
+
+        for work in cleanup_list:
+            if not isinstance(work, Mapping) or work.get("complete") is not True:
+                continue
+            work_id = str(work.get("work_id", "cleanup"))
+            review_ref = work.get("independent_review")
+            if not isinstance(review_ref, Mapping):
+                raise CloseContractError(
+                    f"cleanup work {work_id!r} lacks exact independent Review for recovery package composition"
+                )
+            review_key = (
+                review_ref.get("path"),
+                review_ref.get("commit"),
+                review_ref.get("blob"),
+            )
+            if review_key not in package_exact:
+                raise CloseContractError(
+                    f"cleanup work {work_id!r} independent Review is absent from "
+                    "the H017 recovery package; Final cannot accept package-absent cleanup work"
+                )
+
+            tests_evidence = work.get("tests_evidence", [])
+            if not isinstance(tests_evidence, list):
+                raise CloseContractError(
+                    f"cleanup work {work_id!r} tests_evidence must be an array"
+                )
+            missing_tests = sorted(
+                raw for raw in tests_evidence
+                if isinstance(raw, str) and raw not in package_paths
+            )
+            if missing_tests:
+                raise CloseContractError(
+                    f"cleanup work {work_id!r} evidence is absent from the H017 "
+                    "recovery package: " + ", ".join(missing_tests)
+                )
+
+            try:
+                cleanup_review, _, _ = verify_review_attempt_locator(
+                    project_root=root,
+                    project_repository=repository,
+                    workstream_id=workstream_id,
+                    card_id=work_id,
+                    ref=dict(review_ref),
+                    label=f"cleanup work {work_id!r} package Review",
+                )
+            except ReviewAttemptProvenanceError as exc:
+                raise CloseContractError(
+                    f"cleanup work {work_id!r} package Review identity failed: {exc}"
+                ) from exc
+            review_evidence = cleanup_review.get("evidence_path", "")
+            if (
+                isinstance(review_evidence, str)
+                and review_evidence.strip()
+                and review_evidence.strip() not in package_paths
+            ):
+                raise CloseContractError(
+                    f"cleanup work {work_id!r} Review evidence is absent from "
+                    f"the H017 recovery package: {review_evidence.strip()}"
+                )
+
     return "final_observation_reconciliation_complete"
 
 
