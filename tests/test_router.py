@@ -4059,9 +4059,103 @@ class RouterTests(unittest.TestCase):
         finally:
             temp.cleanup()
 
+
     def install_close_completion(self, project: Path) -> None:
+        # Exact terminal completion is valid only after approved Planning plus a
+        # fresh independent final-scope review of the exact terminal Board.
+        self.install_green_definition(project)
+        self.install_state_record(
+            project,
+            "planning",
+            "planning",
+            "PLANNING.toml",
+            self.planning_content(
+                state="approved", premium_b="satisfied", premium_c="satisfied"
+            ),
+        )
+        planning_path = (
+            "implementation/workstreams/sample-workstream/PLANNING.toml"
+        )
+        self.git_identity_for(project, planning_path)
+        self.install_state_record(
+            project,
+            "plan_review",
+            "plan_review",
+            "PLAN_REVIEW.toml",
+            self.plan_review_content("green"),
+        )
+        self.git_identity_for(
+            project,
+            "implementation/workstreams/sample-workstream/PLAN_REVIEW.toml",
+        )
+
+        # RF011 package derivation requires every recovery-critical Card/result
+        # evidence artifact to be durable, even when this fixture's Card itself
+        # needs no independent Card Review.
+        self.git_identity_for(project, CARD)
+        result_evidence = (
+            "implementation/workstreams/sample-workstream/evidence/M01-T04.md"
+        )
+        self.git_identity_for(project, result_evidence)
+
         board_commit, board_blob = self.git_identity_for(project, BOARD)
-        completion_path = "implementation/workstreams/sample-workstream/close/COMPLETION.toml"
+        planning = tomllib.loads((project / planning_path).read_text())
+        plan_subject = planning["subject"]
+
+        final_evidence_path = (
+            "implementation/workstreams/sample-workstream/evidence/"
+            "FINAL_REVIEW_R01.md"
+        )
+        final_evidence = project / final_evidence_path
+        final_evidence.parent.mkdir(parents=True, exist_ok=True)
+        final_evidence.write_text(
+            "# Final integration review evidence\n\n"
+            "All approved Close acceptance, recovery/cleanup readiness and "
+            "authorization boundaries are satisfied for the exact terminal Board.\n"
+        )
+        self.git_identity_for(project, final_evidence_path)
+
+        final_review_path = (
+            "implementation/workstreams/sample-workstream/reviews/FINAL-R01.toml"
+        )
+        final_review = project / final_review_path
+        final_review.parent.mkdir(parents=True, exist_ok=True)
+        final_review.write_text(
+            'workstream_id = "sample-workstream"\n'
+            'attempt = "R01"\n'
+            'verdict = "green"\n'
+            f'evidence_path = "{final_evidence_path}"\n'
+            'review_kind = "discovery"\n'
+            'source_discovery_attempt = ""\n'
+            'discovery_complete = true\n'
+            'material_finding_ids = []\n'
+            'review_scope = "final"\n'
+            'review_epoch = "E01"\n'
+            'epoch_reset_basis = ""\n'
+            'material_defect_class_ids = []\n'
+            'failed_material_defect_class_ids = []\n'
+            'post_convergence_validation = false\n'
+            'convergence_basis = ""\n\n'
+            '[subject]\n'
+            'class = "git_blob"\n'
+            f'repository = "{RF012_REPOSITORY}"\n'
+            f'commit = "{board_commit}"\n'
+            f'path = "{BOARD}"\n'
+            f'blob = "{board_blob}"\n\n'
+            '[acceptance]\n'
+            'class = "authority"\n'
+            f'path = "{plan_subject["path"]}"\n'
+            f'commit = "{plan_subject["commit"]}"\n'
+            f'blob = "{plan_subject["blob"]}"\n\n'
+            '[independence]\n'
+            'materially_produced_or_repaired_subject = false\n'
+            'basis = "Fresh independent final integration review."\n'
+        )
+        review_commit, review_blob = self.git_identity_for(project, final_review_path)
+
+        completion_path = (
+            "implementation/workstreams/sample-workstream/close/COMPLETION.toml"
+        )
         completion = project / completion_path
         completion.parent.mkdir(parents=True, exist_ok=True)
         completion.write_text(
@@ -4073,9 +4167,16 @@ class RouterTests(unittest.TestCase):
             f'repository = "{RF012_REPOSITORY}"\n'
             f'commit = "{board_commit}"\n'
             f'path = "{BOARD}"\n'
-            f'blob = "{board_blob}"\n'
+            f'blob = "{board_blob}"\n\n'
+            '[final_review]\n'
+            'class = "review_attempt"\n'
+            f'path = "{final_review_path}"\n'
+            f'commit = "{review_commit}"\n'
+            f'blob = "{review_blob}"\n'
         )
-        completion_commit, completion_blob = self.git_identity_for(project, completion_path)
+        completion_commit, completion_blob = self.git_identity_for(
+            project, completion_path
+        )
         workstream = project / MANIFEST
         workstream.write_text(
             workstream.read_text()
@@ -4085,6 +4186,80 @@ class RouterTests(unittest.TestCase):
             + f'commit = "{completion_commit}"\n'
             + f'blob = "{completion_blob}"\n'
         )
+        self.git_identity_for(project, MANIFEST)
+
+
+    def rebind_h027_final_review(
+        self, project: Path, transform,
+    ) -> None:
+        final_review_path = (
+            "implementation/workstreams/sample-workstream/reviews/FINAL-R01.toml"
+        )
+        review = project / final_review_path
+        review.write_text(transform(review.read_text()))
+        review_commit, review_blob = self.git_identity_for(project, final_review_path)
+
+        completion_path = (
+            "implementation/workstreams/sample-workstream/close/COMPLETION.toml"
+        )
+        completion = project / completion_path
+        prefix, suffix = completion.read_text().split("[final_review]", 1)
+        suffix = re.sub(
+            r'commit = "[0-9a-f]{40}"',
+            f'commit = "{review_commit}"',
+            suffix,
+            count=1,
+        )
+        suffix = re.sub(
+            r'blob = "[0-9a-f]{40}"',
+            f'blob = "{review_blob}"',
+            suffix,
+            count=1,
+        )
+        completion.write_text(prefix + "[final_review]" + suffix)
+        completion_commit, completion_blob = self.git_identity_for(
+            project, completion_path
+        )
+
+        workstream = project / MANIFEST
+        prefix, suffix = workstream.read_text().split("[close_completion]", 1)
+        suffix = re.sub(
+            r'commit = "[0-9a-f]{40}"',
+            f'commit = "{completion_commit}"',
+            suffix,
+            count=1,
+        )
+        suffix = re.sub(
+            r'blob = "[0-9a-f]{40}"',
+            f'blob = "{completion_blob}"',
+            suffix,
+            count=1,
+        )
+        workstream.write_text(prefix + "[close_completion]" + suffix)
+        self.git_identity_for(project, MANIFEST)
+
+    def rebind_h027_completion(self, project: Path) -> None:
+        completion_path = (
+            "implementation/workstreams/sample-workstream/close/COMPLETION.toml"
+        )
+        completion_commit, completion_blob = self.git_identity_for(
+            project, completion_path
+        )
+        workstream = project / MANIFEST
+        prefix, suffix = workstream.read_text().split("[close_completion]", 1)
+        suffix = re.sub(
+            r'commit = "[0-9a-f]{40}"',
+            f'commit = "{completion_commit}"',
+            suffix,
+            count=1,
+        )
+        suffix = re.sub(
+            r'blob = "[0-9a-f]{40}"',
+            f'blob = "{completion_blob}"',
+            suffix,
+            count=1,
+        )
+        workstream.write_text(prefix + "[close_completion]" + suffix)
         self.git_identity_for(project, MANIFEST)
 
     def test_h027_close_reentry_requires_durable_completion_before_stop(self) -> None:
@@ -4108,6 +4283,101 @@ class RouterTests(unittest.TestCase):
                 ("stop", "end_of_scope_stop"),
             )
             self.assertIn("package:workflow/USER_STOP.md", stopped.read_set)
+        finally:
+            temp.cleanup()
+
+
+    def test_h027_completion_requires_exact_fresh_green_final_review(self) -> None:
+        for case in ("missing_final_review", "wrong_scope", "wrong_subject", "wrong_acceptance", "stale_evidence"):
+            with self.subTest(case=case):
+                temp, project = self.copy_fixture()
+                try:
+                    self.install_reviewable_result(project, "none")
+                    board = project / BOARD
+                    board.write_text(
+                        board.read_text().replace(
+                            'status = "in_progress"', 'status = "done"', 1
+                        )
+                    )
+                    self.install_close_completion(project)
+                    if case == "missing_final_review":
+                        completion = project / (
+                            "implementation/workstreams/sample-workstream/"
+                            "close/COMPLETION.toml"
+                        )
+                        completion.write_text(
+                            completion.read_text().split("[final_review]", 1)[0].rstrip()
+                            + "\n"
+                        )
+                        self.rebind_h027_completion(project)
+                    elif case == "wrong_scope":
+                        self.rebind_h027_final_review(
+                            project,
+                            lambda text: text.replace(
+                                'review_scope = "final"', 'review_scope = "card"', 1
+                            ),
+                        )
+                    elif case == "wrong_subject":
+                        self.rebind_h027_final_review(
+                            project,
+                            lambda text: text.replace(
+                                f'path = "{BOARD}"',
+                                'path = "implementation/workstreams/sample-workstream/'
+                                'TASK_BOARD_OTHER.toml"',
+                                1,
+                            ),
+                        )
+                    elif case == "wrong_acceptance":
+                        self.rebind_h027_final_review(
+                            project,
+                            lambda text: text.replace(
+                                f'path = "{RF012_PLAN_PATH}"',
+                                f'path = "{RF012_REQ_PATH}"',
+                                1,
+                            ),
+                        )
+                    else:
+                        evidence = project / (
+                            "implementation/workstreams/sample-workstream/evidence/"
+                            "FINAL_REVIEW_R01.md"
+                        )
+                        evidence.write_text("# stale final evidence\n")
+
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertEqual(
+                        (routed.disposition, routed.obligation),
+                        ("recovery", "recovery_boundary"),
+                    )
+                    self.assertNotEqual(
+                        (routed.disposition, routed.obligation),
+                        ("stop", "end_of_scope_stop"),
+                    )
+                finally:
+                    temp.cleanup()
+
+    def test_h027_incomplete_recovery_package_cannot_stop(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_reviewable_result(project, "none")
+            board = project / BOARD
+            board.write_text(
+                board.read_text().replace('status = "in_progress"', 'status = "done"', 1)
+            )
+            self.install_close_completion(project)
+            result_evidence = project / (
+                "implementation/workstreams/sample-workstream/evidence/M01-T04.md"
+            )
+            result_evidence.write_text("# stale recovery evidence\n")
+
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual(
+                (routed.disposition, routed.obligation),
+                ("recovery", "recovery_boundary"),
+            )
+            self.assertNotEqual(
+                (routed.disposition, routed.obligation),
+                ("stop", "end_of_scope_stop"),
+            )
         finally:
             temp.cleanup()
 
