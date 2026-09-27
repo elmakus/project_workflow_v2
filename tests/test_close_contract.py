@@ -3,11 +3,13 @@ from __future__ import annotations
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 from dataclasses import replace
 from pathlib import Path
 
 from tools.close_contract import (
     CloseContractError,
+    H017RecoveryPackageLocator,
     H017RecoveryProof,
     _h017_compute_package_digest,
     RefreshSnapshot,
@@ -1144,6 +1146,127 @@ class BoardBoundFinalGateTests(unittest.TestCase):
                     project_repository="owner/fixture",
                 )
 
+
+    def test_board_gate_requires_exact_cleanup_evidence_package_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw)
+            evidence = f"implementation/workstreams/{BOARD_WORKSTREAM}/evidence/review-R01.md"
+            governing = _write_attempt_toml(
+                project,
+                "R01",
+                observations="[[observations]]\n"
+                'id = "O2"\n'
+                'category = "optional_cleanup"\n'
+                f'evidence = "{evidence}#O2"\n'
+                'disposition = "cleanup_candidate"\n'
+                'disposition_basis = "Safe bounded cleanup."\n',
+            )
+            subject_file = project / H019_SUBJECT_PATH
+            subject_file.parent.mkdir(parents=True, exist_ok=True)
+            subject_file.write_text("# cleanup O2\n", encoding="utf-8")
+            evidence_file = project / H019_EVIDENCE_PATH
+            evidence_file.parent.mkdir(parents=True, exist_ok=True)
+            evidence_file.write_text("exact cleanup evidence\n", encoding="utf-8")
+            _h017_commit_all(project, "governing attempt and cleanup subject")
+            head1 = subprocess.run(
+                ["git", "-C", str(project), "rev-parse", "HEAD"],
+                check=True, capture_output=True, text=True,
+            ).stdout.strip()
+            governing_blob = _h017_blob_for(project, governing, head1)
+            subject = {
+                "repository": H019_REPOSITORY,
+                "commit": head1,
+                "path": H019_SUBJECT_PATH,
+                "blob": _h017_blob_for(project, H019_SUBJECT_PATH, head1),
+            }
+            test_blob = _h017_blob_for(project, H019_EVIDENCE_PATH, head1)
+            cleanup_review = _h019_write_cleanup_review(
+                project, H019_WORK_ID, subject
+            )
+            review_evidence = (
+                f"implementation/workstreams/{BOARD_WORKSTREAM}/evidence/"
+                f"{H019_WORK_ID}-review-R01.md"
+            )
+            _write_board_toml_exact(project, [(governing, head1, governing_blob)])
+            _h017_commit_all(project, "cleanup review and board")
+            head2 = subprocess.run(
+                ["git", "-C", str(project), "rev-parse", "HEAD"],
+                check=True, capture_output=True, text=True,
+            ).stdout.strip()
+            review_blob = _h017_blob_for(project, cleanup_review, head2)
+            review_evidence_blob = _h017_blob_for(project, review_evidence, head2)
+            base_locators = (
+                H017RecoveryPackageLocator(
+                    "review_attempt", cleanup_review, head2, review_blob
+                ),
+                H017RecoveryPackageLocator(
+                    "evidence", review_evidence, head2, review_evidence_blob
+                ),
+            )
+            independent_review = {
+                "class": "review_attempt",
+                "path": cleanup_review,
+                "commit": head2,
+                "blob": review_blob,
+            }
+            exact_locator = {
+                "repository": H019_REPOSITORY,
+                "path": H019_EVIDENCE_PATH,
+                "commit": head1,
+                "blob": test_blob,
+            }
+            cases = (
+                ("exact-locator-absent", [exact_locator], base_locators),
+                (
+                    "same-path-wrong-identity",
+                    [H019_EVIDENCE_PATH],
+                    base_locators + (
+                        H017RecoveryPackageLocator(
+                            "evidence", H019_EVIDENCE_PATH, "f" * 40, "e" * 40
+                        ),
+                    ),
+                ),
+            )
+            for label, tests_evidence, locators in cases:
+                with self.subTest(label=label):
+                    package = H017RecoveryProof(
+                        workstream_id=BOARD_WORKSTREAM,
+                        workstream_path="workstream",
+                        workstream_commit="0" * 40,
+                        workstream_blob="0" * 40,
+                        board_path=BOARD_PATH,
+                        board_commit="0" * 40,
+                        board_blob="0" * 40,
+                        locators=locators,
+                        genuinely_empty=False,
+                        package_digest="",
+                    )
+                    work = {
+                        "work_id": H019_WORK_ID,
+                        "subject": subject,
+                        "tests_evidence": tests_evidence,
+                        "covers_observation_ids": ["O2"],
+                        "complete": True,
+                        "independent_review": independent_review,
+                    }
+                    with patch(
+                        "tools.close_contract.derive_recovery_package_from_board",
+                        return_value=package,
+                    ):
+                        with self.assertRaisesRegex(
+                            CloseContractError, "evidence is absent"
+                        ):
+                            verify_final_observation_reconciliation_from_board(
+                                project_root=project,
+                                board_path=BOARD_PATH,
+                                card_id=BOARD_CARD,
+                                observations=[{
+                                    "id": "O2",
+                                    "disposition": "cleanup_candidate",
+                                }],
+                                cleanup_works=[work],
+                                project_repository=H019_REPOSITORY,
+                            )
 
 
 def _write_board_toml_exact(
