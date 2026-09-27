@@ -1930,7 +1930,9 @@ def verify_final_observation_reconciliation_from_board(
         package_exact = {
             (item.path, item.commit, item.blob) for item in recovery.locators
         }
-        package_paths = {item.path for item in recovery.locators}
+        package_content = {
+            (item.path, item.blob) for item in recovery.locators
+        }
 
         for work in cleanup_list:
             if not isinstance(work, Mapping) or work.get("complete") is not True:
@@ -1953,18 +1955,69 @@ def verify_final_observation_reconciliation_from_board(
                 )
 
             tests_evidence = work.get("tests_evidence", [])
-            if not isinstance(tests_evidence, list):
+            if isinstance(tests_evidence, str) or not isinstance(
+                tests_evidence, Iterable
+            ):
                 raise CloseContractError(
                     f"cleanup work {work_id!r} tests_evidence must be an array"
                 )
-            missing_tests = sorted(
-                raw for raw in tests_evidence
-                if isinstance(raw, str) and raw not in package_paths
+            subject = work.get("subject")
+            subject_commit = (
+                subject.get("commit") if isinstance(subject, Mapping) else None
             )
+            if (
+                not isinstance(subject_commit, str)
+                or re.fullmatch(r"[0-9a-f]{40}", subject_commit) is None
+            ):
+                raise CloseContractError(
+                    f"cleanup work {work_id!r} lacks exact subject commit for "
+                    "recovery package evidence composition"
+                )
+            missing_tests: list[str] = []
+            for index, raw in enumerate(tests_evidence):
+                label = f"cleanup work {work_id!r} package tests_evidence[{index}]"
+                if isinstance(raw, str):
+                    try:
+                        evidence_path = normalize_locator_path(raw, label)
+                        evidence_blob = resolve_blob_at_commit(
+                            project_root=root,
+                            commit=subject_commit,
+                            path=evidence_path,
+                            label=label,
+                        )
+                    except ExactLocatorError as exc:
+                        raise CloseContractError(
+                            f"{label} exact identity failed during recovery "
+                            f"package composition: {exc}"
+                        ) from exc
+                elif isinstance(raw, Mapping):
+                    raw_path = raw.get("path")
+                    evidence_blob = raw.get("blob")
+                    if (
+                        not isinstance(raw_path, str)
+                        or not isinstance(evidence_blob, str)
+                        or re.fullmatch(r"[0-9a-f]{40}", evidence_blob) is None
+                    ):
+                        raise CloseContractError(
+                            f"{label} requires exact path + blob identity"
+                        )
+                    try:
+                        evidence_path = normalize_locator_path(raw_path, label)
+                    except ExactLocatorError as exc:
+                        raise CloseContractError(
+                            f"{label} path is invalid during recovery package "
+                            f"composition: {exc}"
+                        ) from exc
+                else:
+                    raise CloseContractError(
+                        f"{label} must be an exact locator table or canonical path string"
+                    )
+                if (evidence_path, evidence_blob) not in package_content:
+                    missing_tests.append(f"{evidence_path}@{evidence_blob}")
             if missing_tests:
                 raise CloseContractError(
                     f"cleanup work {work_id!r} evidence is absent from the H017 "
-                    "recovery package: " + ", ".join(missing_tests)
+                    "recovery package: " + ", ".join(sorted(missing_tests))
                 )
 
             try:
@@ -1981,15 +2034,38 @@ def verify_final_observation_reconciliation_from_board(
                     f"cleanup work {work_id!r} package Review identity failed: {exc}"
                 ) from exc
             review_evidence = cleanup_review.get("evidence_path", "")
-            if (
-                isinstance(review_evidence, str)
-                and review_evidence.strip()
-                and review_evidence.strip() not in package_paths
-            ):
-                raise CloseContractError(
-                    f"cleanup work {work_id!r} Review evidence is absent from "
-                    f"the H017 recovery package: {review_evidence.strip()}"
-                )
+            if isinstance(review_evidence, str) and review_evidence.strip():
+                review_evidence_path = review_evidence.strip()
+                review_commit = review_ref.get("commit")
+                if (
+                    not isinstance(review_commit, str)
+                    or re.fullmatch(r"[0-9a-f]{40}", review_commit) is None
+                ):
+                    raise CloseContractError(
+                        f"cleanup work {work_id!r} Review evidence lacks exact "
+                        "review commit for recovery package composition"
+                    )
+                try:
+                    review_evidence_blob = resolve_blob_at_commit(
+                        project_root=root,
+                        commit=review_commit,
+                        path=review_evidence_path,
+                        label=f"cleanup work {work_id!r} package Review evidence",
+                    )
+                except ExactLocatorError as exc:
+                    raise CloseContractError(
+                        f"cleanup work {work_id!r} Review evidence exact identity "
+                        f"failed during recovery package composition: {exc}"
+                    ) from exc
+                if (
+                    review_evidence_path,
+                    review_evidence_blob,
+                ) not in package_content:
+                    raise CloseContractError(
+                        f"cleanup work {work_id!r} Review evidence is absent from "
+                        f"the H017 recovery package: "
+                        f"{review_evidence_path}@{review_evidence_blob}"
+                    )
 
     return "final_observation_reconciliation_complete"
 
