@@ -91,6 +91,9 @@ def validate_review_acceptance_migration_shape(
     card_prefix = f"implementation/workstreams/{workstream_id}/cards/"
     if not source_path.startswith(review_prefix) or not source_path.endswith(".toml"):
         raise _fail(label, "source_path is outside selected workstream reviews")
+    expected_review = f"{review_prefix}{out['card_id']}-{out['attempt_id']}.toml"
+    if source_path != expected_review:
+        raise _fail(label, "source_path does not match claimed Card/attempt identity")
     if not acceptance_path.startswith(card_prefix) or not acceptance_path.endswith(".md"):
         raise _fail(label, "acceptance_path is outside selected workstream cards")
     expected_card = f"{card_prefix}{out['card_id']}.md"
