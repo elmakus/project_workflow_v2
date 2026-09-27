@@ -152,6 +152,33 @@ class StateEnvelopeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "duplicate migration"):
             validate_board(duplicate, self.workstream)
 
+        unknown_owner = copy.deepcopy(base)
+        unknown_proof = copy.deepcopy(proof)
+        unknown_proof["card_id"] = "M99-T99"
+        unknown_proof["source_card"] = "M99-T99"
+        unknown_proof["acceptance_path"] = (
+            "implementation/workstreams/sample-workstream/cards/M99-T99.md"
+        )
+        unknown_owner["review_acceptance_migrations"] = [unknown_proof]
+        with self.assertRaisesRegex(ValidationError, "unknown Card"):
+            validate_board(unknown_owner, self.workstream)
+
+        non_done_owner = copy.deepcopy(base)
+        non_done_owner["cards"][0]["status"] = "in_progress"
+        non_done_owner["review_acceptance_migrations"] = [proof]
+        with self.assertRaisesRegex(ValidationError, "requires DONE Card"):
+            validate_board(non_done_owner, self.workstream)
+
+        wrong_contract = copy.deepcopy(base)
+        wrong_contract["cards"][0]["contract"]["path"] = (
+            "implementation/workstreams/sample-workstream/cards/M01-T99.md"
+        )
+        wrong_contract["review_acceptance_migrations"] = [proof]
+        with self.assertRaisesRegex(
+            ValidationError, "acceptance_path does not match selected Card contract"
+        ):
+            validate_board(wrong_contract, self.workstream)
+
         wrong_locator = copy.deepcopy(base)
         wrong_proof = copy.deepcopy(proof)
         wrong_proof["source_blob"] = "d" * 40
