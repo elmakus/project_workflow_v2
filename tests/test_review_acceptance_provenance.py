@@ -142,6 +142,14 @@ class ReviewAcceptanceProvenanceTests(unittest.TestCase):
                     bad, workstream_id=WS, card_id=CARD_ID
                 )
             bad = dict(proof)
+            bad["attempt_id"] = "R99"
+            with self.assertRaisesRegex(
+                ReviewAcceptanceProvenanceError, "source_path does not match claimed Card/attempt identity"
+            ):
+                validate_review_acceptance_migration_shape(
+                    bad, workstream_id=WS, card_id=CARD_ID
+                )
+            bad = dict(proof)
             bad["extra"] = "no"
             with self.assertRaises(ReviewAcceptanceProvenanceError):
                 validate_review_acceptance_migration_shape(
