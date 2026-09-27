@@ -1030,15 +1030,15 @@ def durable_close_completion_stop(
         )
     except (CloseContractError, KeyError) as exc:
         return recovery(reads, f"durable Close completion invalid: {exc}")
-    if proof != "approved_scope_durably_complete":
+    if proof.approved_scope_durably_complete is not True:
         return recovery(
             reads,
             f"durable Close completion returned unexpected proof state {proof!r}",
         )
     action = close_continuation(
-        approved_scope_durably_complete=True,
-        next_authorized_obligation=False,
-        explicit_authorization_gate_due=False,
+        approved_scope_durably_complete=proof.approved_scope_durably_complete,
+        next_authorized_obligation=proof.next_authorized_obligation,
+        explicit_authorization_gate_due=proof.explicit_authorization_gate_due,
     )
     if action != "end_of_scope_stop":
         return recovery(
@@ -1050,8 +1050,8 @@ def durable_close_completion_stop(
         "stop",
         "end_of_scope_stop",
         "Exact durable Close completion proves approved scope complete after "
-        "DONE/review and JIT terminality readback; end of approved scope is the "
-        "next real stop",
+        "DONE/review, JIT, recovery-package and fresh final-review readback; "
+        "end of approved scope is the next real stop",
         owner_module="workflow/CLOSE.md",
     )
 
