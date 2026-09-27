@@ -15,6 +15,7 @@ try:
     from tools.review_contract import (
         OBSERVATION_DISPOSITIONS,
         ReviewContractError,
+        can_finalize_review_obligation,
         derive_observation_state,
     )
     from tools.state_contract import (
@@ -25,6 +26,7 @@ try:
         validate_board,
         validate_locator,
         validate_project,
+        validate_planning,
         validate_review,
         validate_review_history,
         validate_workstream,
@@ -52,6 +54,7 @@ except ModuleNotFoundError:  # direct script execution from tools/
     from review_contract import (
         OBSERVATION_DISPOSITIONS,
         ReviewContractError,
+        can_finalize_review_obligation,
         derive_observation_state,
     )
     from state_contract import (
@@ -62,6 +65,7 @@ except ModuleNotFoundError:  # direct script execution from tools/
         validate_board,
         validate_locator,
         validate_project,
+        validate_planning,
         validate_review,
         validate_review_history,
         validate_workstream,
@@ -993,8 +997,7 @@ def _h019_prove_review_acceptance(
     except ExactLocatorError as exc:
         if exc.kind == "mutated":
             raise CloseContractError(
-                f"{label} {acc_path!r} is stale: package worktree bytes do "
-                f"not match declared blob {blob} (blob mismatch)"
+                f"{label} {acc_path!r} is stale: package worktree bytes do "                f"not match declared blob {blob} (blob mismatch)"
             ) from exc
         if exc.kind == "missing":
             raise CloseContractError(
@@ -1993,8 +1996,7 @@ def _h017_inventory_for_subdir(
         for line in completed.stdout.splitlines():
             candidate = line.strip()
             if candidate.startswith(rel_dir + "/") and candidate.endswith(suffix):
-                inventory.add(candidate)
-    return sorted(inventory)
+                inventory.add(candidate)    return sorted(inventory)
 
 
 def _h017_durable_package_inventory(root: Path, workstream_id: str) -> dict[str, list[str]]:
@@ -2993,8 +2995,7 @@ def _verify_postmerge_evidence(
 
 def verify_target_side_recovery_from_board(
     *,
-    project_root: Path | str,
-    workstream_path: str,
+    project_root: Path | str,    workstream_path: str,
     board_path: str,
     source_branch: str,
     source_head: str,
@@ -3146,21 +3147,242 @@ def verify_terminal_jit_completeness_from_board(
     return "jit_terminal"
 
 
+
+@dataclass(frozen=True)
+class DurableCloseCompletionProof:
+    """Continuation inputs derived only after exact terminal Close proof."""
+
+    approved_scope_durably_complete: bool
+    next_authorized_obligation: bool
+    explicit_authorization_gate_due: bool
+
+
+def _rf015_prove_final_review(
+    *,
+    root: Path,
+    repository: str,
+    workstream: Mapping[str, object],
+    completion: Mapping[str, object],
+    terminal_board: Mapping[str, object],
+) -> None:
+    """Prove one fresh independent final discovery over the exact terminal Board.
+
+    The final review is semantic authority for the whole approved planning
+    subject. This keeps recovery/cleanup/authorization judgments in Review
+    instead of inventing caller booleans in the deterministic selector.
+    """
+    workstream_id = str(workstream["workstream_id"])
+    planning_ref = workstream.get("planning")
+    if not isinstance(planning_ref, Mapping):
+        raise CloseContractError(
+            "durable Close completion requires exact approved Planning state "
+            "before a final integration review can authorize completion"
+        )
+    try:
+        planning_path = validate_locator(
+            dict(planning_ref), "planning", "close completion planning", workstream_id
+        )
+    except ValidationError as exc:
+        raise CloseContractError(f"Close completion Planning locator invalid: {exc}") from exc
+    try:
+        planning, _, _ = _h017_read_proved_toml(
+            root, planning_path, "close completion planning"
+        )
+    except CloseContractError as exc:
+        raise CloseContractError(
+            f"Close completion Planning exact proof failed: {exc}"
+        ) from exc
+    try:
+        validate_planning(planning, workstream_id)
+    except ValidationError as exc:
+        raise CloseContractError(f"Close completion Planning state invalid: {exc}") from exc
+    if planning.get("state") != "approved":
+        raise CloseContractError("Close completion requires approved Planning state")
+    plan_subject = planning.get("subject")
+    if not isinstance(plan_subject, Mapping):
+        raise CloseContractError("Close completion approved Planning lacks exact subject")
+    for key in ("repository", "commit", "path", "blob"):
+        value = plan_subject.get(key)
+        if not isinstance(value, str) or not value:
+            raise CloseContractError(
+                f"Close completion approved Planning subject lacks exact {key}"
+            )
+    if plan_subject.get("repository") != repository:
+        raise CloseContractError(
+            "Close completion approved Planning subject belongs to another repository"
+        )
+    try:
+        verify_exact_git_locator(
+            project_root=root,
+            repository=repository,
+            expected_repository=repository,
+            commit=str(plan_subject["commit"]),
+            path=str(plan_subject["path"]),
+            blob=str(plan_subject["blob"]),
+            label="close completion approved planning subject",
+        )
+        verify_worktree_freshness(
+            project_root=root,
+            path=str(plan_subject["path"]),
+            blob=str(plan_subject["blob"]),
+            label="close completion approved planning subject",
+        )
+        require_commit_in_head_ancestry(
+            project_root=root,
+            commit=str(plan_subject["commit"]),
+            label="close completion approved planning subject",
+        )
+    except (ExactLocatorError, ReviewAttemptProvenanceError) as exc:
+        raise CloseContractError(
+            f"Close completion approved Planning subject proof failed: {exc}"
+        ) from exc
+
+    review_ref = completion.get("final_review")
+    if not isinstance(review_ref, Mapping) or set(review_ref) != {
+        "class", "path", "commit", "blob"
+    }:
+        raise CloseContractError(
+            "durable Close completion requires exact final_review "
+            "class/path/commit/blob proof"
+        )
+    if review_ref.get("class") != "review_attempt":
+        raise CloseContractError(
+            "durable Close completion final_review must be review_attempt"
+        )
+    try:
+        review_path = normalize_locator_path(
+            review_ref.get("path"), "close completion final review"
+        )
+    except ExactLocatorError as exc:
+        raise CloseContractError(f"Close completion final review path invalid: {exc}") from exc
+    review_prefix = f"implementation/workstreams/{workstream_id}/reviews/"
+    if not review_path.startswith(review_prefix) or not review_path.endswith(".toml"):
+        raise CloseContractError(
+            "Close completion final review is sibling/unowned; expected "
+            f"{review_prefix}*.toml"
+        )
+    review_commit = review_ref.get("commit")
+    review_blob = review_ref.get("blob")
+    try:
+        verified_review = verify_exact_git_locator(
+            project_root=root,
+            repository=repository,
+            expected_repository=repository,
+            commit=review_commit,
+            path=review_path,
+            blob=review_blob,
+            label="close completion final review",
+        )
+        review_bytes = verify_worktree_freshness(
+            project_root=root,
+            path=review_path,
+            blob=review_blob,
+            label="close completion final review",
+        )
+        require_commit_in_head_ancestry(
+            project_root=root,
+            commit=verified_review.commit,
+            label="close completion final review",
+        )
+    except (ExactLocatorError, ReviewAttemptProvenanceError) as exc:
+        raise CloseContractError(
+            f"Close completion final review exact proof failed: {exc}"
+        ) from exc
+    try:
+        review = tomllib.loads(review_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError, ValueError) as exc:
+        raise CloseContractError(
+            f"Close completion final review is malformed TOML: {exc}"
+        ) from exc
+    try:
+        validate_review(review, expected_review_scope="final")
+    except ValidationError as exc:
+        raise CloseContractError(f"Close completion final review invalid: {exc}") from exc
+    if review.get("workstream_id") != workstream_id:
+        raise CloseContractError("Close completion final review belongs to another workstream")
+    if review.get("verdict") != "green" or not can_finalize_review_obligation(review):
+        raise CloseContractError(
+            "Close completion requires a fresh GREEN final discovery review"
+        )
+
+    subject = review.get("subject")
+    expected_subject = {
+        "class": "git_blob",
+        "repository": repository,
+        "commit": terminal_board.get("commit"),
+        "path": terminal_board.get("path"),
+        "blob": terminal_board.get("blob"),
+    }
+    if subject != expected_subject:
+        raise CloseContractError(
+            "Close completion final review is stale/unbound: subject must be "
+            "the exact current terminal Task Board"
+        )
+    acceptance = review.get("acceptance")
+    expected_acceptance = {
+        "class": "authority",
+        "path": plan_subject.get("path"),
+        "commit": plan_subject.get("commit"),
+        "blob": plan_subject.get("blob"),
+    }
+    if acceptance != expected_acceptance:
+        raise CloseContractError(
+            "Close completion final review acceptance must bind the exact "
+            "currently approved Planning subject"
+        )
+
+    evidence_path = review.get("evidence_path")
+    if not isinstance(evidence_path, str) or not evidence_path.strip():
+        raise CloseContractError("Close completion final review lacks terminal evidence")
+    try:
+        evidence_rel = normalize_locator_path(
+            evidence_path, "close completion final review evidence"
+        )
+    except ExactLocatorError as exc:
+        raise CloseContractError(
+            f"Close completion final review evidence path invalid: {exc}"
+        ) from exc
+    evidence_prefix = f"implementation/workstreams/{workstream_id}/evidence/"
+    if not evidence_rel.startswith(evidence_prefix) or not evidence_rel.endswith(".md"):
+        raise CloseContractError(
+            "Close completion final review evidence must be workstream-local Markdown"
+        )
+    try:
+        evidence_blob = resolve_blob_at_commit(
+            project_root=root,
+            commit=str(review_commit),
+            path=evidence_rel,
+            label="close completion final review evidence",
+        )
+        verify_worktree_freshness(
+            project_root=root,
+            path=evidence_rel,
+            blob=evidence_blob,
+            label="close completion final review evidence",
+        )
+    except ExactLocatorError as exc:
+        raise CloseContractError(
+            f"Close completion final review evidence exact proof failed: {exc}"
+        ) from exc
+
+
 def verify_durable_close_completion_from_state(
     *,
     project_root: Path | str,
     workstream_path: str,
     board_path: str,
     project_repository: str | None = None,
-) -> str:
+) -> DurableCloseCompletionProof:
     """Prove approved-scope Close completion from exact durable Git state.
 
-    The completion input is a structured workstream locator, never a caller
-    boolean, free text, path-only hint or empty-queue inference. The selected
-    workstream must point at one exact committed completion record; that record
-    in turn binds the exact current terminal Task Board. RF001/RF007/RF014
-    remain the serving foundations: all Cards must be DONE and JIT terminality
-    must still verify from the exact Board before completion can be accepted.
+    A completion marker alone is never terminal proof. Exact completion must
+    bind the exact terminal Board, reuse the RF011 recovery-package derivation,
+    and carry a fresh independent GREEN final-scope review of that Board
+    against the exact currently approved Planning subject. That semantic final
+    review is what proves required acceptance/cleanup evidence is complete and
+    that no authorization gate or already-authorized in-scope obligation
+    remains. The selector therefore receives derived continuation inputs,
+    never caller-attested booleans.
     """
     root = Path(project_root).resolve()
     workstream = _read_project_toml(root, workstream_path, "workstream")
@@ -3229,19 +3451,19 @@ def verify_durable_close_completion_from_state(
         raise CloseContractError(f"Close completion exact proof failed: {exc}") from exc
 
     completion = _read_project_toml(root, completion_path, "close completion")
-    if set(completion) != {"version", "workstream_id", "state", "terminal_board"}:
+    if set(completion) != {
+        "version", "workstream_id", "state", "terminal_board", "final_review"
+    }:
         raise CloseContractError(
             "Close completion record has unsupported or missing fields; expected "
-            "version/workstream_id/state/terminal_board only"
+            "version/workstream_id/state/terminal_board/final_review only"
         )
     if completion.get("version") != 1:
         raise CloseContractError("Close completion version must be 1")
     if completion.get("workstream_id") != workstream["workstream_id"]:
         raise CloseContractError("Close completion is forged for a sibling workstream")
     if completion.get("state") != "complete":
-        raise CloseContractError(
-            "Close completion record is not durably complete"
-        )
+        raise CloseContractError("Close completion record is not durably complete")
 
     terminal = completion.get("terminal_board")
     if not isinstance(terminal, dict) or set(terminal) != {
@@ -3305,8 +3527,31 @@ def verify_durable_close_completion_from_state(
         board_path=board_path,
         project_repository=repository,
     )
-    return "approved_scope_durably_complete"
 
+    # RF011 is a stable dependency of RF015. Re-derive its premerge recovery
+    # package from the same exact terminal Board so a semantically incomplete
+    # package cannot be hidden behind a completion marker.
+    derive_recovery_package_from_board(
+        project_root=root,
+        workstream_path=workstream_path,
+        board_path=board_path,
+        source_branch=str(workstream["branch"]),
+        project_repository=repository,
+    )
+
+    _rf015_prove_final_review(
+        root=root,
+        repository=repository,
+        workstream=workstream,
+        completion=completion,
+        terminal_board=terminal,
+    )
+
+    return DurableCloseCompletionProof(
+        approved_scope_durably_complete=True,
+        next_authorized_obligation=False,
+        explicit_authorization_gate_due=False,
+    )
 
 def close_continuation(
     *,
