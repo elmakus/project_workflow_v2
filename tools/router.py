@@ -80,6 +80,11 @@ from tools.review_attempt_provenance import (
     verify_review_attempt_locator,
     verify_terminal_append_only_from_git,
 )
+from tools.review_acceptance_provenance import (
+    ReviewAcceptanceProvenanceError,
+    migration_for_attempt as review_acceptance_migration_for_attempt,
+    verify_review_acceptance_migration,
+)
 from tools.state_contract import (
     ValidationError,
     read_project,
@@ -806,6 +811,44 @@ def done_close_gate(
                         f"DONE Card {card_id} legacy review acceptance proof failed: {exc}",
                     )
                 reads.items.append(derived_read)
+                reads.project(reviewed_path)
+            elif acceptance_commit is None and acceptance_blob is None:
+                try:
+                    migration = review_acceptance_migration_for_attempt(
+                        board, card_id, str(attempts[-1].get("attempt", ""))
+                    )
+                except ReviewAcceptanceProvenanceError as exc:
+                    return recovery(
+                        reads, f"DONE Card {card_id} review acceptance migration invalid: {exc}"
+                    )
+                if migration is None:
+                    return recovery(
+                        reads,
+                        f"DONE Card {card_id} review acceptance requires exact commit + blob Task Card "
+                        "identity; path-only acceptance cannot prove exact content",
+                    )
+                if parsed_result.get("result_status") != "success":
+                    return recovery(
+                        reads,
+                        f"DONE Card {card_id} review acceptance migration requires structured "
+                        "Result status success",
+                    )
+                try:
+                    migration_read = verify_review_acceptance_migration(
+                        project_root=reads.project_root,
+                        project_repository=project["repository"],
+                        workstream_id=workstream["workstream_id"],
+                        card=card,
+                        attempt_ref=attempt_refs[-1],
+                        attempt=attempts[-1],
+                        proof=migration,
+                        label=f"DONE Card {card_id} review acceptance migration",
+                    )
+                except ReviewAcceptanceProvenanceError as exc:
+                    return recovery(
+                        reads, f"DONE Card {card_id} review acceptance migration failed: {exc}"
+                    )
+                reads.items.append(migration_read)
                 reads.project(reviewed_path)
             else:
                 return recovery(
@@ -1929,9 +1972,44 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                 acceptance_commit = reviewed_acceptance.get("commit")
                 acceptance_blob = reviewed_acceptance.get("blob")
                 if not isinstance(acceptance_commit, str) or not isinstance(acceptance_blob, str):
-                    raise ValidationError(
-                        "review acceptance requires exact commit + blob Task Card identity; path-only acceptance cannot prove exact content"
-                    )
+                    if acceptance_commit is None and acceptance_blob is None and card.get("status") == "done":
+                        try:
+                            migration = review_acceptance_migration_for_attempt(
+                                board, card["id"], str(attempts[-1].get("attempt", ""))
+                            )
+                        except ReviewAcceptanceProvenanceError as exc:
+                            raise ValidationError(
+                                f"review acceptance migration invalid: {exc}"
+                            ) from exc
+                        if migration is None:
+                            raise ValidationError(
+                                "review acceptance requires exact commit + blob Task Card identity; path-only acceptance cannot prove exact content"
+                            )
+                        if parsed_result.get("result_status") != "success":
+                            raise ValidationError(
+                                "review acceptance migration requires structured Result status success"
+                            )
+                        try:
+                            migration_read = verify_review_acceptance_migration(
+                                project_root=reads.project_root,
+                                project_repository=project["repository"],
+                                workstream_id=workstream["workstream_id"],
+                                card=card,
+                                attempt_ref=attempt_refs[-1],
+                                attempt=attempts[-1],
+                                proof=migration,
+                                label=f"Card {card['id']} review acceptance migration",
+                            )
+                        except ReviewAcceptanceProvenanceError as exc:
+                            raise ValidationError(
+                                f"review acceptance migration failed: {exc}"
+                            ) from exc
+                        reads.items.append(migration_read)
+                        reads.project(reviewed_path)
+                    else:
+                        raise ValidationError(
+                            "review acceptance requires exact commit + blob Task Card identity; path-only acceptance cannot prove exact content"
+                        )
                 try:
                     verified_acceptance = verify_exact_git_locator(
                         project_root=reads.project_root,
