@@ -155,12 +155,20 @@ try:
         validate_review_attempt_locator_shape,
         verify_history_append_only,
     )
+    from tools.review_acceptance_provenance import (
+        ReviewAcceptanceProvenanceError,
+        validate_review_acceptance_migration_shape,
+    )
 except ModuleNotFoundError:  # direct script execution from tools/
     from review_attempt_provenance import (
         ReviewAttemptProvenanceError,
         validate_legacy_migration_shape,
         validate_review_attempt_locator_shape,
         verify_history_append_only,
+    )
+    from review_acceptance_provenance import (
+        ReviewAcceptanceProvenanceError,
+        validate_review_acceptance_migration_shape,
     )
 
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
@@ -1157,6 +1165,51 @@ def validate_board(
         _require(
             result_ref.get("path") == proof["source_path"],
             f"{label}: source_path does not match Card {card_id!r} Result path",
+        )
+
+    review_acceptance_migrations = data.get("review_acceptance_migrations", [])
+    _require(
+        isinstance(review_acceptance_migrations, list),
+        "task_board: review_acceptance_migrations must be an array",
+    )
+    migrated_acceptances: set[tuple[str, str]] = set()
+    for index, raw in enumerate(review_acceptance_migrations):
+        label = f"task_board.review_acceptance_migrations[{index}]"
+        try:
+            proof = validate_review_acceptance_migration_shape(
+                raw, workstream_id=workstream["workstream_id"], label=label
+            )
+        except ReviewAcceptanceProvenanceError as exc:
+            raise ValidationError(str(exc)) from exc
+        key = (proof["card_id"], proof["attempt_id"])
+        _require(key not in migrated_acceptances, f"{label}: duplicate migration for {key!r}")
+        migrated_acceptances.add(key)
+        owner = cards_by_id.get(proof["card_id"])
+        _require(owner is not None, f"{label}: unknown Card {proof['card_id']!r}")
+        _require(
+            owner.get("status") == "done",
+            f"{label}: review acceptance migration requires DONE Card {proof['card_id']!r}",
+        )
+        _require(
+            proof["card_id"] not in migrated_cards,
+            f"{label}: review acceptance migration must not overlap legacy Result migration",
+        )
+        _require(
+            isinstance(owner.get("contract"), dict)
+            and owner["contract"].get("path") == proof["acceptance_path"],
+            f"{label}: acceptance_path does not match selected Card contract",
+        )
+        refs = owner.get("review_attempts", [])
+        matches = [
+            ref for ref in refs
+            if isinstance(ref, dict)
+            and ref.get("path") == proof["source_path"]
+            and ref.get("commit") == proof["source_commit"]
+            and ref.get("blob") == proof["source_blob"]
+        ]
+        _require(
+            len(matches) == 1,
+            f"{label}: source Review identity must match exactly one selected Card review locator",
         )
 
     research_obligation = data.get("research_obligation")
