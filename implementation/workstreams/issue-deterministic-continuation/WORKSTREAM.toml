@@ -24,3 +24,7 @@ path = "implementation/workstreams/issue-deterministic-continuation/RESEARCH.tom
 [tracker]
 class = "tracker"
 path = "implementation/workstreams/issue-deterministic-continuation/TRACKER.toml"
+
+[task_board]
+class = "task_board"
+path = "implementation/workstreams/issue-deterministic-continuation/TASK_BOARD.toml"
