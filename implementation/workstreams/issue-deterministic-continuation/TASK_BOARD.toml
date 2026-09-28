@@ -6,7 +6,7 @@ branch = "work/pwv2-deterministic-continuation"
 
 [[cards]]
 id = "M01-T01"
-status = "in_progress"
+status = "done"
 review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-deterministic-continuation/reviews/M01-T01-R01.toml" }]
 
 [cards.contract]
