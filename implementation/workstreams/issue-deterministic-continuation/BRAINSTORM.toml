@@ -1,0 +1,23 @@
+workstream_id = "issue-deterministic-continuation"
+scope_id = "deterministic-nonstop-continuation"
+revision = 1
+state = "active"
+final_challenge = "pending"
+user_stop = false
+promotion_authorization = "pending"
+promotion_subject = "deterministic-nonstop-continuation@1"
+
+problem = "PWv2 defines many semantic boundaries as non-stops and routes deterministic continuation after them, but observed runtime behavior can terminate after a durable RED review instead of continuing to the next canonical obligation."
+authorized_repair_subject = "repair:deterministic-nonstop-continuation:v1"
+current_direction = "Establish a runtime-neutral continuation-completion invariant that composes router/owner transitions until a real USER_STOP/blocker/end-of-scope boundary, without turning ordinary RED/GREEN/Card/role completion into stops and without weakening independent-review semantics."
+open_questions = [
+  "Which canonical non-stop transitions must be covered by the invariant beyond RED?",
+  "Where should the invariant live so semantic routing remains authority while delivery/runtime realization becomes behaviorally testable?",
+  "How should external fresh-review contexts return/continue without persisting runtime identity or inventing a role lifecycle?",
+  "What loop/fail-closed guards are required to prevent runaway continuation on contradictory or non-progressing durable state?",
+  "Which existing #11 contracts/tests should be generalized versus kept as the narrower real-stop delivery contract?"
+]
+research_needed = true
+research_subject = "research:deterministic-continuation-composition:v1"
+research_mode = "formal_orchestrated"
+research_note = "Use the Project Research Orchestration Protocol for broad architecture/prior-art/runtime/red-team coverage before final Brainstorming challenge."
