@@ -1,8 +1,8 @@
 workstream_id = "issue-handoff-determinism"
 card_id = "M01-T01"
 attempt = "R02"
-verdict = "pending"
-evidence_path = ""
+verdict = "red"
+evidence_path = "implementation/workstreams/issue-handoff-determinism/evidence/M01-T01-R02-review.md"
 
 [subject]
 class = "git_blob"
@@ -17,4 +17,4 @@ path = "implementation/workstreams/issue-handoff-determinism/cards/M01-T01.md"
 
 [independence]
 materially_produced_or_repaired_subject = false
-basis = "R02 requires a fresh independent context because the context that finalized R01 RED materially repaired the exact current result subject."
+basis = "R02 performed in a fresh independent context that did not materially produce or repair the exact reviewed subject."
