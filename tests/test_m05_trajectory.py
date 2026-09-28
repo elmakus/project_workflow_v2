@@ -148,10 +148,111 @@ class M05TrajectoryConformanceTests(unittest.TestCase):
         with self.assertRaises(CloseContractError):
             close_continuation(approved_scope_durably_complete=True, next_authorized_obligation=True, explicit_authorization_gate_due=False)
 
-    def test_12_alignment_and_premium_boundaries_are_real_stops(self) -> None:
-        for obligation in ("unresolved_user_or_product_decision", "premium_A", "premium_B", "premium_C"):
-            with self.subTest(obligation=obligation):
-                self.assertTrue(classify_route_completion(disposition="stop", obligation=obligation).legal_return)
+    def test_12_alignment_promotion_and_premium_boundaries_stop_via_selector(self) -> None:
+        h = self.helper()
+
+        temp, project = h.copy_fixture()
+        try:
+            h.install_intake(project, (
+                'workstream_id = "sample-workstream"\n'
+                'kind = "issue"\n'
+                'state = "active"\n'
+                'diagnosis_revision = 1\n'
+                'repair_subject = "repair:v1"\n'
+                'diagnosis_prior_art_subject = "repair:v1"\n'
+                'diagnosis_prior_art_result = "evidence/intake-prior-art.md"\n'
+                'response_kind = "none"\n'
+                'response_observed = false\n'
+                'alignment_state = "pending"\n'
+                'alignment_subject = ""\n'
+                'micro_fix_candidate = false\n'
+            ))
+            h.install_state_record(
+                project, "research", "research", "RESEARCH.toml",
+                h.issue_research_content("repair:v1"),
+            )
+            routed = select_route(project, [MANIFEST])
+            self.assertEqual((routed.disposition, routed.obligation), ("stop", "issue_alignment"))
+            self.assertTrue(classify_route_completion(
+                disposition=routed.disposition, obligation=routed.obligation,
+            ).legal_return)
+        finally:
+            temp.cleanup()
+
+        temp, project = h.copy_fixture()
+        try:
+            h.install_state_record(project, "brainstorm", "brainstorm", "BRAINSTORM.toml", (
+                'workstream_id = "sample-workstream"\n'
+                'scope_id = "scope-a"\n'
+                'revision = 2\n'
+                'state = "ready_for_definition"\n'
+                'challenge_audit = "green"\n'
+                'explicit_user_stop = false\n'
+                'promotion_state = "pending"\n'
+                'promotion_subject = ""\n'
+            ))
+            routed = select_route(project, [MANIFEST])
+            self.assertEqual((routed.disposition, routed.obligation), ("stop", "definition_promotion"))
+            self.assertTrue(classify_route_completion(
+                disposition=routed.disposition, obligation=routed.obligation,
+            ).legal_return)
+        finally:
+            temp.cleanup()
+
+        temp, project = h.copy_fixture()
+        try:
+            h.install_state_record(project, "brainstorm", "brainstorm", "BRAINSTORM.toml", (
+                'workstream_id = "sample-workstream"\n'
+                'scope_id = "scope-a"\n'
+                'revision = 2\n'
+                'state = "promoted"\n'
+                'challenge_audit = "green"\n'
+                'explicit_user_stop = false\n'
+                'promotion_state = "authorized"\n'
+                'promotion_subject = "scope-a@2"\n'
+            ))
+            h.install_state_record(project, "definition", "definition", "DEFINITION.toml", (
+                'workstream_id = "sample-workstream"\n'
+                'source_scope_subject = "scope-a@2"\n'
+                'revision = "R1"\n'
+                'state = "green"\n'
+                'completeness_audit = "green"\n'
+                'premium_a = "due"\n'
+                'decisions = [{ class = "authority", path = "decisions/ADR-001.md" }]\n'
+                '[requirements]\nclass = "authority"\npath = "requirements/REQUIREMENTS.md"\n'
+            ))
+            routed = select_route(project, [MANIFEST])
+            self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_A"))
+        finally:
+            temp.cleanup()
+
+        temp, project = h.copy_fixture()
+        try:
+            h.install_green_definition(project)
+            h.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                h.planning_content(state="frozen", premium_b="due"),
+            )
+            routed = select_route(project, [MANIFEST])
+            self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_B"))
+        finally:
+            temp.cleanup()
+
+        temp, project = h.copy_fixture()
+        try:
+            h.install_green_definition(project)
+            h.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                h.planning_content(state="approved", premium_b="satisfied", premium_c="due"),
+            )
+            h.install_state_record(
+                project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                h.plan_review_content("green"),
+            )
+            routed = select_route(project, [MANIFEST])
+            self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_C"))
+        finally:
+            temp.cleanup()
 
     def test_13_remediable_recovery_continues_nonremediable_blocker_stops(self) -> None:
         self.assertEqual(classify_resolution("bounded_correction"), ("execution", False))
