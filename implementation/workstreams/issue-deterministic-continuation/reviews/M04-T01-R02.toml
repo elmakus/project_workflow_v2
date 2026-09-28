@@ -1,0 +1,18 @@
+class = "review_attempt"
+review_id = "M04-T01-R02"
+card_id = "M04-T01"
+status = "pending"
+verdict = "pending"
+required = true
+
+[subject]
+class = "result"
+path = "implementation/workstreams/issue-deterministic-continuation/results/M04-T01.md"
+commit = "21493ba6e91f7c87febd0216bf56a7f5990cbbe4"
+blob = "2340a1858f444cccdb73ad42f38841f2bb444251"
+
+[acceptance]
+card_path = "implementation/workstreams/issue-deterministic-continuation/cards/M04-T01.md"
+
+[evidence]
+path = ""
