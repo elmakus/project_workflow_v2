@@ -86,7 +86,7 @@ class ParallelTests(unittest.TestCase):
  def test_stale_card_subject_rejected(self):
   self.assertFalse(legal(claims("a",subject=I("z")),claims("b",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",))))
   with self.assertRaises(NativeFoundationError):
-   compatible_fan_in(("a","b"),{"a":I("z"),"b":CB},[A,B],[result("ra",A),result("rb",B)],{"ra":AACC,"rb":BACC},ADM,read_admission,ACC,read_acceptance,verify,lambda xs:True)
+   compatible_fan_in(("a","b"),{"a":I("z"),"b":CB},[A,B],[result("ra",A),result("rb",B)],{"ra":AACC,"rb":BACC},[claims("a",subject=I("z")),claims("b")],ADM,read_admission,ACC,read_acceptance,verify,lambda xs:True)
  def test_disjoint_claims_parallel(self):
   self.assertTrue(legal(claims("a"),claims("b",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",))))
  def test_overlap_serializes(self):
