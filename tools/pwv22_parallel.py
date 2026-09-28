@@ -87,6 +87,7 @@ def compatible_fan_in(expected_card_ids: Sequence[str],
                       expected_results: Sequence[Mapping[str,Any]],
                       results: Sequence[Mapping[str,Any]],
                       acceptance_identities: Mapping[str,Mapping[str,Any]],
+                      sibling_claims: Sequence[Mapping[str,Any]],
                       admission_identity: Mapping[str,Any],
                       read_admission,
                       admission_acceptance_identity: Mapping[str,Any],
@@ -94,14 +95,17 @@ def compatible_fan_in(expected_card_ids: Sequence[str],
                       verify_identity,
                       compatibility)->list[dict[str,Any]]:
     _req(len(expected_results)>1,"fan-in requires sibling set")
-    _req(len(expected_card_ids)==len(expected_results)==len(results),"incomplete sibling set")
+    _req(len(expected_card_ids)==len(expected_results)==len(results)==len(sibling_claims),"incomplete sibling set")
     _req(len(expected_card_ids)==len(set(expected_card_ids)) and all(isinstance(x,str) and x for x in expected_card_ids),
          "invalid sibling card set")
     a=accepted_admission(admission_identity,read_admission,admission_acceptance_identity,read_acceptance,verify_identity)
     _req(set(expected_card_subjects)==set(expected_card_ids),"sibling subjects must exactly cover cards")
-    for cid in expected_card_ids:
+    for cid,raw_claims in zip(expected_card_ids,sibling_claims):
         subject=exact_identity(expected_card_subjects[cid])
         _req(cid in a["cards"] and cid not in a["revoked"] and a["subjects"][cid]==subject,"sibling exact subject is not admitted")
+        claims=typed_claims(raw_claims)
+        _req(claims["card_id"]==cid and claims["subject"]==subject,"sibling ownership proof subject mismatch")
+        _req(claims["mutating_owner"]==a["mutating_owners"][cid],"sibling mutating owner mismatch")
     accepted=[]
     for expected,result in zip(expected_results,results):
         rid=result.get("result_id","")
