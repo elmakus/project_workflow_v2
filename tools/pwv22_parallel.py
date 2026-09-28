@@ -26,11 +26,17 @@ def typed_admission(record: Mapping[str,Any])->dict[str,Any]:
     _req(all(isinstance(x,str) and x in cards for x in revoked),"revoked card outside admission")
     return {"type":"pwv2.2-admission","admission_id":aid,"subject":subject,"cards":list(cards),"revoked":list(revoked)}
 
-def accepted_admission(admission: Mapping[str,Any], acceptance_identity: Mapping[str,Any],
+def accepted_admission(admission_identity: Mapping[str,Any],
+                       read_admission: Callable[[Mapping[str,Any]],Mapping[str,Any]],
+                       acceptance_identity: Mapping[str,Any],
                        read_acceptance: Callable[[Mapping[str,Any]],Mapping[str,Any]],
                        verify_identity)->dict[str,Any]:
+    admission_ref=exact_identity(admission_identity)
+    verify_identity(admission_ref)
+    admission=read_admission(admission_ref)
+    _req(isinstance(admission,Mapping),"admission artifact must be durable mapping")
     a=typed_admission(admission)
-    verify_identity(a["subject"])
+    _req(a["subject"]==admission_ref,"admission material does not match artifact identity")
     acceptance_ref=exact_identity(acceptance_identity)
     acceptance=read_acceptance(acceptance_ref)
     _req(isinstance(acceptance,Mapping),"admission acceptance must be durable mapping")
@@ -47,11 +53,11 @@ def admitted(card_id: str, admission: Mapping[str,Any])->bool:
     a=typed_admission(admission)
     return card_id in a["cards"] and card_id not in a["revoked"]
 
-def parallel_legal(left: Mapping[str,Any], right: Mapping[str,Any], admission: Mapping[str,Any],
-                   admission_acceptance_identity: Mapping[str,Any], read_acceptance,
+def parallel_legal(left: Mapping[str,Any], right: Mapping[str,Any], admission_identity: Mapping[str,Any],
+                   read_admission, admission_acceptance_identity: Mapping[str,Any], read_acceptance,
                    verify_identity)->bool:
     l=typed_claims(left); r=typed_claims(right)
-    a=accepted_admission(admission,admission_acceptance_identity,read_acceptance,verify_identity)
+    a=accepted_admission(admission_identity,read_admission,admission_acceptance_identity,read_acceptance,verify_identity)
     if l["card_id"]==r["card_id"]: return False
     if l["card_id"] not in a["cards"] or l["card_id"] in a["revoked"]: return False
     if r["card_id"] not in a["cards"] or r["card_id"] in a["revoked"]: return False
@@ -72,7 +78,8 @@ def compatible_fan_in(expected_card_ids: Sequence[str],
                       expected_results: Sequence[Mapping[str,Any]],
                       results: Sequence[Mapping[str,Any]],
                       acceptance_identities: Mapping[str,Mapping[str,Any]],
-                      admission: Mapping[str,Any],
+                      admission_identity: Mapping[str,Any],
+                      read_admission,
                       admission_acceptance_identity: Mapping[str,Any],
                       read_acceptance,
                       verify_identity,
@@ -81,7 +88,7 @@ def compatible_fan_in(expected_card_ids: Sequence[str],
     _req(len(expected_card_ids)==len(expected_results)==len(results),"incomplete sibling set")
     _req(len(expected_card_ids)==len(set(expected_card_ids)) and all(isinstance(x,str) and x for x in expected_card_ids),
          "invalid sibling card set")
-    a=accepted_admission(admission,admission_acceptance_identity,read_acceptance,verify_identity)
+    a=accepted_admission(admission_identity,read_admission,admission_acceptance_identity,read_acceptance,verify_identity)
     for cid in expected_card_ids:
         _req(cid in a["cards"] and cid not in a["revoked"],"sibling is not admitted")
     accepted=[]
