@@ -1,5 +1,5 @@
 workstream_id = "issue-deterministic-continuation"
-revision = 8
+revision = 9
 
 [execution_ref]
 branch = "work/pwv2-deterministic-continuation"
@@ -25,7 +25,6 @@ state = "consumed"
 after_card = "M01-T01"
 condition = "Materialize the M02 progress/restart/external-effect safety Card only after M01 is DONE with a durable exact result that can be bound as its dependency."
 
-
 [[cards]]
 id = "M02-T01"
 status = "done"
@@ -40,3 +39,24 @@ class = "result"
 path = "implementation/workstreams/issue-deterministic-continuation/results/M02-T01.md"
 commit = "e77c2926950958cbff5a56cf1bf96164000eecd5"
 blob = "e0da305f3357ec2bf5d8e0608147b2153b406989"
+
+[[jit_triggers]]
+id = "M03-after-M02"
+state = "consumed"
+after_card = "M02-T01"
+condition = "Materialize the M03 Review/USER_STOP composition Card only after M02 is DONE with a durable exact result that can be bound as its dependency."
+
+[[cards]]
+id = "M03-T01"
+status = "ready"
+review_attempts = []
+
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/issue-deterministic-continuation/cards/M03-T01.md"
+
+[[jit_triggers]]
+id = "M04-after-M03"
+state = "waiting"
+after_card = "M03-T01"
+condition = "Materialize the M04 production adapter realization Card only after M03 is DONE with a durable exact result that can be bound as its dependency."
