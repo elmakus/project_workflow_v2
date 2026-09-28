@@ -71,7 +71,7 @@ def one_mutating_owner(claim_sets: Sequence[Mapping[str,Any]])->bool:
 def compatible_fan_in(expected_card_ids: Sequence[str],
                       expected_results: Sequence[Mapping[str,Any]],
                       results: Sequence[Mapping[str,Any]],
-                      acceptances: Mapping[str,Mapping[str,Any]],
+                      acceptance_identities: Mapping[str,Mapping[str,Any]],
                       admission: Mapping[str,Any],
                       admission_acceptance_identity: Mapping[str,Any],
                       read_acceptance,
@@ -87,8 +87,11 @@ def compatible_fan_in(expected_card_ids: Sequence[str],
     accepted=[]
     for expected,result in zip(expected_results,results):
         rid=result.get("result_id","")
-        acc=acceptances.get(rid)
-        _req(acc is not None,"missing sibling acceptance")
+        acc_identity=acceptance_identities.get(rid)
+        _req(acc_identity is not None,"missing sibling acceptance")
+        acc_ref=exact_identity(acc_identity)
+        acc=read_acceptance(acc_ref)
+        _req(isinstance(acc,Mapping),"sibling acceptance must be durable mapping")
         accepted.append(accepted_dependency(expected,result,acc,verify_identity))
     _req(bool(compatibility(accepted)),"integrated sibling incompatibility")
     return accepted
