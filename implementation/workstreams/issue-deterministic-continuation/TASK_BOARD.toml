@@ -1,5 +1,5 @@
 workstream_id = "issue-deterministic-continuation"
-revision = 5
+revision = 6
 
 [execution_ref]
 branch = "work/pwv2-deterministic-continuation"
@@ -33,3 +33,9 @@ status = "in_progress"
 [cards.contract]
 class = "task_card"
 path = "implementation/workstreams/issue-deterministic-continuation/cards/M02-T01.md"
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-deterministic-continuation/results/M02-T01.md"
+commit = "e77c2926950958cbff5a56cf1bf96164000eecd5"
+blob = "e0da305f3357ec2bf5d8e0608147b2153b406989"
