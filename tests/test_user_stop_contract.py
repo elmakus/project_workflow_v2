@@ -6,6 +6,13 @@ from tools.user_stop_contract import (
     HANDOFF_REQUIRED, router_stop_handoff_policy, validate_user_stop_delivery,
 )
 
+EXPECTED_LOCATOR = (
+    "elmakus/project_workflow_v2",
+    "work/pwv2-handoff-determinism",
+    "independent review M01-T01-R01",
+    "implementation/workstreams/issue-handoff-determinism/TASK_BOARD.toml",
+)
+
 VALID_LOCATOR = """NEW CHAT START PROMPT
 
 Repository: elmakus/project_workflow_v2
