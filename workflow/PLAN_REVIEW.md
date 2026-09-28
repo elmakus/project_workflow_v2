@@ -18,9 +18,16 @@ Each `PLAN_REVIEW.toml` attempt owns:
 - exact acceptance authority;
 - semantic independence proof;
 - pending / green / red verdict;
-- concise evidence locator when verdict is terminal.
+- concise evidence locator when verdict is terminal;
+- the same deterministic exact `definition_authority_key` bound by Planning for the reviewed frozen subject.
 
-A changed material plan subject requires a new attempt. RED history remains attached to its failed subject. The only omission is the Planning-owned `editorial_exempt` case: it must point to a prior exact GREEN-reviewed subject from the same cycle with satisfied C and a bounded semantic basis proving strategy, milestone structure, requirement coverage and gates are unchanged.
+Plan Review binds the identical key string as Planning. Helperless check: the two stored strings must be byte-identical and must equal both the live key derived from the current `DEFINITION.toml` plus `git hash-object` over each authority file and the freeze-time snapshot key derived at the frozen plan subject commit. Missing, stale, mismatched or ambiguous bindings fail closed to Recovery; GREEN on a mismatched or stale binding never authorizes Planning consumption.
+
+Plan Review acceptance binds one exact current Definition authority member plus its exact content: the attempt acceptance must name the exact requirements path or one exact listed decision path from the current `DEFINITION.toml` with exact Git commit/blob identity, that identity must resolve in Git, the commit must be reachable from selected HEAD, and current worktree bytes must still match the declared blob. Unrelated authority-rooted paths, sibling paths outside the exact Definition set, missing identity, off-HEAD commits, and stale/mutated content fail closed; keyless legacy attempts prove claimed identity when present and stay valid path-only otherwise.
+
+Any other verdict — including the generic Card Review `in_progress` state — is invalid for Plan Review and fails closed to Recovery/validation; it never routes as RED correction.
+
+A changed material plan subject requires a new attempt. RED history remains attached to its failed subject. The only omission is the Planning-owned `editorial_exempt` case: it must point to a prior exact GREEN-reviewed subject from the same cycle with satisfied C and an exact immutable independent classification record. Free-text basis is not proof. The record must bind exact prior/changed plan subjects, record inspected diff/evidence, be GREEN and `editorial_only`, explicitly show strategy, milestone topology, requirement coverage, gates and acceptance semantics unchanged, and prove classifier independence from materially producing or repairing the changed subject.
 
 ## GREEN
 

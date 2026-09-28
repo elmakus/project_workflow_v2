@@ -178,7 +178,7 @@ class MigrationApplyTests(unittest.TestCase):
         with self.assertRaisesRegex(MigrationApplyError, "retry is forbidden"):
             reconcile_uncertain_external_effect(lambda: "unknown")
 
-    def test_terminal_review_evidence_is_materialized_and_read_back_locally(self):
+    def test_terminal_review_without_migration_proof_blocks_with_obligation_not_evidence(self):
         board, manifest = self.texts()
         plan = dry_run(
             source_class="chatgpt_workstream_yaml_v1",
@@ -212,12 +212,17 @@ class MigrationApplyTests(unittest.TestCase):
             manifest_text=manifest,
             review_proofs={"M05-T05": [proof]},
         )
+        # RF006: no manufactured provenance means no routable attempt and no
+        # terminal evidence; the Card blocks with a precise obligation.
+        self.assertNotIn("M05-T05", bundle["review_attempts"])
         with tempfile.TemporaryDirectory() as td:
             destination = Path(td) / "migrated-chatgpt"
             self.apply(destination, bundle=bundle)
             evidence = destination / "evidence" / "migrated-M05-T05-R01.md"
-            self.assertTrue(evidence.is_file())
-            self.assertIn(proof["evidence_path"], evidence.read_text(encoding="utf-8"))
+            self.assertFalse(evidence.exists())
+            blocker = destination / "blockers" / "M05-T05-migration-review.toml"
+            self.assertTrue(blocker.is_file())
+            self.assertIn("legacy migration proof", blocker.read_text(encoding="utf-8"))
             self.assertEqual(
                 readback_fixture_destination(destination, bundle)["status"],
                 "verified",

@@ -1,0 +1,123 @@
+{
+  "authority_bundle": [
+    {
+      "blob": "1b9e6c5698f10481fb1e215b7caf54edf4adcb8a",
+      "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "content": "# Decision\naccepted\n",
+      "content_sha256": "sha256:e849c2b42890a8acf68ee3b68ba9250f50b5ff49ea14a699a16b0b84fb4a34b2",
+      "path": "decisions/A.md",
+      "repository": "owner/project"
+    },
+    {
+      "blob": "53abf26f4ff6053bf6b09601d397a769865a03ff",
+      "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "content": "# Requirements\naccepted\n",
+      "content_sha256": "sha256:6a17cfcea893926e9b8e0176b6818ce1507aceae59b8d1c8ce2c9dd6db5add38",
+      "path": "requirements/R.md",
+      "repository": "owner/project"
+    }
+  ],
+  "completion": {
+    "acceptance": [
+      "typed contract accepted"
+    ],
+    "evidence": [
+      "durable evidence"
+    ],
+    "tests": [
+      "contract suite GREEN"
+    ]
+  },
+  "constraints": [
+    "canonical writes are coordinator-owned"
+  ],
+  "freshness": {
+    "fingerprint": "sha256:8065e976982799ab7fec91036d479e31053ae8811c5ca8a3f40e319ea564ca36",
+    "material": {
+      "authority": [
+        {
+          "blob": "1b9e6c5698f10481fb1e215b7caf54edf4adcb8a",
+          "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "path": "decisions/A.md",
+          "repository": "owner/project"
+        },
+        {
+          "blob": "53abf26f4ff6053bf6b09601d397a769865a03ff",
+          "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "path": "requirements/R.md",
+          "repository": "owner/project"
+        }
+      ],
+      "completion": {
+        "acceptance": [
+          "typed contract accepted"
+        ],
+        "evidence": [
+          "durable evidence"
+        ],
+        "tests": [
+          "contract suite GREEN"
+        ]
+      },
+      "constraints": [
+        "canonical writes are coordinator-owned"
+      ],
+      "inputs": {
+        "board_revision": 8,
+        "card_id": "M02-T01"
+      },
+      "mutation": {
+        "preconditions": [
+          {
+            "path": "board.revision",
+            "equals": 8
+          }
+        ],
+        "postconditions": [
+          {
+            "path": "board.revision",
+            "equals": 9
+          }
+        ]
+      },
+      "prerequisites": [
+        "M01-T01 DONE"
+      ],
+      "subject": {
+        "blob": "cccccccccccccccccccccccccccccccccccccccc",
+        "commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "implementation/cards/M02-T01.md",
+        "repository": "owner/project"
+      },
+      "rule_fingerprint": "sha256:65c334ebb3b1164b9f2918b3af0447cd976082be77e3b36436a5ea9f31a16539"
+    }
+  },
+  "kind": "pwv2_execution_obligation",
+  "mutation": {
+    "preconditions": [
+      {
+        "path": "board.revision",
+        "equals": 8
+      }
+    ],
+    "postconditions": [
+      {
+        "path": "board.revision",
+        "equals": 9
+      }
+    ]
+  },
+  "obligation_id": "sha256:5ba6a5fbe7c5dc2a5740ab698641d800e7f9b3546aeee648fbe59518f4505481",
+  "prerequisites": [
+    "M01-T01 DONE"
+  ],
+  "role": "execution_prep",
+  "rule_id": "PWV21-K011",
+  "schema_version": 1,
+  "subject": {
+    "blob": "cccccccccccccccccccccccccccccccccccccccc",
+    "commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "path": "implementation/cards/M02-T01.md",
+    "repository": "owner/project"
+  }
+}

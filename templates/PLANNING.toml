@@ -21,3 +21,11 @@ repository = ""
 commit = ""
 path = ""
 blob = ""
+
+# For review_mode = "editorial_exempt" only, add an exact immutable proof locator:
+# [review_exemption_classification]
+# class = "git_blob"
+# repository = "owner/repository"
+# commit = "0000000000000000000000000000000000000000"
+# path = "implementation/workstreams/example-workstream/planning_classifications/P1-E01.toml"
+# blob = "0000000000000000000000000000000000000000"

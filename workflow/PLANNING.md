@@ -20,15 +20,24 @@ The planning record owns:
 - planner completeness/challenge audit;
 - premium A/B/C states and exact gate subjects;
 - exact immutable frozen plan subject once frozen;
-- review mode: normal independent review, or a bounded `editorial_exempt` classification with exact prior reviewed subject and non-empty semantic basis.
+- review mode: normal independent review, or a bounded `editorial_exempt` claim with exact prior reviewed subject, non-empty semantic basis, and an exact immutable independent classification-record locator.
 
 The planner:
 1. works only after A is satisfied for the current entry subject;
 2. maintains requirement/decision coverage and milestone/gate strategy;
 3. completes a GREEN planner audit;
 4. freezes one exact immutable Git-blob subject;
-5. sets premium B due for that exact subject;
-6. stops. The planner must not perform or internally spawn Stage-6 Plan Review.
+5. binds the deterministic exact Definition-authority key for the current GREEN Definition revision plus exact requirements/decision Git blob identities (see below);
+6. sets premium B due for that exact subject;
+7. stops. The planner must not perform or internally spawn Stage-6 Plan Review.
+
+## Definition-authority key
+
+Every frozen/approved `PLANNING.toml` binds `definition_authority_key`, a single canonical string covering the Definition revision plus exact requirements path/blob and sorted decisions path/blob identities:
+
+`rf012-v1:repository:<repo>|definition:<rev>|requirements:<path>@<blob>|decisions:<path>@<blob>,...`
+
+The key binds content blobs, never HEAD or per-file commits, so unrelated commits do not churn it. Path-only or free-text authority is not proof. Helperless derivation: read the current `DEFINITION.toml` revision plus requirements/decisions paths, hash each live file with `git hash-object <path>`, sort decisions by path, and compare the built live string with the stored key; the stored key must also equal the freeze-time snapshot string built from the `DEFINITION.toml` revision plus requirements/decisions paths read at the frozen plan subject commit with `git show <commit>:<definition-path>` and each authority blob resolved with `git rev-parse <commit>:<path>`, and the planning entry revision must match that snapshot. Keyless legacy plans derive the snapshot the same way and compare it with the live string. Stale, missing, mismatched or ambiguous bindings fail closed to Recovery and never authorize Execution Prep or execution. A new Definition revision or same-revision authority-file mutation requires a new planning cycle; updating the key without new plan content does not authorize the old subject.
 
 ## Approval and C
 
@@ -36,7 +45,17 @@ A GREEN independent Plan Review for the exact frozen subject is consumed by Plan
 - state becomes approved;
 - premium C becomes due for the same exact subject.
 
-Premium C must be satisfied before Execution Prep. RED never mutates the failed review subject; material correction creates a new planning cycle/revision and repeats A/B/C. Pure mechanical/editorial correction may remain in the same accepted cycle only when strategy, milestone structure, requirement coverage and gates do not change. It may use `editorial_exempt` only when the cycle already has an exact prior GREEN Plan Review and satisfied C: the new subject is different, the exemption records that prior reviewed subject plus a bounded semantic basis, and prior B/C subjects remain bound to the reviewed base. No new B/Plan Review/C sequence is created for that editorial-only change.
+Premium C must be satisfied before Execution Prep. RED never mutates the failed review subject; material correction creates a new planning cycle/revision and repeats A/B/C. Pure mechanical/editorial correction may remain in the same accepted cycle only when strategy, milestone topology, requirement coverage, gates and acceptance semantics do not change. Free-text `review_exemption_basis` is descriptive context, never proof. `editorial_exempt` is legal only when the cycle already has an exact prior GREEN Plan Review and satisfied C and `PLANNING.toml` points to an immutable workstream-local classification record by exact repository/commit/path/blob identity. That independently produced record must bind the exact prior GREEN-reviewed subject and exact changed subject, record the inspected diff/evidence, be GREEN with semantic classification `editorial_only`, explicitly preserve all five dimensions above, and state that its classifier did not materially produce or repair the changed subject. Prior B/C subjects remain bound to the reviewed base. Missing, stale, mismatched, non-independent, incomplete or non-editorial proof cannot authorize the exemption; the normal Premium-B → independent Plan Review → Premium-C path applies instead. No new B/Plan Review/C sequence is created only for a correctly proven editorial-only change.
+
+## Decomposition seam intent
+
+Strategic Planning may durably classify meaningful decomposition intent as seams. Each seam carries a stable id, exactly one class, and a durable intent statement:
+
+- `required_seam`: a topology boundary whose preservation is part of accepted strategy/correctness;
+- `preferred_seam`: preserve by default, with justified JIT deviation allowed;
+- `illustrative`: a non-binding implementation example.
+
+Planning expresses seam intent without speculative future Card IDs: it never invents Card identities, and Execution Prep owns exact JIT Card materialization. Canonical state stores seams in `PLANNING.toml`; absent seams mean no declared seam intent, and historical states without seams remain valid.
 
 ## Human-facing premium recommendations
 

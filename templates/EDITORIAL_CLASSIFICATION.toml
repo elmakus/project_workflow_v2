@@ -1,0 +1,32 @@
+# TEMPLATE ONLY — immutable independent classification for one editorial-only plan change.
+workstream_id = "example-workstream"
+planning_cycle = 1
+plan_revision = "P1"
+verdict = "green"
+classification = "editorial_only"
+inspected_diff_evidence = "Describe the exact old/new plan diff inspected and why it changes no accepted semantics."
+
+[base_subject]
+class = "git_blob"
+repository = "owner/repository"
+commit = "0000000000000000000000000000000000000000"
+path = "planning/MASTER_PLAN.md"
+blob = "0000000000000000000000000000000000000000"
+
+[changed_subject]
+class = "git_blob"
+repository = "owner/repository"
+commit = "0000000000000000000000000000000000000000"
+path = "planning/MASTER_PLAN.md"
+blob = "0000000000000000000000000000000000000000"
+
+[unchanged]
+strategy = true
+milestone_topology = true
+requirement_coverage = true
+gates = true
+acceptance_semantics = true
+
+[independence]
+materially_produced_or_repaired_changed_subject = false
+basis = "Fresh semantic classifier did not materially produce or repair the changed plan subject."

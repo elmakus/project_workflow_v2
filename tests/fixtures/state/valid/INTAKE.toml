@@ -10,3 +10,10 @@ response_observed = true
 alignment_state = "authorized"
 alignment_subject = "repair:sample:v2"
 micro_fix_candidate = true
+
+[diagnosis_prior_art_proof]
+class = "research"
+repository = "owner/sample"
+commit = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+path = "implementation/workstreams/sample-workstream/RESEARCH.toml"
+blob = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"

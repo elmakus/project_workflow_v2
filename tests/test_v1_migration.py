@@ -200,7 +200,11 @@ class V1MigrationDryRunTests(unittest.TestCase):
             ) if verdict in {"green", "red"} else "",
         }
 
-    def test_safe_conversion_validates_as_common_v2_state_when_review_proof_is_exact(self) -> None:
+    def test_terminal_review_proof_blocks_until_exact_migration_proof_is_established(self) -> None:
+        # RF006: dry-run has no Git readback and no source TOML in the V1 YAML
+        # source, so even an exact terminal proof cannot yield migration
+        # provenance. The Card blocks with a precise obligation instead of
+        # routing on manufactured Git identities.
         board, manifest = self.texts("chatgpt")
         plan = self.plan("chatgpt_workstream_yaml_v1", "chatgpt")
         bundle = convert_dry_run(
@@ -211,15 +215,14 @@ class V1MigrationDryRunTests(unittest.TestCase):
         )
         validate_workstream(bundle["workstream"])
         validate_board(bundle["task_board"], bundle["workstream"])
-        validate_review_history(
-            bundle["review_attempts"]["M05-T05"],
-            expected_card_id="M05-T05",
-            workstream_id="migrated-chatgpt",
-        )
+        self.assertNotIn("M05-T05", bundle["review_attempts"])
         card = bundle["task_board"]["cards"][0]
-        self.assertEqual(card["status"], "done")
+        self.assertEqual(card["status"], "blocked")
         self.assertIn("result", card)
-        self.assertEqual(bundle["review_obligations"], [])
+        self.assertIn("blocker", card)
+        self.assertEqual(len(bundle["review_obligations"]), 1)
+        self.assertIn("legacy migration proof", bundle["review_obligations"][0]["reason"])
+        self.assertIn("manufactures no", bundle["review_obligations"][0]["reason"])
         self.assertEqual(bundle["provenance"]["source_branch"], "feat/common-preexecution-core")
         self.assertEqual(bundle["provenance"]["source_base_ref"], "fd2dc95f539d982e1009d71bbf1301f3098900f6")
         self.assertEqual(bundle["provenance"]["source_integration_target"], "main")
@@ -290,7 +293,10 @@ class V1MigrationDryRunTests(unittest.TestCase):
         self.assertEqual(bundle["task_board"]["cards"][0]["status"], "blocked")
         self.assertIn("not bound", bundle["review_obligations"][0]["reason"])
 
-    def test_exact_red_to_green_history_is_append_only_and_current_green_is_reused(self) -> None:
+    def test_exact_red_to_green_proofs_block_without_manufactured_provenance(self) -> None:
+        # RF006: two exact terminal proofs still carry no source-attempt Git
+        # identity, so the Card blocks rather than reusing history whose
+        # provenance dry-run would have to invent.
         board, manifest = self.texts("chatgpt")
         red = self.exact_review_proof("red", subject_suffix="1", attempt="R01")
         red["source_review_subject"] = "older-red-subject"
@@ -301,15 +307,16 @@ class V1MigrationDryRunTests(unittest.TestCase):
             manifest_text=manifest,
             review_proofs={"M05-T05": [red, green]},
         )
-        attempts = bundle["review_attempts"]["M05-T05"]
-        self.assertEqual([a["verdict"] for a in attempts], ["red", "green"])
-        self.assertNotEqual(attempts[0]["subject"], attempts[1]["subject"])
-        validate_review_history(
-            attempts, expected_card_id="M05-T05", workstream_id="migrated-chatgpt"
-        )
-        self.assertEqual(bundle["task_board"]["cards"][0]["status"], "done")
+        self.assertNotIn("M05-T05", bundle["review_attempts"])
+        self.assertEqual(bundle["task_board"]["cards"][0]["status"], "blocked")
+        self.assertEqual(len(bundle["review_obligations"]), 1)
+        self.assertIn("R01", bundle["review_obligations"][0]["reason"])
+        self.assertIn("legacy migration proof", bundle["review_obligations"][0]["reason"])
 
-    def test_exact_red_remains_blocked_for_correction(self) -> None:
+    def test_exact_red_blocks_for_missing_migration_proof_not_correction(self) -> None:
+        # RF006: an exact RED proof blocks on the missing source-attempt proof
+        # itself; correction routing resumes only after materialization
+        # establishes exact legacy migration proof.
         board, manifest = self.texts("chatgpt")
         red_board = board.replace("review_state: green", "review_state: red")
         red = self.exact_review_proof("red")
@@ -328,13 +335,9 @@ class V1MigrationDryRunTests(unittest.TestCase):
             manifest_text=manifest,
             review_proofs={"M05-T05": [red]},
         )
-        validate_review_history(
-            bundle["review_attempts"]["M05-T05"],
-            expected_card_id="M05-T05",
-            workstream_id="migrated-chatgpt",
-        )
+        self.assertNotIn("M05-T05", bundle["review_attempts"])
         self.assertEqual(bundle["task_board"]["cards"][0]["status"], "blocked")
-        self.assertIn("corrective review", bundle["review_obligations"][0]["reason"])
+        self.assertIn("legacy migration proof", bundle["review_obligations"][0]["reason"])
 
     def test_exact_pending_review_remains_blocking_until_green(self) -> None:
         board, manifest = self.texts("chatgpt")
@@ -362,6 +365,16 @@ class V1MigrationDryRunTests(unittest.TestCase):
             workstream_id="migrated-chatgpt",
         )
         self.assertEqual(attempts[-1]["verdict"], "pending")
+        self.assertEqual(attempts[-1]["review_kind"], "discovery")
+        self.assertFalse(attempts[-1]["discovery_complete"])
+        self.assertEqual(attempts[-1]["material_finding_ids"], [])
+        self.assertEqual(attempts[-1]["review_scope"], "card")
+        self.assertEqual(attempts[-1]["review_epoch"], "E01")
+        self.assertEqual(attempts[-1]["epoch_reset_basis"], "")
+        self.assertEqual(attempts[-1]["material_defect_class_ids"], [])
+        self.assertEqual(attempts[-1]["failed_material_defect_class_ids"], [])
+        self.assertFalse(attempts[-1]["post_convergence_validation"])
+        self.assertEqual(attempts[-1]["convergence_basis"], "")
         self.assertEqual(bundle["task_board"]["cards"][0]["status"], "blocked")
         self.assertIn("pending review remains outstanding", bundle["review_obligations"][0]["reason"])
 

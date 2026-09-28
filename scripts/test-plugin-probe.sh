@@ -7,6 +7,7 @@ test -f skills/project_workflow_v2/SKILL.md
 test -f hooks/hooks.json
 test -f hooks/session-start.py
 test -f workflow/ROUTER.md
+test -f .codex-plugin/router-integrity.json
 
 grep -q '"name": "pw"' .codex-plugin/plugin.json
 grep -q '"version": "0.2.1"' .codex-plugin/plugin.json
@@ -18,12 +19,14 @@ grep -q 'SessionStart' hooks/hooks.json
 grep -q 'Canonical bundled router' hooks/session-start.py
 grep -q 'Production selector: `tools/router.py`.' workflow/ROUTER.md
 grep -q 'fail closed' workflow/ROUTER.md
+grep -q 'router-integrity.json' hooks/session-start.py
+test "$(git hash-object workflow/ROUTER.md)" = "$(python3 -c 'import json; print(json.load(open(".codex-plugin/router-integrity.json"))["git_blob_sha1"])')"
 
 if find workflow -maxdepth 2 -type d \( -name chatgpt_only -o -name codex_only \) | grep -q .; then
   echo "legacy policy tree present" >&2
   exit 1
 fi
 
-python3 -m unittest tests.test_codex_delivery
+python3 -m unittest tests.test_codex_delivery tests.test_session_router_integrity
 
 echo "M05-T02 package bootstrap checks: PASS"

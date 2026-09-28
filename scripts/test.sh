@@ -19,6 +19,14 @@ if test -f scripts/test-state-envelope.sh; then
   sh scripts/test-state-envelope.sh
 fi
 
+if test -f scripts/test-policy-kernel.sh; then
+  sh scripts/test-policy-kernel.sh
+fi
+
+if test -f scripts/test-obligation-contract.sh; then
+  sh scripts/test-obligation-contract.sh
+fi
+
 if test -f scripts/test-router.sh; then
   sh scripts/test-router.sh
 fi
