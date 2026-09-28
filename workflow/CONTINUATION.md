@@ -27,3 +27,12 @@ Runtime safety fuses may abort execution technically, but they never establish s
 ## State boundary
 
 This contract introduces no Continuation phase, durable continuation/session ledger, event log, runtime role catalog, model/provider/session/worker identity, or invocation identity. Fresh rerouting is reconstructed from existing durable workflow authority.
+
+
+## Progress, restart and external-effect safety
+
+Continuation must fail closed when a semantic owner claims successful reconciliation but the freshly derived authoritative obligation/evidence fingerprint is unchanged. A repeated semantic fingerprint already seen in the same invocation is a cycle unless new accepted durable evidence or authority changes its evidence epoch.
+
+These fingerprints are ephemeral and derive only from durable semantic inputs. Runtime/model/provider/session/worker/invocation identity is neither an input nor durable authority. Runtime iteration/time bounds may abort technically but cannot establish semantic success or a workflow stop.
+
+On restart, already durable semantic results, Review verdicts, Research returns and reconciled external effects are consumed from durable state rather than replayed. If an external mutation may have occurred but its effect is uncertain, exact target readback is required before any retry; unresolved occurrence fails closed under the owning external-effect contract.
