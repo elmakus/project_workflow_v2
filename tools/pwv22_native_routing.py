@@ -1,6 +1,12 @@
 from __future__ import annotations
+from pathlib import Path
 from typing import Any, Mapping, Sequence
-from tools.pwv22_native_foundation import NativeFoundationError, canonical_json, material_fingerprint
+from tools.pwv22_native_foundation import (
+    NativeFoundationError,
+    admit_native,
+    exact_blob,
+    material_fingerprint,
+)
 
 OWNERS=("intake","research","brainstorming","definition","planning","execution_prep","execution","review","close")
 GATES=("A","B","C","D")
@@ -9,12 +15,16 @@ QUALIFICATION=("handoff","known_defect_cleanup","targeted_bug_hunt","global_bug_
 def _req(ok: bool,msg: str)->None:
     if not ok: raise NativeFoundationError(msg)
 
-def exact_subject(subject: Mapping[str,Any])->dict[str,str]:
-    for k in ("repository","commit","path","blob"):
-        _req(isinstance(subject.get(k),str) and subject[k],f"missing subject {k}")
+def exact_subject(subject: Mapping[str,Any], *, repo: Path, actual_repository: str,
+                  remote: str="origin", canonical_ref: str="refs/heads/main")->dict[str,str]:
+    # S05 exact_blob is the single exact Git identity validator: repository identity,
+    # 40-hex commit/blob, safe regular-blob path, canonical reachability and commit:path == blob.
+    exact_blob(repo,actual_repository,subject,remote=remote,canonical_ref=canonical_ref)
     return {k:subject[k] for k in ("repository","commit","path","blob")}
 
-def route_owner(state: Mapping[str,Any])->str:
+def route_owner(state: Mapping[str,Any], official: Mapping[str,Any])->str:
+    # Ordinary native routing is illegal until S05 native admission proves generation/epoch.
+    admit_native(state,official)
     phase=state.get("phase")
     _req(phase in OWNERS,"unsupported owner phase")
     if state.get("return_consumed") is True:
@@ -33,9 +43,12 @@ def simplification_ready(record: Mapping[str,Any])->bool:
         if f in dispositions: _req(dispositions[f] in ("accept","reject"),"invalid owner disposition")
     return all(f in dispositions for f in findings)
 
-def satisfy_gate(gate: str, expected_subject: Mapping[str,Any], presented_subject: Mapping[str,Any])->dict[str,Any]:
+def satisfy_gate(gate: str, expected_subject: Mapping[str,Any], presented_subject: Mapping[str,Any],
+                 *, repo: Path, actual_repository: str, remote: str="origin",
+                 canonical_ref: str="refs/heads/main")->dict[str,Any]:
     _req(gate in GATES,"unsupported gate")
-    expected=exact_subject(expected_subject); presented=exact_subject(presented_subject)
+    expected=exact_subject(expected_subject,repo=repo,actual_repository=actual_repository,remote=remote,canonical_ref=canonical_ref)
+    presented=exact_subject(presented_subject,repo=repo,actual_repository=actual_repository,remote=remote,canonical_ref=canonical_ref)
     _req(expected==presented,"stale or wrong gate subject")
     return {"gate":gate,"subject":expected,"satisfied":True}
 
@@ -51,10 +64,11 @@ def initial_prep(seams: Sequence[Mapping[str,Any]])->dict[str,list[str]]:
             jit.append(sid)
     return {"materialize":materialize,"jit":jit}
 
-def premium_d_subject(prepared_subject: Mapping[str,Any], readback_subject: Mapping[str,Any])->dict[str,Any]:
-    prepared=exact_subject(prepared_subject); readback=exact_subject(readback_subject)
-    _req(prepared==readback,"prepared subject not read back")
-    return satisfy_gate("D",prepared,readback)
+def premium_d_subject(prepared_subject: Mapping[str,Any], readback_subject: Mapping[str,Any],
+                      *, repo: Path, actual_repository: str, remote: str="origin",
+                      canonical_ref: str="refs/heads/main")->dict[str,Any]:
+    return satisfy_gate("D",prepared_subject,readback_subject,repo=repo,actual_repository=actual_repository,
+                        remote=remote,canonical_ref=canonical_ref)
 
 def next_qualification(completed: Sequence[str])->str:
     completed=list(completed)
@@ -62,6 +76,7 @@ def next_qualification(completed: Sequence[str])->str:
     _req(completed==list(QUALIFICATION[:len(completed)]),"skipped or reordered qualification")
     return "done" if len(completed)==len(QUALIFICATION) else QUALIFICATION[len(completed)]
 
-def routing_fingerprint(state: Mapping[str,Any], authority_refs: Sequence[Mapping[str,Any]])->str:
-    material={"owner":route_owner(state),"phase":state.get("phase"),"gate":state.get("gate"),"qualification":state.get("qualification")}
+def routing_fingerprint(state: Mapping[str,Any], official: Mapping[str,Any],
+                        authority_refs: Sequence[Mapping[str,Any]])->str:
+    material={"owner":route_owner(state,official),"phase":state.get("phase"),"gate":state.get("gate"),"qualification":state.get("qualification")}
     return material_fingerprint(list(authority_refs),material)
