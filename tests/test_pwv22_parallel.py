@@ -1,10 +1,12 @@
+import hashlib
+import json
 import unittest
 from tools.pwv22_native_foundation import NativeFoundationError
 from tools.pwv22_parallel import *
 I=lambda n:{"repository":"R","commit":n*40,"path":"p","blob":n*40}
 A=I("a"); B=I("b"); ADM=I("c"); ACC=I("d"); RED=I("e"); STALE=I("f"); AACC=I("g"); BACC=I("h")
 def admission(cards=("a","b"),revoked=()):
- return {"type":"pwv2.2-admission","admission_id":"x","subject":ADM,"cards":list(cards),"revoked":list(revoked)}
+ return {"type":"pwv2.2-admission","admission_id":"x","cards":list(cards),"revoked":list(revoked)}
 def claims(card,owner="main",writes=("w",),resources=("r",),semantics=("s",),effects=("e",)):
  return {"card_id":card,"mutating_owner":owner,"writes":list(writes),"resources":list(resources),"semantics":list(semantics),"effects":list(effects)}
 def result(rid,artifact):
@@ -34,7 +36,27 @@ class ParallelTests(unittest.TestCase):
   self.assertTrue(admitted("a",admission()))
   self.assertFalse(admitted("a",admission(revoked=("a",))))
   with self.assertRaises(NativeFoundationError):
-   typed_admission({"type":"pwv2.2-admission","admission_id":"x","subject":ADM,"cards":[]})
+   typed_admission({"type":"pwv2.2-admission","admission_id":"x","cards":[]})
+ def test_hashable_admission_payload_is_bound_by_external_locator(self):
+  payload=admission()
+  raw=json.dumps(payload,sort_keys=True,separators=(",",":")).encode()
+  blob=hashlib.sha1(b"blob "+str(len(raw)).encode()+b"\\0"+raw).hexdigest()
+  identity={"repository":"R","commit":"1"*40,"path":"admission.json","blob":blob}
+  acceptance_identity=I("2")
+  def read_real(ref):
+   self.assertEqual(ref,identity)
+   actual=hashlib.sha1(b"blob "+str(len(raw)).encode()+b"\\0"+raw).hexdigest()
+   if actual!=ref["blob"]: raise NativeFoundationError("admission blob mismatch")
+   return payload
+  def read_real_acceptance(ref):
+   if ref!=acceptance_identity: raise NativeFoundationError("acceptance artifact not durable")
+   return acc(identity)
+  def verify_real(ref):
+   if ref!=identity: raise NativeFoundationError("bad identity")
+  self.assertEqual(accepted_admission(identity,read_real,acceptance_identity,read_real_acceptance,verify_real),payload)
+  tampered=dict(identity,blob="3"*40)
+  with self.assertRaises(NativeFoundationError):
+   accepted_admission(tampered,read_real,acceptance_identity,read_real_acceptance,verify_real)
  def test_unaccepted_or_stale_admission_rejected(self):
   with self.assertRaises(NativeFoundationError): legal(claims("a"),claims("b",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",)),adm_acc=RED)
   with self.assertRaises(NativeFoundationError): legal(claims("a"),claims("b",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",)),adm_acc=STALE)
