@@ -29,10 +29,11 @@ def verify(i):
  if i not in (A,B,ADM,CA,CB): raise NativeFoundationError("bad identity")
 def legal(left,right,adm_ref=ADM,adm_acc=ACC):
  return parallel_legal(left,right,adm_ref,read_admission,adm_acc,read_acceptance,verify)
-def fan(card_ids=("a","b"),adm_ref=ADM,adm_acc=ACC,compatibility=lambda xs:True,sibling_accs=None):
+def fan(card_ids=("a","b"),adm_ref=ADM,adm_acc=ACC,compatibility=lambda xs:True,sibling_accs=None,sibling_claims=None):
  rs=[result("ra",A),result("rb",B)]
  sibling_accs={"ra":AACC,"rb":BACC} if sibling_accs is None else sibling_accs
- return compatible_fan_in(card_ids,{cid:{"a":CA,"b":CB}.get(cid,I("k")) for cid in card_ids},[A,B],rs,sibling_accs,adm_ref,read_admission,adm_acc,read_acceptance,verify,compatibility)
+ sibling_claims=[claims(cid) for cid in card_ids] if sibling_claims is None else sibling_claims
+ return compatible_fan_in(card_ids,{cid:{"a":CA,"b":CB}.get(cid,I("k")) for cid in card_ids},[A,B],rs,sibling_accs,sibling_claims,adm_ref,read_admission,adm_acc,read_acceptance,verify,compatibility)
 
 class ParallelTests(unittest.TestCase):
  def test_explicit_finite_admission_and_revocation(self):
@@ -79,7 +80,7 @@ class ParallelTests(unittest.TestCase):
    with self.assertRaises(NativeFoundationError):
     legal(claims("a",subject=fabricated),claims("b",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",)))
    with self.assertRaises(NativeFoundationError):
-    compatible_fan_in(("a","b"),{"a":fabricated,"b":CB},[A,B],[result("ra",A),result("rb",B)],{"ra":AACC,"rb":BACC},ADM,read_admission,ACC,read_acceptance,verify,lambda xs:True)
+    compatible_fan_in(("a","b"),{"a":fabricated,"b":CB},[A,B],[result("ra",A),result("rb",B)],{"ra":AACC,"rb":BACC},[claims("a",subject=fabricated),claims("b")],ADM,read_admission,ACC,read_acceptance,verify,lambda xs:True)
   finally:
    DURABLE_ADMISSIONS[tuple(ADM.values())]=prior
  def test_stale_card_subject_rejected(self):
@@ -103,6 +104,9 @@ class ParallelTests(unittest.TestCase):
  def test_admission_owner_binding_is_exact_and_nonempty(self):
   with self.assertRaises(NativeFoundationError): typed_admission(admission(owners={"a":"","b":"main"}))
   with self.assertRaises(NativeFoundationError): typed_admission({**admission(),"mutating_owners":{"a":"main"}})
+ def test_fan_in_rejects_owner_mismatch_against_durable_admission(self):
+  with self.assertRaises(NativeFoundationError):
+   fan(sibling_claims=[claims("a","other"),claims("b","main")])
  def test_exact_ordered_fan_in(self):
   out=fan(compatibility=lambda xs:[x["result_id"] for x in xs]==["ra","rb"])
   self.assertEqual([x["result_id"] for x in out],["ra","rb"])
