@@ -1,12 +1,12 @@
 workstream_id = "issue-handoff-determinism"
-revision = 5
+revision = 6
 
 [execution_ref]
 branch = "work/pwv2-handoff-determinism"
 
 [[cards]]
 id = "M01-T01"
-status = "in_progress"
+status = "done"
 review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-handoff-determinism/reviews/M01-T01-R01.toml" }, { class = "review_attempt", path = "implementation/workstreams/issue-handoff-determinism/reviews/M01-T01-R02.toml" }, { class = "review_attempt", path = "implementation/workstreams/issue-handoff-determinism/reviews/M01-T01-R03.toml" }]
 
 [cards.result]
