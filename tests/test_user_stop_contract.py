@@ -98,6 +98,20 @@ class UserStopContractTests(unittest.TestCase):
                 (EXPECTED_LOCATOR[0], "TBD", EXPECTED_LOCATOR[2], EXPECTED_LOCATOR[3]),
             )
 
+    def test_required_needs_structural_nonempty_user_action_line(self):
+        requirement = DeliveryRequirement(True, HANDOFF_REQUIRED, EXPECTED_LOCATOR)
+        for bad_prefix in (
+            "No USER ACTION REQUIRED: continue here.\n",
+            "Narrative mentions USER ACTION REQUIRED: but does not issue it.\n",
+            "USER ACTION REQUIRED:\n",
+        ):
+            with self.subTest(bad_prefix=bad_prefix), self.assertRaises(DeliveryContractError):
+                validate_user_stop_delivery(requirement, bad_prefix + VALID_LOCATOR)
+        validate_user_stop_delivery(
+            requirement,
+            "USER ACTION REQUIRED: start a fresh independent context.\n" + VALID_LOCATOR,
+        )
+
     def test_handoff_policy_requires_expected_locator_identity(self):
         with self.assertRaises(DeliveryContractError):
             DeliveryRequirement(True, HANDOFF_OFFERED)
