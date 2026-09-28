@@ -1,0 +1,14 @@
+workstream_id = "issue-handoff-determinism"
+revision = 1
+
+[execution_ref]
+branch = "work/pwv2-handoff-determinism"
+
+[[cards]]
+id = "M01-T01"
+status = "ready"
+review_attempts = []
+
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/issue-handoff-determinism/cards/M01-T01.md"
