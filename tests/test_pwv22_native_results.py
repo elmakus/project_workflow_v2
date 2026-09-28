@@ -3,7 +3,7 @@ from tools.pwv22_native_foundation import NativeFoundationError
 from tools.pwv22_native_results import *
 
 I=lambda n:{"repository":"R","commit":n*40,"path":"p","blob":n*40}
-A=I("a"); B=I("b"); C=I("c"); D=I("d")
+A=I("a"); B=I("b"); C=I("c"); D=I("d"); E=I("e")
 def result(rid,artifact,subject=A,materials=None):
  return {"type":"pwv2.2-result","result_id":rid,"result_artifact":artifact,
          "implementation_subject":subject,"material_inputs":materials or []}
@@ -26,7 +26,7 @@ class NativeResultTests(unittest.TestCase):
   with self.assertRaises(NativeFoundationError): accepted_dependency(A,result("r1",A),acceptance(B),verify)
   with self.assertRaises(NativeFoundationError): accepted_dependency(A,result("r1",A),acceptance(A,"red"),verify)
  def test_consistently_forged_locator_fails_closed(self):
-  forged={"repository":"R","commit":"d"*40,"path":"p","blob":"d"*40}
+  forged={"repository":"R","commit":"e"*40,"path":"p","blob":"e"*40}
   with self.assertRaises(NativeFoundationError):
    accepted_dependency(forged,result("r1",forged,subject=A),acceptance(forged),verify)
  def test_material_local_freshness_preserves_unrelated(self):
