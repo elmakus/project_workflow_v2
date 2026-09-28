@@ -19,12 +19,11 @@ def _claim_set(value: Any, kind: str)->set[str]:
 def typed_admission(record: Mapping[str,Any])->dict[str,Any]:
     _req(record.get("type")=="pwv2.2-admission","wrong admission type")
     aid=record.get("admission_id"); _req(isinstance(aid,str) and aid,"missing admission id")
-    subject=exact_identity(record.get("subject",{}))
     cards=record.get("cards"); _req(isinstance(cards,list) and cards,"admission must be finite non-empty")
     _req(len(cards)==len(set(cards)) and all(isinstance(x,str) and x for x in cards),"invalid admission cards")
     revoked=record.get("revoked",[]); _req(isinstance(revoked,list),"revoked must be list")
     _req(all(isinstance(x,str) and x in cards for x in revoked),"revoked card outside admission")
-    return {"type":"pwv2.2-admission","admission_id":aid,"subject":subject,"cards":list(cards),"revoked":list(revoked)}
+    return {"type":"pwv2.2-admission","admission_id":aid,"cards":list(cards),"revoked":list(revoked)}
 
 def accepted_admission(admission_identity: Mapping[str,Any],
                        read_admission: Callable[[Mapping[str,Any]],Mapping[str,Any]],
@@ -36,12 +35,11 @@ def accepted_admission(admission_identity: Mapping[str,Any],
     admission=read_admission(admission_ref)
     _req(isinstance(admission,Mapping),"admission artifact must be durable mapping")
     a=typed_admission(admission)
-    _req(a["subject"]==admission_ref,"admission material does not match artifact identity")
     acceptance_ref=exact_identity(acceptance_identity)
     acceptance=read_acceptance(acceptance_ref)
     _req(isinstance(acceptance,Mapping),"admission acceptance must be durable mapping")
     _req(acceptance.get("verdict")=="green","admission acceptance is not GREEN")
-    _req(exact_identity(acceptance.get("subject",{}))==a["subject"],"stale admission acceptance")
+    _req(exact_identity(acceptance.get("subject",{}))==admission_ref,"stale admission acceptance")
     return a
 
 def typed_claims(record: Mapping[str,Any])->dict[str,set[str]]:
