@@ -1,34 +1,30 @@
 workstream_id = "issue-deterministic-continuation"
-state = "active"
+state = "consumed"
 origin_role = "brainstorming"
 origin_subject = "research:deterministic-continuation-composition:v1"
 return_target = "brainstorming"
-return_reconciliation = "pending"
-return_result = ""
-finding = ""
-limitations = ""
-conflicts = ""
-
-package = "elmakus/project-research@main:projects/project_workflow_v2/issues/issue-16-deterministic-continuation/RESEARCH_PLAN.md"
-research_base = "85534dc88364236e0d696a3afd2408e911b26e3e"
-analysis_subject = "elmakus/project_workflow_v2@8d4f2d804feb2f78fc739a4f4c4c5a2d995254c3"
+return_reconciliation = "applied"
+return_result = "elmakus/project-research@research/pwv2-issue16-integration:projects/project_workflow_v2/issues/issue-16-deterministic-continuation/FINAL_SYNTHESIS.md"
+finding = "Issue #16 is a generic continuation-completion/liveness composition gap. Preserve the one-step router and add a runtime-neutral route-after-reconcile continuation postcondition with durable reread/reroute, exact-authority consumption, restartability, review-independence preservation, USER_STOP composition, and semantic progress/cycle fencing."
+limitations = "Research selected architecture/invariants but did not implement the repair. Runtime-specific realizations still require qualification against the common contract."
+conflicts = "Resolved: unconditional continue-until-stop is unsafe without progress fencing; RED-only repair is insufficient; same-context continuation cannot override exact-subject Review independence."
 
 [[sources]]
 class = "official_upstream"
-status = "pending"
-weight = "pending"
+status = "checked"
+weight = "primary"
 
 [[sources]]
 class = "project_runtime"
-status = "pending"
-weight = "pending"
+status = "checked"
+weight = "primary"
 
 [[sources]]
 class = "tracker_discussion"
-status = "pending"
-weight = "pending"
+status = "checked"
+weight = "direct"
 
 [[sources]]
 class = "practitioner_community"
-status = "pending"
-weight = "pending"
+status = "checked"
+weight = "supporting"
