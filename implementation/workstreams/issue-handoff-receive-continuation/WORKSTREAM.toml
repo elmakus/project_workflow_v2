@@ -1,0 +1,9 @@
++++
+workstream_id = "issue-handoff-receive-continuation"
+kind = "issue"
+lifecycle = "active"
+tracker_issue = 17
++++
+# Issue #17 — handoff receive continuation
+
+Intake-owned issue workstream for the receive/bootstrap contract gap where a valid PWv2 NEW CHAT START PROMPT can cause a redundant second confirmation instead of immediate execution of its canonically validated transferable entry boundary.
