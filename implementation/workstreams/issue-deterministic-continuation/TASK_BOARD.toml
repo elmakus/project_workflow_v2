@@ -1,5 +1,5 @@
 workstream_id = "issue-deterministic-continuation"
-revision = 11
+revision = 12
 
 [execution_ref]
 branch = "work/pwv2-deterministic-continuation"
@@ -49,7 +49,7 @@ condition = "Materialize the M03 Review/USER_STOP composition Card only after M0
 [[cards]]
 id = "M03-T01"
 status = "in_progress"
-review_attempts = []
+review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-deterministic-continuation/reviews/M03-T01-R01.toml" }]
 
 [cards.contract]
 class = "task_card"
