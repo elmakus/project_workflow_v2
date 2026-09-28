@@ -2,7 +2,7 @@ import unittest
 from tools.pwv22_native_foundation import NativeFoundationError
 from tools.pwv22_parallel import *
 I=lambda n:{"repository":"R","commit":n*40,"path":"p","blob":n*40}
-A=I("a"); B=I("b"); ADM=I("c")
+A=I("a"); B=I("b"); ADM=I("c"); ACC=I("d"); RED=I("e"); STALE=I("f")
 def admission(cards=("a","b"),revoked=()):
  return {"type":"pwv2.2-admission","admission_id":"x","subject":ADM,"cards":list(cards),"revoked":list(revoked)}
 def claims(card,owner="main",writes=("w",),resources=("r",),semantics=("s",),effects=("e",)):
@@ -10,17 +10,20 @@ def claims(card,owner="main",writes=("w",),resources=("r",),semantics=("s",),eff
 def result(rid,artifact):
  return {"type":"pwv2.2-result","result_id":rid,"result_artifact":artifact,"implementation_subject":artifact,"material_inputs":[]}
 def acc(subject): return {"verdict":"green","subject":subject}
+DURABLE={tuple(ACC.values()):acc(ADM),tuple(RED.values()):{"verdict":"red","subject":ADM},tuple(STALE.values()):acc(A)}
+def read_acceptance(identity):
+ key=tuple(identity[k] for k in ("repository","commit","path","blob"))
+ if key not in DURABLE: raise NativeFoundationError("acceptance artifact not durable")
+ return DURABLE[key]
 def verify(i):
  if i not in (A,B,ADM): raise NativeFoundationError("bad identity")
-def legal(left,right,adm=None,adm_acc=None):
+def legal(left,right,adm=None,adm_acc=ACC):
  adm=admission() if adm is None else adm
- adm_acc=acc(ADM) if adm_acc is None else adm_acc
- return parallel_legal(left,right,adm,adm_acc,verify)
-def fan(card_ids=("a","b"),adm=None,adm_acc=None,compatibility=lambda xs:True):
+ return parallel_legal(left,right,adm,adm_acc,read_acceptance,verify)
+def fan(card_ids=("a","b"),adm=None,adm_acc=ACC,compatibility=lambda xs:True):
  rs=[result("ra",A),result("rb",B)]
  adm=admission() if adm is None else adm
- adm_acc=acc(ADM) if adm_acc is None else adm_acc
- return compatible_fan_in(card_ids,[A,B],rs,{"ra":acc(A),"rb":acc(B)},adm,adm_acc,verify,compatibility)
+ return compatible_fan_in(card_ids,[A,B],rs,{"ra":acc(A),"rb":acc(B)},adm,adm_acc,read_acceptance,verify,compatibility)
 
 class ParallelTests(unittest.TestCase):
  def test_explicit_finite_admission_and_revocation(self):
@@ -29,8 +32,12 @@ class ParallelTests(unittest.TestCase):
   with self.assertRaises(NativeFoundationError):
    typed_admission({"type":"pwv2.2-admission","admission_id":"x","subject":ADM,"cards":[]})
  def test_unaccepted_or_stale_admission_rejected(self):
-  with self.assertRaises(NativeFoundationError): legal(claims("a"),claims("b",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",)),adm_acc={"verdict":"red","subject":ADM})
-  with self.assertRaises(NativeFoundationError): legal(claims("a"),claims("b",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",)),adm_acc=acc(A))
+  with self.assertRaises(NativeFoundationError): legal(claims("a"),claims("b",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",)),adm_acc=RED)
+  with self.assertRaises(NativeFoundationError): legal(claims("a"),claims("b",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",)),adm_acc=STALE)
+ def test_fabricated_in_memory_green_cannot_authorize(self):
+  fabricated=I("9")
+  with self.assertRaises(NativeFoundationError): legal(claims("a"),claims("b",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",)),adm_acc=fabricated)
+  with self.assertRaises(NativeFoundationError): fan(adm_acc=fabricated)
  def test_disjoint_claims_parallel(self):
   self.assertTrue(legal(claims("a"),claims("b",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",))))
  def test_overlap_serializes(self):
@@ -51,10 +58,10 @@ class ParallelTests(unittest.TestCase):
   with self.assertRaises(NativeFoundationError): fan(adm=admission(revoked=("a",)))
   with self.assertRaises(NativeFoundationError): fan(card_ids=("a","z"))
  def test_unaccepted_admission_cannot_fan_in(self):
-  with self.assertRaises(NativeFoundationError): fan(adm_acc={"verdict":"red","subject":ADM})
+  with self.assertRaises(NativeFoundationError): fan(adm_acc=RED)
  def test_stale_sibling_acceptance_rejected(self):
   rs=[result("ra",A),result("rb",B)]
   with self.assertRaises(NativeFoundationError):
-   compatible_fan_in(("a","b"),[A,B],rs,{"ra":acc(A),"rb":acc(A)},admission(),acc(ADM),verify,lambda xs:True)
+   compatible_fan_in(("a","b"),[A,B],rs,{"ra":acc(A),"rb":acc(A)},admission(),ACC,read_acceptance,verify,lambda xs:True)
 
 if __name__=="__main__": unittest.main()
