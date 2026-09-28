@@ -71,7 +71,7 @@ condition = "Materialize the M04 production adapter realization Card only after 
 [[cards]]
 id = "M04-T01"
 status = "in_progress"
-review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-deterministic-continuation/reviews/M04-T01-R01.toml" }]
+review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-deterministic-continuation/reviews/M04-T01-R01.toml" }, { class = "review_attempt", path = "implementation/workstreams/issue-deterministic-continuation/reviews/M04-T01-R02.toml" }]
 
 [cards.contract]
 class = "task_card"
@@ -81,5 +81,5 @@ path = "implementation/workstreams/issue-deterministic-continuation/cards/M04-T0
 [cards.result]
 class = "result"
 path = "implementation/workstreams/issue-deterministic-continuation/results/M04-T01.md"
-commit = "f7c7402bbb98caa29d4ed143684f5dc2d68c6165"
-blob = "fa210e40e758a9e137a68b78857e717694f2c109"
+commit = "21493ba6e91f7c87febd0216bf56a7f5990cbbe4"
+blob = "2340a1858f444cccdb73ad42f38841f2bb444251"
