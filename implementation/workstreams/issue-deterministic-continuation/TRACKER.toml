@@ -7,3 +7,5 @@ issue_number = 16
 candidate_issue_numbers = []
 readback_state = "verified"
 final_pr = 19
+final_merge = "44a1729ba858420599d8260b55ffee2f4df2c7a8"
+closure_readback = "verified_closed"
