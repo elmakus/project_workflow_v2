@@ -11,20 +11,23 @@ def result(rid,artifact):
  return {"type":"pwv2.2-result","result_id":rid,"result_artifact":artifact,"implementation_subject":artifact,"material_inputs":[]}
 def acc(subject): return {"verdict":"green","subject":subject}
 DURABLE={tuple(ACC.values()):acc(ADM),tuple(RED.values()):{"verdict":"red","subject":ADM},tuple(STALE.values()):acc(A),tuple(AACC.values()):acc(A),tuple(BACC.values()):acc(B)}
+DURABLE_ADMISSIONS={tuple(ADM.values()):admission()}
+def read_admission(identity):
+ key=tuple(identity[k] for k in ("repository","commit","path","blob"))
+ if key not in DURABLE_ADMISSIONS: raise NativeFoundationError("admission artifact not durable")
+ return DURABLE_ADMISSIONS[key]
 def read_acceptance(identity):
  key=tuple(identity[k] for k in ("repository","commit","path","blob"))
  if key not in DURABLE: raise NativeFoundationError("acceptance artifact not durable")
  return DURABLE[key]
 def verify(i):
  if i not in (A,B,ADM): raise NativeFoundationError("bad identity")
-def legal(left,right,adm=None,adm_acc=ACC):
- adm=admission() if adm is None else adm
- return parallel_legal(left,right,adm,adm_acc,read_acceptance,verify)
-def fan(card_ids=("a","b"),adm=None,adm_acc=ACC,compatibility=lambda xs:True,sibling_accs=None):
+def legal(left,right,adm_ref=ADM,adm_acc=ACC):
+ return parallel_legal(left,right,adm_ref,read_admission,adm_acc,read_acceptance,verify)
+def fan(card_ids=("a","b"),adm_ref=ADM,adm_acc=ACC,compatibility=lambda xs:True,sibling_accs=None):
  rs=[result("ra",A),result("rb",B)]
- adm=admission() if adm is None else adm
  sibling_accs={"ra":AACC,"rb":BACC} if sibling_accs is None else sibling_accs
- return compatible_fan_in(card_ids,[A,B],rs,sibling_accs,adm,adm_acc,read_acceptance,verify,compatibility)
+ return compatible_fan_in(card_ids,[A,B],rs,sibling_accs,adm_ref,read_admission,adm_acc,read_acceptance,verify,compatibility)
 
 class ParallelTests(unittest.TestCase):
  def test_explicit_finite_admission_and_revocation(self):
@@ -39,6 +42,10 @@ class ParallelTests(unittest.TestCase):
   fabricated=I("9")
   with self.assertRaises(NativeFoundationError): legal(claims("a"),claims("b",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",)),adm_acc=fabricated)
   with self.assertRaises(NativeFoundationError): fan(adm_acc=fabricated)
+ def test_fabricated_admission_membership_cannot_authorize(self):
+  fabricated=I("9")
+  with self.assertRaises(NativeFoundationError): legal(claims("a"),claims("z",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",)),adm_ref=fabricated)
+  with self.assertRaises(NativeFoundationError): fan(card_ids=("a","z"),adm_ref=fabricated)
  def test_disjoint_claims_parallel(self):
   self.assertTrue(legal(claims("a"),claims("b",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",))))
  def test_overlap_serializes(self):
@@ -56,7 +63,7 @@ class ParallelTests(unittest.TestCase):
  def test_incompatible_fan_in_rejected(self):
   with self.assertRaises(NativeFoundationError): fan(compatibility=lambda xs:False)
  def test_revoked_or_nonadmitted_sibling_cannot_fan_in(self):
-  with self.assertRaises(NativeFoundationError): fan(adm=admission(revoked=("a",)))
+  with self.assertRaises(NativeFoundationError): fan(adm_ref=I("9"))
   with self.assertRaises(NativeFoundationError): fan(card_ids=("a","z"))
  def test_unaccepted_admission_cannot_fan_in(self):
   with self.assertRaises(NativeFoundationError): fan(adm_acc=RED)
