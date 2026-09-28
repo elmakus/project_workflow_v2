@@ -63,3 +63,32 @@ def validate_atomic_candidate(changes: Mapping[str,bytes], allowed_paths: set[st
         _req(safe_path(p) in allowed_paths,"write outside envelope")
         _req(isinstance(v,bytes),"candidate bytes required")
     return hashlib.sha256(canonical_json({p:hashlib.sha256(v).hexdigest() for p,v in sorted(changes.items())})).hexdigest()
+
+def remote_ref_head(repo: Path, remote: str, ref: str) -> str:
+    _req(isinstance(remote,str) and remote, "remote required")
+    _req(isinstance(ref,str) and ref.startswith("refs/heads/"), "branch ref required")
+    out=_git(repo,"ls-remote","--refs",remote,ref).decode().strip().splitlines()
+    _req(len(out)==1, "remote ref missing or ambiguous")
+    sha, found_ref=out[0].split("\t",1)
+    _req(found_ref==ref and HEX40.fullmatch(sha) is not None, "invalid remote ref identity")
+    return sha
+
+def guarded_git_ref_publish(*, repo: Path, remote: str, ref: str,
+                            expected_old: str, candidate: str) -> str:
+    """Atomically publish one already-assembled Git commit with remote CAS and readback."""
+    _req(HEX40.fullmatch(expected_old) is not None and HEX40.fullmatch(candidate) is not None,
+         "invalid commit identity")
+    _git(repo,"cat-file","-e",f"{candidate}^{commit}")
+    observed=remote_ref_head(repo,remote,ref)
+    _req(observed==expected_old,"stale expected-old")
+    try:
+        subprocess.check_output(
+            ["git","-C",str(repo),"push","--porcelain",remote,
+             f"{candidate}:{ref}",f"--force-with-lease={ref}:{expected_old}"],
+            stderr=subprocess.STDOUT,
+        )
+    except subprocess.CalledProcessError as e:
+        raise NativeFoundationError(e.output.decode(errors="replace").strip()) from e
+    final=remote_ref_head(repo,remote,ref)
+    _req(final==candidate,"target readback mismatch")
+    return final
