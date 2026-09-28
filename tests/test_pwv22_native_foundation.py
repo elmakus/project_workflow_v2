@@ -53,4 +53,44 @@ class NativeFoundationTests(unittest.TestCase):
   for p in ["../x","/x","a/../x"]:
    with self.assertRaises(NativeFoundationError): safe_path(p)
 
+ def remote_fixture(self):
+  t=tempfile.TemporaryDirectory(); root=Path(t.name); remote=root/"remote.git"; a=root/"a"; b=root/"b"
+  subprocess.check_call(["git","init","--bare","-q",str(remote)])
+  for p in (a,b):
+   subprocess.check_call(["git","clone","-q",str(remote),str(p)])
+   subprocess.check_call(["git","-C",str(p),"config","user.email","t@example.invalid"])
+   subprocess.check_call(["git","-C",str(p),"config","user.name","T"])
+  (a/"one").write_text("one\n"); (a/"two").write_text("two\n")
+  subprocess.check_call(["git","-C",str(a),"add","one","two"]); subprocess.check_call(["git","-C",str(a),"commit","-qm","base"])
+  base=git(a,"rev-parse","HEAD"); subprocess.check_call(["git","-C",str(a),"push","-q","origin","HEAD:refs/heads/main"])
+  subprocess.check_call(["git","-C",str(b),"fetch","-q","origin","main"])
+  return t,remote,a,b,base
+ def test_git_native_atomic_multifile_publish_and_readback(self):
+  t,remote,a,b,base=self.remote_fixture()
+  with t:
+   (a/"one").write_text("ONE\n"); (a/"two").write_text("TWO\n")
+   subprocess.check_call(["git","-C",str(a),"add","one","two"]); subprocess.check_call(["git","-C",str(a),"commit","-qm","candidate"])
+   candidate=git(a,"rev-parse","HEAD")
+   self.assertEqual(guarded_git_ref_publish(repo=a,remote="origin",ref="refs/heads/main",expected_old=base,candidate=candidate),candidate)
+   self.assertEqual(remote_ref_head(a,"origin","refs/heads/main"),candidate)
+ def test_interleaving_remote_move_rejects_stale_candidate(self):
+  t,remote,a,b,base=self.remote_fixture()
+  with t:
+   (a/"one").write_text("candidate\n"); subprocess.check_call(["git","-C",str(a),"add","one"]); subprocess.check_call(["git","-C",str(a),"commit","-qm","candidate"])
+   candidate=git(a,"rev-parse","HEAD")
+   subprocess.check_call(["git","-C",str(b),"checkout","-q","-B","main","origin/main"])
+   (b/"one").write_text("racer\n"); subprocess.check_call(["git","-C",str(b),"add","one"]); subprocess.check_call(["git","-C",str(b),"commit","-qm","racer"])
+   racer=git(b,"rev-parse","HEAD"); subprocess.check_call(["git","-C",str(b),"push","-q","origin","HEAD:refs/heads/main"])
+   with self.assertRaises(NativeFoundationError):
+    guarded_git_ref_publish(repo=a,remote="origin",ref="refs/heads/main",expected_old=base,candidate=candidate)
+   self.assertEqual(remote_ref_head(a,"origin","refs/heads/main"),racer)
+ def test_crash_before_atomic_publish_leaves_remote_unchanged(self):
+  t,remote,a,b,base=self.remote_fixture()
+  with t:
+   (a/"one").write_text("candidate\n"); (a/"two").write_text("candidate\n")
+   subprocess.check_call(["git","-C",str(a),"add","one","two"]); subprocess.check_call(["git","-C",str(a),"commit","-qm","off-canonical candidate"])
+   candidate=git(a,"rev-parse","HEAD")
+   self.assertNotEqual(candidate,base)
+   self.assertEqual(remote_ref_head(a,"origin","refs/heads/main"),base)
+
 if __name__=="__main__": unittest.main()
