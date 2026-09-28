@@ -1,5 +1,5 @@
 workstream_id = "issue-deterministic-continuation"
-revision = 7
+revision = 8
 
 [execution_ref]
 branch = "work/pwv2-deterministic-continuation"
@@ -28,7 +28,7 @@ condition = "Materialize the M02 progress/restart/external-effect safety Card on
 
 [[cards]]
 id = "M02-T01"
-status = "in_progress"
+status = "done"
 review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-deterministic-continuation/reviews/M02-T01-R01.toml" }]
 
 [cards.contract]
