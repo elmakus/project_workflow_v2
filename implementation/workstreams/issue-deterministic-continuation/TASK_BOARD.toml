@@ -1,5 +1,5 @@
 workstream_id = "issue-deterministic-continuation"
-revision = 16
+revision = 17
 
 [execution_ref]
 branch = "work/pwv2-deterministic-continuation"
@@ -83,3 +83,19 @@ class = "result"
 path = "implementation/workstreams/issue-deterministic-continuation/results/M04-T01.md"
 commit = "21493ba6e91f7c87febd0216bf56a7f5990cbbe4"
 blob = "2340a1858f444cccdb73ad42f38841f2bb444251"
+
+
+[[jit_triggers]]
+id = "M05-after-M04"
+state = "consumed"
+after_card = "M04-T01"
+condition = "Materialize the M05 trajectory conformance and regression qualification Card only after M04 is DONE with a durable exact result that can be bound as its dependency."
+
+[[cards]]
+id = "M05-T01"
+status = "ready"
+review_attempts = []
+
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/issue-deterministic-continuation/cards/M05-T01.md"
