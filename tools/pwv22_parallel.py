@@ -38,6 +38,8 @@ def accepted_admission(admission_identity: Mapping[str,Any],
     admission=read_admission(admission_ref)
     _req(isinstance(admission,Mapping),"admission artifact must be durable mapping")
     a=typed_admission(admission)
+    for subject in a["subjects"].values():
+        verify_identity(subject)
     acceptance_ref=exact_identity(acceptance_identity)
     acceptance=read_acceptance(acceptance_ref)
     _req(isinstance(acceptance,Mapping),"admission acceptance must be durable mapping")
