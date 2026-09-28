@@ -1,0 +1,30 @@
+workstream_id = "issue-deterministic-continuation"
+state = "consumed"
+origin_role = "intake"
+origin_subject = "repair:deterministic-nonstop-continuation:v1"
+return_target = "intake"
+return_reconciliation = "applied"
+return_result = "elmakus/project-research@research/pwv2-issue16-intake-prior-art:projects/project_workflow_v2/issues/issue-16-deterministic-continuation/INTAKE_PRIOR_ART.md"
+finding = "Post-#11 reproduction is a distinct deterministic-continuation gap: canonical RED/non-stop routing exists, but completion is not behaviorally enforced after a durable non-stop transition."
+limitations = "Bounded Intake prior-art does not select final mechanism or enumerate every non-stop transition class; broader design research belongs to Brainstorming."
+conflicts = "none material: USER_STOP forbids fabricating a RED stop while ROUTER/RECOVERY require continuation; the missing composition is the defect."
+
+[[sources]]
+class = "official_upstream"
+status = "checked"
+weight = "primary"
+
+[[sources]]
+class = "project_runtime"
+status = "checked"
+weight = "primary"
+
+[[sources]]
+class = "tracker_discussion"
+status = "checked"
+weight = "direct"
+
+[[sources]]
+class = "practitioner_community"
+status = "not_relevant"
+weight = "none"
