@@ -1,5 +1,5 @@
 workstream_id = "issue-deterministic-continuation"
-revision = 2
+revision = 3
 
 [execution_ref]
 branch = "work/pwv2-deterministic-continuation"
@@ -11,6 +11,12 @@ status = "in_progress"
 [cards.contract]
 class = "task_card"
 path = "implementation/workstreams/issue-deterministic-continuation/cards/M01-T01.md"
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-deterministic-continuation/results/M01-T01.md"
+commit = "c964c6c0b3cd540522504af8ae2eef69ab0f5cd3"
+blob = "98f13ffaafef4c1100015a25407298cdd0bba0b4"
 
 [[jit_triggers]]
 id = "M02-after-M01"
