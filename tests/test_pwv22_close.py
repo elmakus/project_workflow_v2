@@ -16,6 +16,10 @@ class CloseTests(unittest.TestCase):
  def test_blocking_finding_blocks(self):
   f={"finding_id":"f","impact":"unknown","affected_results":["r"]}
   self.assertFalse(close_ready(**{**BASE,"findings":[f]}))
+ def test_blocking_finding_without_affected_results_blocks(self):
+  for impact in ("acceptance_falsifying","unknown"):
+   f={"finding_id":"f","impact":impact,"affected_results":[]}
+   self.assertFalse(close_ready(**{**BASE,"findings":[f]}))
  def test_stale_or_recovery_blocks(self):
   self.assertFalse(close_ready(**{**BASE,"evolution_disposition":"stale"}))
   self.assertFalse(close_ready(**{**BASE,"evolution_disposition":"recovery"}))
