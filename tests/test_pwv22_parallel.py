@@ -25,7 +25,7 @@ def read_acceptance(identity):
  if key not in DURABLE: raise NativeFoundationError("acceptance artifact not durable")
  return DURABLE[key]
 def verify(i):
- if i not in (A,B,ADM): raise NativeFoundationError("bad identity")
+ if i not in (A,B,ADM,CA,CB): raise NativeFoundationError("bad identity")
 def legal(left,right,adm_ref=ADM,adm_acc=ACC):
  return parallel_legal(left,right,adm_ref,read_admission,adm_acc,read_acceptance,verify)
 def fan(card_ids=("a","b"),adm_ref=ADM,adm_acc=ACC,compatibility=lambda xs:True,sibling_accs=None):
@@ -54,7 +54,7 @@ class ParallelTests(unittest.TestCase):
    if ref!=acceptance_identity: raise NativeFoundationError("acceptance artifact not durable")
    return acc(identity)
   def verify_real(ref):
-   if ref!=identity: raise NativeFoundationError("bad identity")
+   if ref not in (identity,CA,CB): raise NativeFoundationError("bad identity")
   self.assertEqual(accepted_admission(identity,read_real,acceptance_identity,read_real_acceptance,verify_real),payload)
   tampered=dict(identity,blob="3"*40)
   with self.assertRaises(NativeFoundationError):
@@ -70,6 +70,17 @@ class ParallelTests(unittest.TestCase):
   fabricated=I("9")
   with self.assertRaises(NativeFoundationError): legal(claims("a"),claims("z",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",)),adm_ref=fabricated)
   with self.assertRaises(NativeFoundationError): fan(card_ids=("a","z"),adm_ref=fabricated)
+ def test_fabricated_admitted_card_subject_rejected(self):
+  fabricated=I("9")
+  prior=DURABLE_ADMISSIONS[tuple(ADM.values())]
+  DURABLE_ADMISSIONS[tuple(ADM.values())]=admission(subjects={"a":fabricated,"b":CB})
+  try:
+   with self.assertRaises(NativeFoundationError):
+    legal(claims("a",subject=fabricated),claims("b",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",)))
+   with self.assertRaises(NativeFoundationError):
+    compatible_fan_in(("a","b"),{"a":fabricated,"b":CB},[A,B],[result("ra",A),result("rb",B)],{"ra":AACC,"rb":BACC},ADM,read_admission,ACC,read_acceptance,verify,lambda xs:True)
+  finally:
+   DURABLE_ADMISSIONS[tuple(ADM.values())]=prior
  def test_stale_card_subject_rejected(self):
   self.assertFalse(legal(claims("a",subject=I("z")),claims("b",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",))))
   with self.assertRaises(NativeFoundationError):
