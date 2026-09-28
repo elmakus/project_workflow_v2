@@ -1,8 +1,8 @@
 class = "review_attempt"
 review_id = "M05-T01-R01"
 card_id = "M05-T01"
-status = "pending"
-verdict = "pending"
+status = "red"
+verdict = "red"
 required = true
 
 [subject]
@@ -15,4 +15,6 @@ blob = "2e3c5ab08bbaa12a7ea4115049034281267de0ae"
 card_path = "implementation/workstreams/issue-deterministic-continuation/cards/M05-T01.md"
 
 [evidence]
-path = ""
+path = "tests/test_m05_trajectory.py"
+summary = "RED: required trajectory case 12 is not actually covered against the real production selector. test_12 manually feeds disposition=stop to classify_route_completion and covers unresolved_user_or_product_decision plus premium_A/B/C, but it does not construct/reroute issue alignment state or the definition-promotion boundary. This misses the frozen PLAN requirement 'issue alignment/promotion and Premium A/B/C boundaries stop exactly' and the Card acceptance that all 19 required M05 cases exercise the real production selector/common contracts."
+independence = "This review context did not materially produce or repair the exact reviewed subject."
