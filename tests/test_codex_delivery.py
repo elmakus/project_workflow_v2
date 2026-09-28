@@ -44,7 +44,7 @@ class CodexDeliveryTests(unittest.TestCase):
         self.assertIn("$pw:project_workflow_v2", text)
         self.assertIn("<plugin-root>/workflow/ROUTER.md", text)
         self.assertIn("fail closed", text)
-        self.assertIn("Do not fetch remote workflow policy", text)
+        self.assertIn("Do not fetch remote workflow policy", text)\n        self.assertIn("Continue deterministic authorized transitions", text)
         self.assertNotIn("review_state:", text)
         self.assertNotIn("execution_status:", text)
         self.assertNotIn("premium_stop_", text)
@@ -121,7 +121,7 @@ class CodexDeliveryTests(unittest.TestCase):
         self.assertEqual(contexts[1], contexts[2])
         self.assertIn("Canonical bundled router:", contexts[0])
         self.assertIn("local router first", contexts[0])
-        self.assertIn("not workflow policy", contexts[0])
+        self.assertIn("not workflow policy", contexts[0])\n        self.assertIn("continue deterministic authorized transitions", contexts[0])\n        self.assertIn("real stop", contexts[0])
         self.assertLessEqual(len(contexts[0]), 900)
 
     def test_missing_and_malformed_router_fail_closed(self) -> None:
