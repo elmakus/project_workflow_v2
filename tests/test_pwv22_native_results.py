@@ -3,13 +3,13 @@ from tools.pwv22_native_foundation import NativeFoundationError
 from tools.pwv22_native_results import *
 
 I=lambda n:{"repository":"R","commit":n*40,"path":"p","blob":n*40}
-A=I("a"); B=I("b"); C=I("c")
+A=I("a"); B=I("b"); C=I("c"); D=I("d")
 def result(rid,artifact,subject=A,materials=None):
  return {"type":"pwv2.2-result","result_id":rid,"result_artifact":artifact,
          "implementation_subject":subject,"material_inputs":materials or []}
 def acceptance(subject,verdict="green"): return {"verdict":verdict,"subject":subject}
 def verify(identity):
- if identity.get("repository")!="R" or identity.get("path")!="p" or identity.get("commit") not in {A["commit"],B["commit"],C["commit"]} or identity.get("blob")!=identity.get("commit"):
+ if identity.get("repository")!="R" or identity.get("path")!="p" or identity.get("commit") not in {A["commit"],B["commit"],C["commit"],D["commit"]} or identity.get("blob")!=identity.get("commit"):
   raise NativeFoundationError("unverifiable identity")
 
 class NativeResultTests(unittest.TestCase):
@@ -37,7 +37,7 @@ class NativeResultTests(unittest.TestCase):
  def test_affected_cone_propagates_through_result_artifacts(self):
   r1=result("r1",B,materials=[A])
   r2=result("r2",C,materials=[B])
-  unrelated=result("r3",A,materials=[C])
+  unrelated=result("r3",D,materials=[D])
   self.assertEqual(affected_results([r1,r2,unrelated],[A]),["r1","r2"])
  def test_frontier_is_derived(self):
   r=result("r1",A)
