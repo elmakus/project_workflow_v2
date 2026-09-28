@@ -28,7 +28,7 @@ condition = "Materialize the M02 progress/restart/external-effect safety Card on
 
 [[cards]]
 id = "M02-T01"
-status = "ready"
+status = "in_progress"
 
 [cards.contract]
 class = "task_card"
