@@ -16,5 +16,5 @@ class = "task_card"
 path = "implementation/workstreams/issue-handoff-determinism/cards/M01-T01.md"
 
 [independence]
-materially_produced_or_repaired_subject = true
-basis = "The current coordinator context materially produced the exact implementation result and cannot issue its independent verdict."
+materially_produced_or_repaired_subject = false
+basis = "R01 is reserved for a fresh independent context that did not materially produce or repair this exact result subject."
