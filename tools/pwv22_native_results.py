@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 from tools.pwv22_native_foundation import NativeFoundationError, material_fingerprint
 
 REQUIRED_IDENTITY=("repository","commit","path","blob")
@@ -23,11 +23,16 @@ def typed_result(record: Mapping[str,Any])->dict[str,Any]:
     return {"type":"pwv2.2-result","result_id":rid,"implementation_subject":subject,"material_inputs":normalized}
 
 def accepted_dependency(expected: Mapping[str,Any], result: Mapping[str,Any],
-                        acceptance: Mapping[str,Any])->dict[str,Any]:
+                        acceptance: Mapping[str,Any],
+                        verify_identity: Callable[[Mapping[str,Any]],Any])->dict[str,Any]:
     expected=exact_identity(expected)
     locator=exact_identity(result.get("result_artifact",{}))
     _req(locator==expected,"missing, stale or wrong predecessor Result")
+    verify_identity(expected)
     typed=typed_result(result)
+    verify_identity(typed["implementation_subject"])
+    for material in typed["material_inputs"]:
+        verify_identity(material)
     _req(acceptance.get("verdict")=="green","predecessor acceptance is not GREEN")
     _req(exact_identity(acceptance.get("subject",{}))==expected,"stale constituent acceptance")
     return typed
@@ -54,7 +59,8 @@ def affected_results(results: Sequence[Mapping[str,Any]], changed_inputs: Sequen
     return affected
 
 def readiness(required: Sequence[Mapping[str,Any]], available: Sequence[Mapping[str,Any]],
-              acceptances: Mapping[str,Mapping[str,Any]])->bool:
+              acceptances: Mapping[str,Mapping[str,Any]],
+              verify_identity: Callable[[Mapping[str,Any]],Any])->bool:
     by_locator={tuple(exact_identity(r.get("result_artifact",{}))[k] for k in REQUIRED_IDENTITY):r for r in available}
     for dep in required:
         identity=exact_identity(dep); key=tuple(identity[k] for k in REQUIRED_IDENTITY)
@@ -62,16 +68,17 @@ def readiness(required: Sequence[Mapping[str,Any]], available: Sequence[Mapping[
         if result is None: return False
         acceptance=acceptances.get(result.get("result_id",""))
         if acceptance is None: return False
-        accepted_dependency(identity,result,acceptance)
+        accepted_dependency(identity,result,acceptance,verify_identity)
     return True
 
 def frontier(cards: Sequence[Mapping[str,Any]], available: Sequence[Mapping[str,Any]],
-             acceptances: Mapping[str,Mapping[str,Any]])->list[str]:
+             acceptances: Mapping[str,Mapping[str,Any]],
+             verify_identity: Callable[[Mapping[str,Any]],Any])->list[str]:
     ready=[]
     for card in cards:
         cid=card.get("id"); _req(isinstance(cid,str) and cid,"missing card id")
         deps=card.get("dependencies",[]); _req(isinstance(deps,list),"dependencies must be list")
-        if readiness(deps,available,acceptances): ready.append(cid)
+        if readiness(deps,available,acceptances,verify_identity): ready.append(cid)
     return ready
 
 def append_result(history: Sequence[Mapping[str,Any]], candidate: Mapping[str,Any])->list[Mapping[str,Any]]:
