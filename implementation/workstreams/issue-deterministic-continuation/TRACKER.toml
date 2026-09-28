@@ -1,0 +1,9 @@
+workstream_id = "issue-deterministic-continuation"
+provider = "github"
+repository = "elmakus/project_workflow_v2"
+dedup_key = "project-workflow:issue-deterministic-continuation"
+state = "linked"
+issue_number = 16
+candidate_issue_numbers = []
+readback_state = "verified"
+final_pr = 19

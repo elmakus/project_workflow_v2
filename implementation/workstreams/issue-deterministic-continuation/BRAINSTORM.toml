@@ -1,0 +1,37 @@
+workstream_id = "issue-deterministic-continuation"
+scope_id = "deterministic-nonstop-continuation"
+revision = 2
+state = "promoted"
+final_challenge = "complete"
+user_stop = false
+promotion_authorization = "authorized"
+promotion_subject = "deterministic-nonstop-continuation@2"
+
+problem = "PWv2 correctly selects next obligations pointwise but lacks a common completion guarantee requiring a caller to reroute and continue after a reconciled non-stop semantic boundary."
+authorized_repair_subject = "repair:deterministic-nonstop-continuation:v1"
+research_result = "elmakus/project-research@research/pwv2-issue16-integration:projects/project_workflow_v2/issues/issue-16-deterministic-continuation/FINAL_SYNTHESIS.md"
+selected_direction = "Keep the canonical router as a pure one-step selector. Add one small runtime-neutral route-after-reconcile continuation driver/postcondition: reread durable authority, reroute, consume only the exact authorized obligation, and repeat until an existing real USER_STOP, genuine non-remediable blocker/fail-closed Recovery boundary, or durable end-of-approved-scope. Preserve exact-subject Review independence and Issue #11 handoff delivery; use ephemeral semantic progress/cycle fencing and trajectory-level conformance tests."
+required_invariants = [
+  "fresh canonical route after every reconciled semantic step before normal termination",
+  "only canonical authority establishes termination or continuation authority",
+  "no new authority, inferred approval, scope expansion, or synthetic handoff",
+  "durable readback before next route and restart without replay",
+  "exact-subject Review independence survives continuation",
+  "Issue #11 remains a stop-delivery postcondition only",
+  "semantic progress/no-op/cycle fencing is fail-closed and runtime metadata remains non-authoritative",
+  "external-effect uncertainty remains readback-first",
+  "one canonical semantic reconciler",
+  "end-of-scope remains proof-based"
+]
+rejected_alternatives = [
+  "RED-specific patch",
+  "turn every RED/GREEN/role completion into a stop",
+  "expand router into an executor",
+  "persist session/model/worker identity as workflow state",
+  "add a canonical Continuation phase/event ledger/scheduler",
+  "unconditional loop without progress fencing",
+  "generic blind retry",
+  "allow repairer to independently review its repaired exact subject"
+]
+final_challenge_note = "Adversarial Research challenged runaway autonomy, cycles, authority laundering, stale state, external effects, restart replay and Review contamination. Revision 2 incorporates durable reread, exact-authority consumption, no-progress/cycle fail-closed fencing, readback-first external effects and exact-subject independence. No unresolved material alternative remains."
+research_needed = false

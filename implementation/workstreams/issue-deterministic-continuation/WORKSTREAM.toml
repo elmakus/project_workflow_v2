@@ -1,0 +1,30 @@
+kind = "issue"
+workstream_id = "issue-deterministic-continuation"
+branch = "work/pwv2-deterministic-continuation"
+integration_target = "main"
+authority = [
+  { class = "authority", path = "requirements/PROJECT_WORKFLOW_V2.md" },
+  { class = "authority", path = "workflow/ROUTER.md" },
+  { class = "authority", path = "workflow/INTAKE.md" },
+  { class = "authority", path = "workflow/RESEARCH.md" },
+  { class = "authority", path = "workflow/BRAINSTORMING.md" },
+  { class = "authority", path = "workflow/REVIEW.md" },
+  { class = "authority", path = "workflow/RECOVERY.md" },
+  { class = "authority", path = "workflow/USER_STOP.md" },
+]
+
+[intake]
+class = "intake"
+path = "implementation/workstreams/issue-deterministic-continuation/INTAKE.toml"
+
+[research]
+class = "research"
+path = "implementation/workstreams/issue-deterministic-continuation/RESEARCH.toml"
+
+[tracker]
+class = "tracker"
+path = "implementation/workstreams/issue-deterministic-continuation/TRACKER.toml"
+
+[task_board]
+class = "task_board"
+path = "implementation/workstreams/issue-deterministic-continuation/TASK_BOARD.toml"

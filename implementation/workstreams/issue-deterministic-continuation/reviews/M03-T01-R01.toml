@@ -1,0 +1,19 @@
+class = "review_attempt"
+review_id = "M03-T01-R01"
+card_id = "M03-T01"
+status = "GREEN"
+verdict = "GREEN"
+required = true
+
+[subject]
+class = "result"
+path = "implementation/workstreams/issue-deterministic-continuation/results/M03-T01.md"
+commit = "5681051266a9d5c04effdc9d2242266ec0b1a546"
+blob = "2fcc6ba11c04dd0e58114d441a7bff58dabb931c"
+
+[acceptance]
+card_path = "implementation/workstreams/issue-deterministic-continuation/cards/M03-T01.md"
+
+[evidence]
+path = "implementation/workstreams/issue-deterministic-continuation/reviews/M03-T01-R01.toml"
+summary = "GREEN: exact M03 result subject satisfies the frozen Card acceptance. Review/USER_STOP composition preserves exact-subject independence across repaired subjects; RED/GREEN/Card/Research transitions remain non-boundary continuation; genuinely independent internal review avoids synthetic handoff; unavailable qualifying independence retains the established fresh-context boundary and USER_STOP delivery; GitHub Actions run 36497544543 is recorded successful for exact implementation head 181ccf57aff37ced23aaefc5a04664f44ead3a89."

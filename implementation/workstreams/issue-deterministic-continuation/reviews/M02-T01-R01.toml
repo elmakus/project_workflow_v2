@@ -1,0 +1,19 @@
+class = "review_attempt"
+review_id = "M02-T01-R01"
+card_id = "M02-T01"
+status = "GREEN"
+verdict = "GREEN"
+required = true
+
+[subject]
+class = "result"
+path = "implementation/workstreams/issue-deterministic-continuation/results/M02-T01.md"
+commit = "e77c2926950958cbff5a56cf1bf96164000eecd5"
+blob = "e0da305f3357ec2bf5d8e0608147b2153b406989"
+
+[acceptance]
+card_path = "implementation/workstreams/issue-deterministic-continuation/cards/M02-T01.md"
+
+[evidence]
+path = "implementation/workstreams/issue-deterministic-continuation/reviews/M02-T01-R01.toml"
+summary = "GREEN: exact result subject and implementation evidence blobs match the frozen M02 acceptance; continuation progress/cycle fencing is fail-closed and ephemeral, restart reconciles durable semantic work without replay, uncertain external effects require readback before retry, runtime identity is absent from semantic authority, and GitHub Actions run 36497196147 completed the repository test job successfully."

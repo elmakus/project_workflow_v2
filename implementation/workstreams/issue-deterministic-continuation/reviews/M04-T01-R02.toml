@@ -1,0 +1,19 @@
+class = "review_attempt"
+review_id = "M04-T01-R02"
+card_id = "M04-T01"
+status = "complete"
+verdict = "GREEN"
+required = true
+
+[subject]
+class = "result"
+path = "implementation/workstreams/issue-deterministic-continuation/results/M04-T01.md"
+commit = "21493ba6e91f7c87febd0216bf56a7f5990cbbe4"
+blob = "2340a1858f444cccdb73ad42f38841f2bb444251"
+
+[acceptance]
+card_path = "implementation/workstreams/issue-deterministic-continuation/cards/M04-T01.md"
+
+[evidence]
+path = "skills/project_workflow_v2/SKILL.md"
+summary = "GREEN: exact corrected implementation subject c7a245975c35bc144316b03e01abd1d7f633dc8a satisfies the M04 production-adapter acceptance. The prior escaped-newline defect is removed: step 5 is a real Markdown list item and exact-subject regression coverage rejects literal escaped-newline corruption. ChatGPT/manual and Codex bootstraps both require deterministic continuation through fresh canonical rerouting to a real stop while remaining thin, semantic-policy-free locators; SessionStart remains router-only and fail-closed. Durable result records focused 13/13 and repository 188/188 exact-head verification GREEN."

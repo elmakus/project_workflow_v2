@@ -1,0 +1,30 @@
+workstream_id = "issue-deterministic-continuation"
+state = "consumed"
+origin_role = "brainstorming"
+origin_subject = "research:deterministic-continuation-composition:v1"
+return_target = "brainstorming"
+return_reconciliation = "applied"
+return_result = "elmakus/project-research@research/pwv2-issue16-integration:projects/project_workflow_v2/issues/issue-16-deterministic-continuation/FINAL_SYNTHESIS.md"
+finding = "Issue #16 is a generic continuation-completion/liveness composition gap. Preserve the one-step router and add a runtime-neutral route-after-reconcile continuation postcondition with durable reread/reroute, exact-authority consumption, restartability, review-independence preservation, USER_STOP composition, and semantic progress/cycle fencing."
+limitations = "Research selected architecture/invariants but did not implement the repair. Runtime-specific realizations still require qualification against the common contract."
+conflicts = "Resolved: unconditional continue-until-stop is unsafe without progress fencing; RED-only repair is insufficient; same-context continuation cannot override exact-subject Review independence."
+
+[[sources]]
+class = "official_upstream"
+status = "checked"
+weight = "primary"
+
+[[sources]]
+class = "project_runtime"
+status = "checked"
+weight = "primary"
+
+[[sources]]
+class = "tracker_discussion"
+status = "checked"
+weight = "direct"
+
+[[sources]]
+class = "practitioner_community"
+status = "checked"
+weight = "supporting"

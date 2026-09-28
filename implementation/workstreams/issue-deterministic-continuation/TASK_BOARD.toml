@@ -1,0 +1,107 @@
+workstream_id = "issue-deterministic-continuation"
+revision = 22
+
+[execution_ref]
+branch = "work/pwv2-deterministic-continuation"
+
+[[cards]]
+id = "M01-T01"
+status = "done"
+review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-deterministic-continuation/reviews/M01-T01-R01.toml" }]
+
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/issue-deterministic-continuation/cards/M01-T01.md"
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-deterministic-continuation/results/M01-T01.md"
+commit = "c964c6c0b3cd540522504af8ae2eef69ab0f5cd3"
+blob = "98f13ffaafef4c1100015a25407298cdd0bba0b4"
+
+[[jit_triggers]]
+id = "M02-after-M01"
+state = "consumed"
+after_card = "M01-T01"
+condition = "Materialize the M02 progress/restart/external-effect safety Card only after M01 is DONE with a durable exact result that can be bound as its dependency."
+
+[[cards]]
+id = "M02-T01"
+status = "done"
+review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-deterministic-continuation/reviews/M02-T01-R01.toml" }]
+
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/issue-deterministic-continuation/cards/M02-T01.md"
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-deterministic-continuation/results/M02-T01.md"
+commit = "e77c2926950958cbff5a56cf1bf96164000eecd5"
+blob = "e0da305f3357ec2bf5d8e0608147b2153b406989"
+
+[[jit_triggers]]
+id = "M03-after-M02"
+state = "consumed"
+after_card = "M02-T01"
+condition = "Materialize the M03 Review/USER_STOP composition Card only after M02 is DONE with a durable exact result that can be bound as its dependency."
+
+[[cards]]
+id = "M03-T01"
+status = "done"
+review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-deterministic-continuation/reviews/M03-T01-R01.toml" }]
+
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/issue-deterministic-continuation/cards/M03-T01.md"
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-deterministic-continuation/results/M03-T01.md"
+commit = "5681051266a9d5c04effdc9d2242266ec0b1a546"
+blob = "2fcc6ba11c04dd0e58114d441a7bff58dabb931c"
+
+[[jit_triggers]]
+id = "M04-after-M03"
+state = "consumed"
+after_card = "M03-T01"
+condition = "Materialize the M04 production adapter realization Card only after M03 is DONE with a durable exact result that can be bound as its dependency."
+
+
+[[cards]]
+id = "M04-T01"
+status = "done"
+review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-deterministic-continuation/reviews/M04-T01-R01.toml" }, { class = "review_attempt", path = "implementation/workstreams/issue-deterministic-continuation/reviews/M04-T01-R02.toml" }]
+
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/issue-deterministic-continuation/cards/M04-T01.md"
+
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-deterministic-continuation/results/M04-T01.md"
+commit = "21493ba6e91f7c87febd0216bf56a7f5990cbbe4"
+blob = "2340a1858f444cccdb73ad42f38841f2bb444251"
+
+
+[[jit_triggers]]
+id = "M05-after-M04"
+state = "consumed"
+after_card = "M04-T01"
+condition = "Materialize the M05 trajectory conformance and regression qualification Card only after M04 is DONE with a durable exact result that can be bound as its dependency."
+
+[[cards]]
+id = "M05-T01"
+status = "done"
+review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-deterministic-continuation/reviews/M05-T01-R01.toml" }, { class = "review_attempt", path = "implementation/workstreams/issue-deterministic-continuation/reviews/M05-T01-R02.toml" }]
+
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/issue-deterministic-continuation/cards/M05-T01.md"
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-deterministic-continuation/results/M05-T01.md"
+commit = "fdc292d765935c2f2c5db80457c7e277bfc80dc0"
+blob = "e0ff4d00d99ff513e756b99148be14acc3089666"

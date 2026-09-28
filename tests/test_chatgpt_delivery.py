@@ -18,6 +18,7 @@ class ChatGPTDeliveryTests(unittest.TestCase):
         self.assertIn("workflow/ROUTER.md", text)
         self.assertIn("<owner/repository>", text)
         self.assertIn("bootstrap locator", text)
+        self.assertIn("continue deterministic authorized transitions until the router reaches a real stop", text)
         self.assertNotIn("review_state:", text)
         self.assertNotIn("execution_policy:", text)
         self.assertNotIn("active_execution", text)
