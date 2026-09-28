@@ -24,9 +24,13 @@ def typed_admission(record: Mapping[str,Any])->dict[str,Any]:
     subjects=record.get("subjects"); _req(isinstance(subjects,Mapping),"admission subjects must be object")
     _req(set(subjects)==set(cards),"admission subjects must exactly cover cards")
     typed_subjects={cid:exact_identity(subjects[cid]) for cid in cards}
+    owners=record.get("mutating_owners"); _req(isinstance(owners,Mapping),"admission mutating owners must be object")
+    _req(set(owners)==set(cards),"admission mutating owners must exactly cover cards")
+    typed_owners={cid:owners[cid] for cid in cards}
+    _req(all(isinstance(owner,str) and owner for owner in typed_owners.values()),"invalid admission mutating owner")
     revoked=record.get("revoked",[]); _req(isinstance(revoked,list),"revoked must be list")
     _req(all(isinstance(x,str) and x in cards for x in revoked),"revoked card outside admission")
-    return {"type":"pwv2.2-admission","admission_id":aid,"cards":list(cards),"subjects":typed_subjects,"revoked":list(revoked)}
+    return {"type":"pwv2.2-admission","admission_id":aid,"cards":list(cards),"subjects":typed_subjects,"mutating_owners":typed_owners,"revoked":list(revoked)}
 
 def accepted_admission(admission_identity: Mapping[str,Any],
                        read_admission: Callable[[Mapping[str,Any]],Mapping[str,Any]],
@@ -63,8 +67,8 @@ def parallel_legal(left: Mapping[str,Any], right: Mapping[str,Any], admission_id
     l=typed_claims(left); r=typed_claims(right)
     a=accepted_admission(admission_identity,read_admission,admission_acceptance_identity,read_acceptance,verify_identity)
     if l["card_id"]==r["card_id"]: return False
-    if l["card_id"] not in a["cards"] or l["card_id"] in a["revoked"] or a["subjects"][l["card_id"]]!=l["subject"]: return False
-    if r["card_id"] not in a["cards"] or r["card_id"] in a["revoked"] or a["subjects"][r["card_id"]]!=r["subject"]: return False
+    if l["card_id"] not in a["cards"] or l["card_id"] in a["revoked"] or a["subjects"][l["card_id"]]!=l["subject"] or a["mutating_owners"][l["card_id"]]!=l["mutating_owner"]: return False
+    if r["card_id"] not in a["cards"] or r["card_id"] in a["revoked"] or a["subjects"][r["card_id"]]!=r["subject"] or a["mutating_owners"][r["card_id"]]!=r["mutating_owner"]: return False
     for kind in CLAIM_KINDS:
         if not l[kind] or not r[kind]: return False
         if l[kind] & r[kind]: return False
