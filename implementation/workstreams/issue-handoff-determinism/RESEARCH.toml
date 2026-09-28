@@ -1,0 +1,30 @@
+workstream_id = "issue-handoff-determinism"
+state = "consumed"
+origin_role = "intake"
+origin_subject = "repair:fresh-context-handoff-delivery-postcondition:v1"
+return_target = "intake"
+return_reconciliation = "applied"
+return_result = "elmakus/project-research@research/pwv2-handoff-determinism-integration:projects/project_workflow_v2/issues/issue-11-handoff-determinism/FINAL_SYNTHESIS.md"
+finding = "Integrated 10-lane formal Research finds a latent contract-to-delivery gap: semantic stop/Review independence already exists, but no behavioral completion gate composes an established fresh-context boundary with required USER_STOP handoff rendering. Repair must cover router-native stops and the Review-realization seam while keeping USER_STOP downstream-only."
+limitations = "Research does not prove which model/harness event caused each historical omission and intentionally leaves exact implementation symbols/renderer-validator mechanism to authorized repair design. Frozen canonical subject was 4fb4bfb7d7b1481d6f347c182fc96a5a1135e045."
+conflicts = "none material: red-team qualification that fresh Review boundary may arise after route/review was integrated; all lanes agree presentation must not become semantic stop authority."
+
+[[sources]]
+class = "official_upstream"
+status = "checked"
+weight = "supporting"
+
+[[sources]]
+class = "project_runtime"
+status = "checked"
+weight = "primary"
+
+[[sources]]
+class = "tracker_discussion"
+status = "checked"
+weight = "direct"
+
+[[sources]]
+class = "practitioner_community"
+status = "checked"
+weight = "supporting"
