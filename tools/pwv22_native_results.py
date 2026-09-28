@@ -16,20 +16,20 @@ def exact_identity(value: Mapping[str,Any])->dict[str,str]:
 def typed_result(record: Mapping[str,Any])->dict[str,Any]:
     _req(record.get("type")=="pwv2.2-result","wrong result type")
     rid=record.get("result_id"); _req(isinstance(rid,str) and rid,"missing result id")
+    artifact=exact_identity(record.get("result_artifact",{}))
     subject=exact_identity(record.get("implementation_subject",{}))
     materials=record.get("material_inputs",[])
     _req(isinstance(materials,list),"material inputs must be list")
     normalized=[exact_identity(x) for x in materials]
-    return {"type":"pwv2.2-result","result_id":rid,"implementation_subject":subject,"material_inputs":normalized}
+    return {"type":"pwv2.2-result","result_id":rid,"result_artifact":artifact,"implementation_subject":subject,"material_inputs":normalized}
 
 def accepted_dependency(expected: Mapping[str,Any], result: Mapping[str,Any],
                         acceptance: Mapping[str,Any],
                         verify_identity: Callable[[Mapping[str,Any]],Any])->dict[str,Any]:
     expected=exact_identity(expected)
-    locator=exact_identity(result.get("result_artifact",{}))
-    _req(locator==expected,"missing, stale or wrong predecessor Result")
-    verify_identity(expected)
     typed=typed_result(result)
+    _req(typed["result_artifact"]==expected,"missing, stale or wrong predecessor Result")
+    verify_identity(typed["result_artifact"])
     verify_identity(typed["implementation_subject"])
     for material in typed["material_inputs"]:
         verify_identity(material)
@@ -86,5 +86,6 @@ def append_result(history: Sequence[Mapping[str,Any]], candidate: Mapping[str,An
     for prior in history:
         p=typed_result(prior)
         _req(p["result_id"]!=typed["result_id"],"Result history is immutable")
+        _req(p["result_artifact"]!=typed["result_artifact"],"Result artifact history is immutable")
         _req(p["implementation_subject"]!=typed["implementation_subject"],"unchanged implementation must retain existing Result")
     return [*history,candidate]
