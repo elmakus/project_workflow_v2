@@ -78,7 +78,7 @@ def guarded_git_ref_publish(*, repo: Path, remote: str, ref: str,
     """Atomically publish one already-assembled Git commit with remote CAS and readback."""
     _req(HEX40.fullmatch(expected_old) is not None and HEX40.fullmatch(candidate) is not None,
          "invalid commit identity")
-    _git(repo,"cat-file","-e",f"{candidate}^{commit}")
+    _git(repo,"cat-file","-e",f"{candidate}^{{commit}}")
     observed=remote_ref_head(repo,remote,ref)
     _req(observed==expected_old,"stale expected-old")
     try:
