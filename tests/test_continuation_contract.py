@@ -3,6 +3,9 @@ import unittest
 from tools.continuation_contract import (
     ContinuationContractError,
     classify_route_completion,
+    classify_progress,
+    ProgressObservation,
+    resume_action,
 )
 
 
@@ -62,6 +65,42 @@ class ContinuationContractTests(unittest.TestCase):
                     classify_route_completion(
                         disposition=disposition, obligation=obligation
                     )
+
+
+    def test_claimed_success_without_progress_fails_closed(self):
+        state = ProgressObservation("route:execution:M02-T01", "evidence:1")
+        with self.assertRaises(ContinuationContractError):
+            classify_progress(previous=state, current=state)
+
+    def test_evidence_free_semantic_cycle_fails_closed(self):
+        previous = ProgressObservation("route:review:M02-T01", "evidence:1")
+        current = ProgressObservation("route:execution:M02-T01", "evidence:1")
+        with self.assertRaises(ContinuationContractError):
+            classify_progress(
+                previous=previous,
+                current=current,
+                seen=frozenset({(current.fingerprint, current.evidence_epoch)}),
+            )
+
+    def test_new_evidence_allows_same_semantic_shape_to_progress(self):
+        previous = ProgressObservation("route:review:M02-T01", "evidence:1")
+        current = ProgressObservation("route:execution:M02-T01", "evidence:2")
+        self.assertEqual(
+            classify_progress(previous=previous, current=current, seen=frozenset()),
+            "continue",
+        )
+
+    def test_restart_reconciles_durable_result_without_replay(self):
+        self.assertEqual(
+            resume_action(durable_semantic_result=True, external_effect_uncertain=False),
+            "reconcile_without_replay",
+        )
+
+    def test_uncertain_external_effect_requires_readback_before_retry(self):
+        self.assertEqual(
+            resume_action(durable_semantic_result=False, external_effect_uncertain=True),
+            "readback_external_effect_before_retry",
+        )
 
 
 if __name__ == "__main__":
