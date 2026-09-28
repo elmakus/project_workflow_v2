@@ -26,6 +26,18 @@ When user action is required, include an explicit `USER ACTION REQUIRED:` line w
 
 When a fresh ChatGPT context is required or recommended, include a ready-to-copy `NEW CHAT START PROMPT` using the support template at `prompts/CHATGPT_FRESH_SESSION.md`.
 
+### Delivery completion postcondition
+
+Handoff delivery is an observable postcondition of an **already-established** boundary, never a way to establish one.
+
+- handoff policy `none`: no fresh-context locator is implied;
+- handoff policy `offered`: delivery is incomplete until the exact locator-only prompt is present;
+- handoff policy `required`: delivery is incomplete until both `USER ACTION REQUIRED:` and the exact locator-only prompt are present.
+
+The same postcondition applies when Review semantics plus transient capability realization establish a fresh independent-context boundary after the router has selected Review. A current context that did not materially produce/repair the exact subject, or a genuinely independent internal context, does not require an external handoff.
+
+Missing or placeholder locator fields fail closed at the delivery boundary. Delivery failure does not mutate workflow state, create a stop, or persist model/session/worker identity. Runtime implementations may render or validate this contract by any mechanism that preserves these observable semantics.
+
 ## Premium A/B/C handoff behavior
 
 Premium gates have distinct handoff requirements:
