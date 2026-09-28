@@ -8,6 +8,6 @@ acceptance_authority = [
   "elmakus/project-research@research/pwv2-issue16-integration:projects/project_workflow_v2/issues/issue-16-deterministic-continuation/FINAL_SYNTHESIS.md"
 ]
 independence_proof = "fresh independent Premium B context; this context did not materially author or repair the exact frozen plan subject"
-state = "pending"
-verdict = "pending"
-evidence_locator = ""
+state = "green"
+verdict = "GREEN"
+evidence_locator = "implementation/workstreams/issue-deterministic-continuation/PLAN_REVIEW.md"
