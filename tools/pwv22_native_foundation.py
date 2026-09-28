@@ -14,6 +14,7 @@ def canonical_json(value: Any) -> bytes:
 
 def safe_path(raw: str) -> str:
     _req(isinstance(raw,str) and raw, "path required")
+    _req("\\" not in raw, "unsafe path")
     p=PurePosixPath(raw)
     _req(not p.is_absolute() and ".." not in p.parts and "." not in p.parts, "unsafe path")
     return p.as_posix()
@@ -22,14 +23,32 @@ def _git(repo: Path, *args: str) -> bytes:
     try: return subprocess.check_output(["git","-C",str(repo),*args], stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e: raise NativeFoundationError(e.output.decode(errors="replace").strip()) from e
 
-def exact_blob(repo: Path, actual_repository: str, ref: Mapping[str,Any], serving_bytes: bytes|None=None) -> bytes:
+def _remote_repository_identity(repo: Path, remote: str) -> str:
+    url=_git(repo,"remote","get-url",remote).decode().strip().rstrip("/")
+    github=re.fullmatch(r"(?:https://github\\.com/|git@github\\.com:)([^/]+/[^/]+?)(?:\\.git)?",url)
+    if github: return github.group(1)
+    local=Path(url[7:] if url.startswith("file://") else url).name
+    _req(bool(local),"cannot derive repository identity")
+    return local[:-4] if local.endswith(".git") else local
+
+def exact_blob(repo: Path, actual_repository: str, ref: Mapping[str,Any], serving_bytes: bytes|None=None,
+               *, remote: str="origin", canonical_ref: str="refs/heads/main") -> bytes:
     for k in ("repository","commit","path","blob"): _req(isinstance(ref.get(k),str) and ref[k], f"missing {k}")
-    _req(ref["repository"]==actual_repository, "wrong repository")
+    derived_repository=_remote_repository_identity(repo,remote)
+    _req(ref["repository"]==actual_repository==derived_repository, "wrong repository")
     _req(bool(HEX40.fullmatch(ref["commit"])) and bool(HEX40.fullmatch(ref["blob"])), "identity must be 40-hex")
     path=safe_path(ref["path"])
-    typ=_git(repo,"cat-file","-t",f'{ref["commit"]}:{path}').decode().strip()
-    _req(typ=="blob","object is not blob")
-    actual=_git(repo,"rev-parse",f'{ref["commit"]}:{path}').decode().strip()
+    remote_head=remote_ref_head(repo,remote,canonical_ref)
+    try:
+        subprocess.check_output(["git","-C",str(repo),"merge-base","--is-ancestor",ref["commit"],remote_head],
+                                stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as e:
+        raise NativeFoundationError("commit not reachable from canonical published ref") from e
+    entry=_git(repo,"ls-tree",ref["commit"],"--",path).decode().rstrip("\n")
+    _req(bool(entry) and "\n" not in entry, "path missing or ambiguous")
+    meta, found_path=entry.split("\t",1)
+    mode, typ, actual=meta.split(" ",2)
+    _req(found_path==path and typ=="blob" and mode!="120000","object is not regular blob")
     _req(actual==ref["blob"],"wrong blob")
     data=_git(repo,"show",f'{ref["commit"]}:{path}')
     if serving_bytes is not None: _req(data==serving_bytes,"serving bytes differ")
