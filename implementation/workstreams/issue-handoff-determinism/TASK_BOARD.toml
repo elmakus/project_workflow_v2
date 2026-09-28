@@ -7,13 +7,13 @@ branch = "work/pwv2-handoff-determinism"
 [[cards]]
 id = "M01-T01"
 status = "in_progress"
-review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-handoff-determinism/reviews/M01-T01-R01.toml" }]
+review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-handoff-determinism/reviews/M01-T01-R01.toml" }, { class = "review_attempt", path = "implementation/workstreams/issue-handoff-determinism/reviews/M01-T01-R02.toml" }]
 
 [cards.result]
 class = "result"
 path = "implementation/workstreams/issue-handoff-determinism/results/M01-T01.md"
-commit = "5cf28e4a9456e5889e5ce51215a3708f409b47f7"
-blob = "23886091d1b34874d49b56657208f9fe0ddf5ee3"
+commit = "8c401c85e5c7fce3700ed8d587e82b435398113e"
+blob = "be5954120d033c74bb36b27401c579f6458415b5"
 
 [cards.contract]
 class = "task_card"
