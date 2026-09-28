@@ -15,6 +15,5 @@ path = "implementation/workstreams/issue-deterministic-continuation/cards/M01-T0
 [[jit_triggers]]
 id = "M02-after-M01"
 state = "waiting"
-predecessor_card = "M01-T01"
-target_milestone = "M02"
-summary = "Materialize the progress/restart/external-effect safety Card only after M01 has a durable DONE result whose exact identity can be bound as a dependency."
+after_card = "M01-T01"
+condition = "Materialize the M02 progress/restart/external-effect safety Card only after M01 is DONE with a durable exact result that can be bound as its dependency."
