@@ -48,3 +48,47 @@ def classify_route_completion(*, disposition: str, obligation: str) -> Continuat
             "fail-closed recovery is not semantic success or a normal workflow stop",
         )
     raise ContinuationContractError(f"unknown route disposition {disposition!r}")
+
+
+@dataclass(frozen=True)
+class ProgressObservation:
+    fingerprint: str
+    evidence_epoch: str
+
+
+def classify_progress(
+    *,
+    previous: ProgressObservation,
+    current: ProgressObservation,
+    seen: frozenset[tuple[str, str]] = frozenset(),
+) -> str:
+    """Fail closed on claimed success without semantic progress or on evidence-free cycles.
+
+    Fingerprints and evidence epochs are ephemeral values derived by the caller
+    only from authoritative durable semantic inputs. Runtime identity is
+    deliberately absent.
+    """
+    for item in (previous.fingerprint, previous.evidence_epoch, current.fingerprint, current.evidence_epoch):
+        if not isinstance(item, str) or not item.strip():
+            raise ContinuationContractError("progress identities must be non-empty")
+
+    if current == previous:
+        raise ContinuationContractError(
+            "claimed reconciliation produced no authoritative semantic progress"
+        )
+
+    key = (current.fingerprint, current.evidence_epoch)
+    if key in seen:
+        raise ContinuationContractError(
+            "semantic continuation cycle repeated without new accepted evidence or authority"
+        )
+    return "continue"
+
+
+def resume_action(*, durable_semantic_result: bool, external_effect_uncertain: bool) -> str:
+    """Choose restart behavior without replaying already durable semantic work."""
+    if external_effect_uncertain:
+        return "readback_external_effect_before_retry"
+    if durable_semantic_result:
+        return "reconcile_without_replay"
+    return "execute_selected_obligation"
