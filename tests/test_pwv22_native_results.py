@@ -41,6 +41,9 @@ class NativeResultTests(unittest.TestCase):
   r=result("r1",A,subject=B)
   with self.assertRaises(NativeFoundationError): append_result([r],result("r1",C,subject=C))
   with self.assertRaises(NativeFoundationError): append_result([r],result("r2",C,subject=B))
+  with self.assertRaises(NativeFoundationError): append_result([r],result("r2",A,subject=C))
+  missing_artifact={"type":"pwv2.2-result","result_id":"r2","implementation_subject":C,"material_inputs":[]}
+  with self.assertRaises(NativeFoundationError): append_result([r],missing_artifact)
   self.assertEqual(result_fingerprint(r),result_fingerprint(r))
  def test_invalid_typed_payload(self):
   with self.assertRaises(NativeFoundationError): typed_result({"type":"legacy"})
