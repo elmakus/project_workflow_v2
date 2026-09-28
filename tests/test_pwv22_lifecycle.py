@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from tools.pwv22_native_foundation import NativeFoundationError
 from tools.pwv22_lifecycle import integrated_lifecycle
@@ -53,6 +54,15 @@ class LifecycleTests(unittest.TestCase):
             integrated_lifecycle(**base(results=[result("a",A)]))
         with self.assertRaises(NativeFoundationError):
             integrated_lifecycle(**base(constituent_acceptances=[acceptance(A),acceptance(I("f"))]))
+
+    def test_incompatible_multi_result_fan_in_fails(self):
+        fan={"expected_card_ids":["a","b"],"expected_card_subjects":{"a":A,"b":B},
+             "acceptance_identities":{},"sibling_claims":[],"admission_identity":A,
+             "read_admission":lambda x:{}, "admission_acceptance_identity":B,
+             "read_acceptance":lambda x:{}, "compatibility":lambda xs:False}
+        with patch("tools.pwv22_lifecycle.compatible_fan_in", side_effect=NativeFoundationError("integrated sibling incompatibility")):
+            with self.assertRaises(NativeFoundationError):
+                integrated_lifecycle(**base(fan_in=fan))
 
     def test_integrated_review_must_be_green_and_independent(self):
         with self.assertRaises(NativeFoundationError):
