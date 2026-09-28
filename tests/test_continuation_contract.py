@@ -7,6 +7,8 @@ from tools.continuation_contract import (
     ProgressObservation,
     resume_action,
 )
+from tools.review_contract import review_delivery_policy, select_review_realization
+from tools.user_stop_contract import HANDOFF_NONE, HANDOFF_REQUIRED
 
 
 class ContinuationContractTests(unittest.TestCase):
@@ -66,7 +68,6 @@ class ContinuationContractTests(unittest.TestCase):
                         disposition=disposition, obligation=obligation
                     )
 
-
     def test_claimed_success_without_progress_fails_closed(self):
         state = ProgressObservation("route:execution:M02-T01", "evidence:1")
         with self.assertRaises(ContinuationContractError):
@@ -100,6 +101,54 @@ class ContinuationContractTests(unittest.TestCase):
         self.assertEqual(
             resume_action(durable_semantic_result=False, external_effect_uncertain=True),
             "readback_external_effect_before_retry",
+        )
+
+    def test_green_and_red_review_transitions_do_not_stop_by_verdict(self):
+        for obligation in ("post_review_finalization", "execution", "research"):
+            with self.subTest(obligation=obligation):
+                decision = classify_route_completion(
+                    disposition="route", obligation=obligation
+                )
+                self.assertEqual(decision.action, "continue")
+                self.assertFalse(decision.legal_return)
+
+    def test_review_independence_is_recomputed_for_repaired_subject(self):
+        self.assertEqual(
+            select_review_realization(
+                current_context_produced_subject=True,
+                independent_context_available=False,
+            ),
+            "fresh_context",
+        )
+        self.assertEqual(
+            review_delivery_policy(
+                current_context_produced_subject=True,
+                independent_context_available=False,
+            ),
+            HANDOFF_REQUIRED,
+        )
+
+    def test_internal_independent_review_avoids_synthetic_handoff(self):
+        self.assertEqual(
+            select_review_realization(
+                current_context_produced_subject=True,
+                independent_context_available=True,
+            ),
+            "internal_independent",
+        )
+        self.assertEqual(
+            review_delivery_policy(
+                current_context_produced_subject=True,
+                independent_context_available=True,
+            ),
+            HANDOFF_NONE,
+        )
+        self.assertEqual(
+            review_delivery_policy(
+                current_context_produced_subject=False,
+                independent_context_available=False,
+            ),
+            HANDOFF_NONE,
         )
 
 
