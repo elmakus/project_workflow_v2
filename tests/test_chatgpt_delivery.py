@@ -47,6 +47,8 @@ class ChatGPTDeliveryTests(unittest.TestCase):
         self.assertIn("Premium C — optional handoff", text)
         self.assertIn("another context or harness", text)
         self.assertNotIn("review evidence:", text.lower())
+        self.assertIn("Delivery completion postcondition", text)
+        self.assertIn("already-established", text)
 
     def test_router_points_to_canonical_user_stop_module(self) -> None:
         text = ROUTER.read_text(encoding="utf-8")
