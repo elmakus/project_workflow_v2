@@ -1,5 +1,5 @@
 workstream_id = "issue-deterministic-continuation"
-revision = 19
+revision = 20
 
 [execution_ref]
 branch = "work/pwv2-deterministic-continuation"
@@ -94,7 +94,7 @@ condition = "Materialize the M05 trajectory conformance and regression qualifica
 [[cards]]
 id = "M05-T01"
 status = "in_progress"
-review_attempts = []
+review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-deterministic-continuation/reviews/M05-T01-R01.toml" }]
 
 [cards.contract]
 class = "task_card"
