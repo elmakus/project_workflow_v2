@@ -34,6 +34,11 @@ class NativeResultTests(unittest.TestCase):
   self.assertEqual(affected_results([r1,r2],[B]),["r1"])
   self.assertTrue(material_fresh(r2,[C]))
   self.assertFalse(material_fresh(r1,[C]))
+ def test_affected_cone_propagates_through_result_artifacts(self):
+  r1=result("r1",B,materials=[A])
+  r2=result("r2",C,materials=[B])
+  unrelated=result("r3",A,materials=[C])
+  self.assertEqual(affected_results([r1,r2,unrelated],[A]),["r1","r2"])
  def test_frontier_is_derived(self):
   r=result("r1",A)
   self.assertEqual(frontier([{"id":"x","dependencies":[A]},{"id":"y","dependencies":[B]}],[r],{"r1":acceptance(A)},verify),["x"])

@@ -50,13 +50,21 @@ def material_fresh(result: Mapping[str,Any], current_material_inputs: Sequence[M
     return typed["material_inputs"]==current
 
 def affected_results(results: Sequence[Mapping[str,Any]], changed_inputs: Sequence[Mapping[str,Any]])->list[str]:
-    changed={tuple(exact_identity(x)[k] for k in REQUIRED_IDENTITY) for x in changed_inputs}
-    affected=[]
-    for result in results:
-        typed=typed_result(result)
-        material={tuple(x[k] for k in REQUIRED_IDENTITY) for x in typed["material_inputs"]}
-        if material & changed: affected.append(typed["result_id"])
-    return affected
+    typed_results=[typed_result(result) for result in results]
+    affected_inputs={tuple(exact_identity(x)[k] for k in REQUIRED_IDENTITY) for x in changed_inputs}
+    affected_ids:set[str]=set()
+    changed=True
+    while changed:
+        changed=False
+        for typed in typed_results:
+            if typed["result_id"] in affected_ids:
+                continue
+            material={tuple(x[k] for k in REQUIRED_IDENTITY) for x in typed["material_inputs"]}
+            if material & affected_inputs:
+                affected_ids.add(typed["result_id"])
+                affected_inputs.add(tuple(typed["result_artifact"][k] for k in REQUIRED_IDENTITY))
+                changed=True
+    return [typed["result_id"] for typed in typed_results if typed["result_id"] in affected_ids]
 
 def readiness(required: Sequence[Mapping[str,Any]], available: Sequence[Mapping[str,Any]],
               acceptances: Mapping[str,Mapping[str,Any]],
