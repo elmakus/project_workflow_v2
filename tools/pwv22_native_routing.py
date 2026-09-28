@@ -28,7 +28,10 @@ def simplification_ready(record: Mapping[str,Any])->bool:
     _req(isinstance(findings,list),"invalid simplification findings")
     dispositions=record.get("owner_dispositions",{})
     _req(isinstance(dispositions,Mapping),"invalid simplification dispositions")
-    return all(isinstance(f,str) and dispositions.get(f) in ("accept","reject") for f in findings)
+    for f in findings:
+        _req(isinstance(f,str) and f,"invalid simplification finding")
+        if f in dispositions: _req(dispositions[f] in ("accept","reject"),"invalid owner disposition")
+    return all(f in dispositions for f in findings)
 
 def satisfy_gate(gate: str, expected_subject: Mapping[str,Any], presented_subject: Mapping[str,Any])->dict[str,Any]:
     _req(gate in GATES,"unsupported gate")
