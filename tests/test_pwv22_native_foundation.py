@@ -6,13 +6,15 @@ def git(p,*a): return subprocess.check_output(["git","-C",str(p),*a]).decode().s
 
 class NativeFoundationTests(unittest.TestCase):
  def fixture(self):
-  t=tempfile.TemporaryDirectory(); p=Path(t.name)
-  subprocess.check_call(["git","-C",str(p),"init","-q"])
+  t=tempfile.TemporaryDirectory(); root=Path(t.name); remote=root/"R.git"; p=root/"work"
+  subprocess.check_call(["git","init","--bare","-q",str(remote)])
+  subprocess.check_call(["git","clone","-q",str(remote),str(p)])
   subprocess.check_call(["git","-C",str(p),"config","user.email","t@example.invalid"])
   subprocess.check_call(["git","-C",str(p),"config","user.name","T"])
   (p/"a.txt").write_text("alpha\n")
   subprocess.check_call(["git","-C",str(p),"add","a.txt"]); subprocess.check_call(["git","-C",str(p),"commit","-qm","a"])
   c=git(p,"rev-parse","HEAD"); b=git(p,"rev-parse",f"{c}:a.txt")
+  subprocess.check_call(["git","-C",str(p),"push","-q","origin","HEAD:refs/heads/main"])
   return t,p,c,b
  def test_exact_identity_and_serving_bytes(self):
   t,p,c,b=self.fixture()
@@ -23,6 +25,30 @@ class NativeFoundationTests(unittest.TestCase):
     bad=dict(r); bad[k]=v
     with self.assertRaises(NativeFoundationError): exact_blob(p,"R",bad)
    with self.assertRaises(NativeFoundationError): exact_blob(p,"R",r,b"changed\n")
+ def test_exact_identity_rejects_unpublished_backslash_and_symlink(self):
+  t,p,c,b=self.fixture()
+  with t:
+   r={"repository":"R","commit":c,"path":"a.txt","blob":b}
+   bad=dict(r); bad["path"]="dir\\\\a.txt"
+   with self.assertRaises(NativeFoundationError): exact_blob(p,"R",bad)
+   (p/"link").symlink_to("a.txt")
+   subprocess.check_call(["git","-C",str(p),"add","link"]); subprocess.check_call(["git","-C",str(p),"commit","-qm","symlink"])
+   symlink_commit=git(p,"rev-parse","HEAD"); symlink_blob=git(p,"rev-parse",f"{symlink_commit}:link")
+   subprocess.check_call(["git","-C",str(p),"push","-q","origin","HEAD:refs/heads/main"])
+   link_ref={"repository":"R","commit":symlink_commit,"path":"link","blob":symlink_blob}
+   with self.assertRaises(NativeFoundationError): exact_blob(p,"R",link_ref)
+   (p/"local.txt").write_text("local\n")
+   subprocess.check_call(["git","-C",str(p),"add","local.txt"]); subprocess.check_call(["git","-C",str(p),"commit","-qm","local only"])
+   local_commit=git(p,"rev-parse","HEAD"); local_blob=git(p,"rev-parse",f"{local_commit}:local.txt")
+   local_ref={"repository":"R","commit":local_commit,"path":"local.txt","blob":local_blob}
+   with self.assertRaises(NativeFoundationError): exact_blob(p,"R",local_ref)
+
+ def test_repository_identity_is_derived_from_remote(self):
+  t,p,c,b=self.fixture()
+  with t:
+   r={"repository":"X","commit":c,"path":"a.txt","blob":b}
+   with self.assertRaises(NativeFoundationError): exact_blob(p,"X",r)
+
  def test_material_locality(self):
   r={"repository":"R","commit":"1"*40,"path":"x","blob":"2"*40}
   a=material_fingerprint([r],{"property":"v"})
@@ -50,7 +76,7 @@ class NativeFoundationTests(unittest.TestCase):
   self.assertTrue(validate_atomic_candidate({"x":b"1","y":b"2"},{"x","y"}))
   with self.assertRaises(NativeFoundationError): validate_atomic_candidate({"z":b"3"},{"x","y"})
  def test_safe_paths(self):
-  for p in ["../x","/x","a/../x"]:
+  for p in ["../x","/x","a/../x","a\\\\b"]:
    with self.assertRaises(NativeFoundationError): safe_path(p)
 
  def remote_fixture(self):
