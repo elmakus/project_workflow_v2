@@ -1,5 +1,5 @@
 workstream_id = "issue-deterministic-continuation"
-revision = 15
+revision = 16
 
 [execution_ref]
 branch = "work/pwv2-deterministic-continuation"
@@ -70,7 +70,7 @@ condition = "Materialize the M04 production adapter realization Card only after 
 
 [[cards]]
 id = "M04-T01"
-status = "in_progress"
+status = "done"
 review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-deterministic-continuation/reviews/M04-T01-R01.toml" }, { class = "review_attempt", path = "implementation/workstreams/issue-deterministic-continuation/reviews/M04-T01-R02.toml" }]
 
 [cards.contract]
