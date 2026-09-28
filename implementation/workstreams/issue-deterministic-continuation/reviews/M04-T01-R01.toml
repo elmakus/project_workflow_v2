@@ -1,8 +1,8 @@
 class = "review_attempt"
 review_id = "M04-T01-R01"
 card_id = "M04-T01"
-status = "pending"
-verdict = "pending"
+status = "complete"
+verdict = "RED"
 required = true
 
 [subject]
@@ -15,4 +15,5 @@ blob = "fa210e40e758a9e137a68b78857e717694f2c109"
 card_path = "implementation/workstreams/issue-deterministic-continuation/cards/M04-T01.md"
 
 [evidence]
-path = ""
+path = "skills/project_workflow_v2/SKILL.md"
+summary = "RED: exact implementation subject cf539fbbda90f2d661d3ff36f08ee3229c64b438 contains a literal \\n before step 5 in the Codex Skill, so the fail-closed step is not a real Markdown list item. Existing Codex delivery coverage checks substrings but does not detect this malformed production bootstrap. Bounded correction is within the accepted M04 adapter scope."
