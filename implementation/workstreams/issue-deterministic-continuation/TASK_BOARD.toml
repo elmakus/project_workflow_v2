@@ -1,5 +1,5 @@
 workstream_id = "issue-deterministic-continuation"
-revision = 12
+revision = 13
 
 [execution_ref]
 branch = "work/pwv2-deterministic-continuation"
@@ -48,7 +48,7 @@ condition = "Materialize the M03 Review/USER_STOP composition Card only after M0
 
 [[cards]]
 id = "M03-T01"
-status = "in_progress"
+status = "done"
 review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-deterministic-continuation/reviews/M03-T01-R01.toml" }]
 
 [cards.contract]
@@ -63,6 +63,16 @@ blob = "2fcc6ba11c04dd0e58114d441a7bff58dabb931c"
 
 [[jit_triggers]]
 id = "M04-after-M03"
-state = "waiting"
+state = "consumed"
 after_card = "M03-T01"
 condition = "Materialize the M04 production adapter realization Card only after M03 is DONE with a durable exact result that can be bound as its dependency."
+
+
+[[cards]]
+id = "M04-T01"
+status = "ready"
+review_attempts = []
+
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/issue-deterministic-continuation/cards/M04-T01.md"
