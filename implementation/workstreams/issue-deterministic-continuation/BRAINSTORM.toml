@@ -1,23 +1,37 @@
 workstream_id = "issue-deterministic-continuation"
 scope_id = "deterministic-nonstop-continuation"
-revision = 1
-state = "active"
-final_challenge = "pending"
-user_stop = false
+revision = 2
+state = "ready"
+final_challenge = "complete"
+user_stop = true
 promotion_authorization = "pending"
-promotion_subject = "deterministic-nonstop-continuation@1"
+promotion_subject = "deterministic-nonstop-continuation@2"
 
-problem = "PWv2 defines many semantic boundaries as non-stops and routes deterministic continuation after them, but observed runtime behavior can terminate after a durable RED review instead of continuing to the next canonical obligation."
+problem = "PWv2 correctly selects next obligations pointwise but lacks a common completion guarantee requiring a caller to reroute and continue after a reconciled non-stop semantic boundary."
 authorized_repair_subject = "repair:deterministic-nonstop-continuation:v1"
-current_direction = "Establish a runtime-neutral continuation-completion invariant that composes router/owner transitions until a real USER_STOP/blocker/end-of-scope boundary, without turning ordinary RED/GREEN/Card/role completion into stops and without weakening independent-review semantics."
-open_questions = [
-  "Which canonical non-stop transitions must be covered by the invariant beyond RED?",
-  "Where should the invariant live so semantic routing remains authority while delivery/runtime realization becomes behaviorally testable?",
-  "How should external fresh-review contexts return/continue without persisting runtime identity or inventing a role lifecycle?",
-  "What loop/fail-closed guards are required to prevent runaway continuation on contradictory or non-progressing durable state?",
-  "Which existing #11 contracts/tests should be generalized versus kept as the narrower real-stop delivery contract?"
+research_result = "elmakus/project-research@research/pwv2-issue16-integration:projects/project_workflow_v2/issues/issue-16-deterministic-continuation/FINAL_SYNTHESIS.md"
+selected_direction = "Keep the canonical router as a pure one-step selector. Add one small runtime-neutral route-after-reconcile continuation driver/postcondition: reread durable authority, reroute, consume only the exact authorized obligation, and repeat until an existing real USER_STOP, genuine non-remediable blocker/fail-closed Recovery boundary, or durable end-of-approved-scope. Preserve exact-subject Review independence and Issue #11 handoff delivery; use ephemeral semantic progress/cycle fencing and trajectory-level conformance tests."
+required_invariants = [
+  "fresh canonical route after every reconciled semantic step before normal termination",
+  "only canonical authority establishes termination or continuation authority",
+  "no new authority, inferred approval, scope expansion, or synthetic handoff",
+  "durable readback before next route and restart without replay",
+  "exact-subject Review independence survives continuation",
+  "Issue #11 remains a stop-delivery postcondition only",
+  "semantic progress/no-op/cycle fencing is fail-closed and runtime metadata remains non-authoritative",
+  "external-effect uncertainty remains readback-first",
+  "one canonical semantic reconciler",
+  "end-of-scope remains proof-based"
 ]
-research_needed = true
-research_subject = "research:deterministic-continuation-composition:v1"
-research_mode = "formal_orchestrated"
-research_note = "Use the Project Research Orchestration Protocol for broad architecture/prior-art/runtime/red-team coverage before final Brainstorming challenge."
+rejected_alternatives = [
+  "RED-specific patch",
+  "turn every RED/GREEN/role completion into a stop",
+  "expand router into an executor",
+  "persist session/model/worker identity as workflow state",
+  "add a canonical Continuation phase/event ledger/scheduler",
+  "unconditional loop without progress fencing",
+  "generic blind retry",
+  "allow repairer to independently review its repaired exact subject"
+]
+final_challenge_note = "Adversarial Research challenged runaway autonomy, cycles, authority laundering, stale state, external effects, restart replay and Review contamination. Revision 2 incorporates durable reread, exact-authority consumption, no-progress/cycle fail-closed fencing, readback-first external effects and exact-subject independence. No unresolved material alternative remains."
+research_needed = false
