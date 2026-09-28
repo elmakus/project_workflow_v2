@@ -24,3 +24,7 @@ path = "implementation/workstreams/issue-handoff-determinism/RESEARCH.toml"
 [tracker]
 class = "tracker"
 path = "implementation/workstreams/issue-handoff-determinism/TRACKER.toml"
+
+[task_board]
+class = "task_board"
+path = "implementation/workstreams/issue-handoff-determinism/TASK_BOARD.toml"
