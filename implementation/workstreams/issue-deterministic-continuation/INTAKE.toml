@@ -1,12 +1,12 @@
 workstream_id = "issue-deterministic-continuation"
 kind = "issue"
-state = "alignment_pending"
+state = "complete"
 diagnosis_revision = 1
 repair_subject = "repair:deterministic-nonstop-continuation:v1"
 diagnosis_prior_art_subject = "repair:deterministic-nonstop-continuation:v1"
 diagnosis_prior_art_result = "elmakus/project-research@research/pwv2-issue16-intake-prior-art:projects/project_workflow_v2/issues/issue-16-deterministic-continuation/INTAKE_PRIOR_ART.md"
-response_kind = "pending"
-response_observed = false
-alignment_state = "pending"
+response_kind = "authorization"
+response_observed = true
+alignment_state = "authorized"
 alignment_subject = "repair:deterministic-nonstop-continuation:v1"
 micro_fix_candidate = false
