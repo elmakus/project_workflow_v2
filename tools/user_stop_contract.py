@@ -94,5 +94,13 @@ def validate_user_stop_delivery(requirement: DeliveryRequirement, text: str) -> 
     locator = _extract_exact_locator_prompt(text)
     if locator is None or locator != requirement.expected_locator:
         raise DeliveryContractError("offered/required fresh-context handoff needs the exact locator-only prompt")
-    if requirement.handoff_policy == HANDOFF_REQUIRED and "USER ACTION REQUIRED:" not in text:
-        raise DeliveryContractError("required fresh-context handoff needs explicit user action")
+    if requirement.handoff_policy == HANDOFF_REQUIRED:
+        action_lines = [
+            line.strip()
+            for line in text.splitlines()
+            if line.strip().startswith("USER ACTION REQUIRED:")
+        ]
+        if len(action_lines) != 1 or not action_lines[0][len("USER ACTION REQUIRED:"):].strip():
+            raise DeliveryContractError(
+                "required fresh-context handoff needs one explicit USER ACTION REQUIRED line with a non-empty action"
+            )
