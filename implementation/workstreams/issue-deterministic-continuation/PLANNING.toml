@@ -1,0 +1,14 @@
+workstream_id = "issue-deterministic-continuation"
+cycle = 1
+entry_subject = "deterministic-nonstop-continuation@2"
+revision = 1
+state = "frozen"
+plan_locator = "implementation/workstreams/issue-deterministic-continuation/PLAN.md"
+planner_audit = "GREEN"
+review_mode = "normal"
+premium_a = "satisfied"
+premium_a_subject = "deterministic-nonstop-continuation@2"
+frozen_plan_subject = "elmakus/project_workflow_v2:implementation/workstreams/issue-deterministic-continuation/PLAN.md@blob:129011d19d2f4123555954121391794dcd8acf4a"
+premium_b = "due"
+premium_b_subject = "elmakus/project_workflow_v2:implementation/workstreams/issue-deterministic-continuation/PLAN.md@blob:129011d19d2f4123555954121391794dcd8acf4a"
+premium_c = "not_due"
