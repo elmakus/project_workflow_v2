@@ -60,10 +60,9 @@ def build_context() -> str:
             "Project Workflow V2 package is enabled. "
             f"Canonical bundled router: {router}. "
             "Read that local router first, then recover only the exact durable consumer-project "
-            "state and authority it requests. This SessionStart message is bootstrap context, "
-            "not workflow policy. Do not fetch remote workflow policy during ordinary operation."
-        )
-    except BootstrapError as exc:
+            "state and authority it requests; continue deterministic authorized transitions until fresh "
+            "canonical routing reaches a real stop. This SessionStart message is bootstrap context, not "
+            "workflow policy. Do not fetch remote workflow policy during ordinary operation."\n        )\n    except BootstrapError as exc:
         context = (
             f"BLOCKING Project Workflow V2 plugin-package error: {exc}. "
             "Do not fall back to V1, another package/source, runtime-specific policy, "
