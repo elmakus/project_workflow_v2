@@ -1,0 +1,122 @@
+from __future__ import annotations
+import unittest
+from tools.review_contract import review_delivery_policy
+from tools.user_stop_contract import (
+    DeliveryContractError, DeliveryRequirement, HANDOFF_NONE, HANDOFF_OFFERED,
+    HANDOFF_REQUIRED, router_stop_handoff_policy, validate_user_stop_delivery,
+)
+
+EXPECTED_LOCATOR = (
+    "elmakus/project_workflow_v2",
+    "work/pwv2-handoff-determinism",
+    "independent review M01-T01-R01",
+    "implementation/workstreams/issue-handoff-determinism/TASK_BOARD.toml",
+)
+
+VALID_LOCATOR = """NEW CHAT START PROMPT
+
+Repository: elmakus/project_workflow_v2
+Branch: work/pwv2-handoff-determinism
+Entry obligation: independent review M01-T01-R01
+Durable start pointer: implementation/workstreams/issue-handoff-determinism/TASK_BOARD.toml
+"""
+
+class UserStopContractTests(unittest.TestCase):
+    def test_router_premium_policies_are_downstream_only(self):
+        self.assertEqual(router_stop_handoff_policy(disposition="stop", obligation="premium_A"), HANDOFF_OFFERED)
+        self.assertEqual(router_stop_handoff_policy(disposition="stop", obligation="premium_B"), HANDOFF_REQUIRED)
+        self.assertEqual(router_stop_handoff_policy(disposition="stop", obligation="premium_C"), HANDOFF_OFFERED)
+        self.assertEqual(router_stop_handoff_policy(disposition="stop", obligation="end_of_scope"), HANDOFF_NONE)
+        self.assertEqual(router_stop_handoff_policy(disposition="route", obligation="premium_B"), HANDOFF_NONE)
+
+    def test_producer_without_internal_independent_context_requires_fresh_handoff(self):
+        policy = review_delivery_policy(current_context_produced_subject=True, independent_context_available=False)
+        self.assertEqual(policy, HANDOFF_REQUIRED)
+        requirement = DeliveryRequirement(True, policy, EXPECTED_LOCATOR)
+        with self.assertRaises(DeliveryContractError):
+            validate_user_stop_delivery(requirement, "Review is pending.")
+        with self.assertRaises(DeliveryContractError):
+            validate_user_stop_delivery(requirement, VALID_LOCATOR)
+        validate_user_stop_delivery(requirement, "USER ACTION REQUIRED: start fresh.\n" + VALID_LOCATOR)
+
+    def test_repairer_re_review_has_same_required_postcondition(self):
+        policy = review_delivery_policy(current_context_produced_subject=True, independent_context_available=False)
+        repaired = VALID_LOCATOR.replace("M01-T01-R01", "M01-T01-R02")
+        repaired_locator = (*EXPECTED_LOCATOR[:2], "independent review M01-T01-R02", EXPECTED_LOCATOR[3])
+        validate_user_stop_delivery(DeliveryRequirement(True, policy, repaired_locator), "USER ACTION REQUIRED: start fresh.\n" + repaired)
+
+    def test_nonproducer_or_internal_independent_review_needs_no_external_handoff(self):
+        self.assertEqual(review_delivery_policy(current_context_produced_subject=False, independent_context_available=False), HANDOFF_NONE)
+        self.assertEqual(review_delivery_policy(current_context_produced_subject=True, independent_context_available=True), HANDOFF_NONE)
+
+    def test_non_boundary_cannot_acquire_handoff_policy(self):
+        for policy in (HANDOFF_OFFERED, HANDOFF_REQUIRED):
+            with self.assertRaises(DeliveryContractError):
+                DeliveryRequirement(False, policy)
+        validate_user_stop_delivery(DeliveryRequirement(False, HANDOFF_NONE), "GREEN / RED / Card completion")
+
+    def test_offered_requires_locator_but_not_user_action(self):
+        requirement = DeliveryRequirement(True, HANDOFF_OFFERED, EXPECTED_LOCATOR)
+        with self.assertRaises(DeliveryContractError):
+            validate_user_stop_delivery(requirement, "Premium A stop")
+        validate_user_stop_delivery(requirement, VALID_LOCATOR)
+
+    def test_required_rejects_placeholder_or_incomplete_locator(self):
+        requirement = DeliveryRequirement(True, HANDOFF_REQUIRED, EXPECTED_LOCATOR)
+        bad = VALID_LOCATOR.replace("work/pwv2-handoff-determinism", "<exact-branch>")
+        with self.assertRaises(DeliveryContractError):
+            validate_user_stop_delivery(requirement, "USER ACTION REQUIRED: fresh.\n" + bad)
+        incomplete = VALID_LOCATOR.replace("Durable start pointer:", "Pointer:")
+        with self.assertRaises(DeliveryContractError):
+            validate_user_stop_delivery(requirement, "USER ACTION REQUIRED: fresh.\n" + incomplete)
+
+    def test_required_rejects_wrong_nonempty_locator_values(self):
+        requirement = DeliveryRequirement(True, HANDOFF_REQUIRED, EXPECTED_LOCATOR)
+        for old, new in (
+            ("elmakus/project_workflow_v2", "wrong/repository"),
+            ("work/pwv2-handoff-determinism", "wrong-branch"),
+            ("independent review M01-T01-R01", "wrong obligation"),
+            ("implementation/workstreams/issue-handoff-determinism/TASK_BOARD.toml", "wrong.toml"),
+        ):
+            with self.subTest(new=new), self.assertRaises(DeliveryContractError):
+                validate_user_stop_delivery(
+                    requirement,
+                    "USER ACTION REQUIRED: fresh.\n" + VALID_LOCATOR.replace(old, new),
+                )
+
+    def test_handoff_requires_locator_only_tail_and_rejects_common_placeholders(self):
+        requirement = DeliveryRequirement(True, HANDOFF_REQUIRED, EXPECTED_LOCATOR)
+        with self.assertRaises(DeliveryContractError):
+            validate_user_stop_delivery(
+                requirement,
+                "USER ACTION REQUIRED: fresh.\n" + VALID_LOCATOR + "Review evidence: forbidden extra field\n",
+            )
+        with self.assertRaises(DeliveryContractError):
+            DeliveryRequirement(
+                True,
+                HANDOFF_REQUIRED,
+                (EXPECTED_LOCATOR[0], "TBD", EXPECTED_LOCATOR[2], EXPECTED_LOCATOR[3]),
+            )
+
+    def test_required_needs_structural_nonempty_user_action_line(self):
+        requirement = DeliveryRequirement(True, HANDOFF_REQUIRED, EXPECTED_LOCATOR)
+        for bad_prefix in (
+            "No USER ACTION REQUIRED: continue here.\n",
+            "Narrative mentions USER ACTION REQUIRED: but does not issue it.\n",
+            "USER ACTION REQUIRED:\n",
+        ):
+            with self.subTest(bad_prefix=bad_prefix), self.assertRaises(DeliveryContractError):
+                validate_user_stop_delivery(requirement, bad_prefix + VALID_LOCATOR)
+        validate_user_stop_delivery(
+            requirement,
+            "USER ACTION REQUIRED: start a fresh independent context.\n" + VALID_LOCATOR,
+        )
+
+    def test_handoff_policy_requires_expected_locator_identity(self):
+        with self.assertRaises(DeliveryContractError):
+            DeliveryRequirement(True, HANDOFF_OFFERED)
+        with self.assertRaises(DeliveryContractError):
+            DeliveryRequirement(True, HANDOFF_REQUIRED)
+
+if __name__ == "__main__":
+    unittest.main()

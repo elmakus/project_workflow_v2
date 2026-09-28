@@ -1,0 +1,30 @@
+kind = "issue"
+workstream_id = "issue-handoff-determinism"
+branch = "work/pwv2-handoff-determinism"
+created_from = "4fb4bfb7d7b1481d6f347c182fc96a5a1135e045"
+integration_target = "main"
+authority = [
+  { class = "authority", path = "requirements/PROJECT_WORKFLOW_V2.md" },
+  { class = "authority", path = "workflow/ROUTER.md" },
+  { class = "authority", path = "workflow/INTAKE.md" },
+  { class = "authority", path = "workflow/RESEARCH.md" },
+  { class = "authority", path = "workflow/REVIEW.md" },
+  { class = "authority", path = "workflow/USER_STOP.md" },
+  { class = "authority", path = "workflow/EXECUTION_PREP.md" },
+]
+
+[intake]
+class = "intake"
+path = "implementation/workstreams/issue-handoff-determinism/INTAKE.toml"
+
+[research]
+class = "research"
+path = "implementation/workstreams/issue-handoff-determinism/RESEARCH.toml"
+
+[tracker]
+class = "tracker"
+path = "implementation/workstreams/issue-handoff-determinism/TRACKER.toml"
+
+[task_board]
+class = "task_board"
+path = "implementation/workstreams/issue-handoff-determinism/TASK_BOARD.toml"

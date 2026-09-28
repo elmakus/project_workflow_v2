@@ -1,0 +1,20 @@
+workstream_id = "issue-handoff-determinism"
+card_id = "M01-T01"
+attempt = "R03"
+verdict = "GREEN"
+evidence_path = "implementation/workstreams/issue-handoff-determinism/evidence/M01-T01-R03-review.md"
+
+[subject]
+class = "git_blob"
+repository = "elmakus/project_workflow_v2"
+commit = "d16563a6ec9ce5618bc9f2928874a36e37427891"
+path = "implementation/workstreams/issue-handoff-determinism/results/M01-T01.md"
+blob = "00bda26901c8312fa8207065bfa1bea847b4d261"
+
+[acceptance]
+class = "task_card"
+path = "implementation/workstreams/issue-handoff-determinism/cards/M01-T01.md"
+
+[independence]
+materially_produced_or_repaired_subject = false
+basis = "R03 requires a fresh independent context because the current context materially repaired the implementation represented by the exact current result subject."

@@ -10,6 +10,7 @@ from pathlib import Path, PurePosixPath
 
 from tools.execution_contract import ExecutionContractError, parse_card_result
 from tools.recovery_contract import RecoveryContractError, classify_resolution, exact_result_subject, review_subject
+from tools.user_stop_contract import router_stop_handoff_policy
 from tools.state_contract import (
     ValidationError,
     read_project,
@@ -57,6 +58,7 @@ class RouteResult:
     owner_module: str | None
     reason: str
     read_set: tuple[str, ...]
+    handoff_policy: str = "none"
 
 
 class Reads:
@@ -91,7 +93,8 @@ def result(reads: Reads, disposition: str, obligation: str, reason: str,
             reads.package("workflow/USER_STOP.md").read_text(encoding="utf-8")
         except OSError as exc:
             return recovery(reads, f"real-stop formatter unavailable: {exc}")
-    return RouteResult(disposition, obligation, subject, owner_module, reason, tuple(reads.items))
+    handoff_policy = router_stop_handoff_policy(disposition=disposition, obligation=obligation)
+    return RouteResult(disposition, obligation, subject, owner_module, reason, tuple(reads.items), handoff_policy)
 
 
 def recovery(reads: Reads, reason: str) -> RouteResult:

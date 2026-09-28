@@ -1,0 +1,20 @@
+workstream_id = "issue-handoff-determinism"
+card_id = "M01-T01"
+attempt = "R02"
+verdict = "red"
+evidence_path = "implementation/workstreams/issue-handoff-determinism/evidence/M01-T01-R02-review.md"
+
+[subject]
+class = "git_blob"
+repository = "elmakus/project_workflow_v2"
+commit = "8c401c85e5c7fce3700ed8d587e82b435398113e"
+path = "implementation/workstreams/issue-handoff-determinism/results/M01-T01.md"
+blob = "be5954120d033c74bb36b27401c579f6458415b5"
+
+[acceptance]
+class = "task_card"
+path = "implementation/workstreams/issue-handoff-determinism/cards/M01-T01.md"
+
+[independence]
+materially_produced_or_repaired_subject = false
+basis = "R02 performed in a fresh independent context that did not materially produce or repair the exact reviewed subject."
