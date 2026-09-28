@@ -13,10 +13,10 @@ def close_ready(*,integration_confirmed: bool,publication_confirmed: bool,
     _req(isinstance(integration_confirmed,bool) and isinstance(publication_confirmed,bool),"invalid completion proof")
     _req(isinstance(durable_confirmation,bool),"invalid durable confirmation")
     _req(evolution_disposition in ("preserve","revalidate","stale","recovery"),"invalid evolution disposition")
-    for finding in findings: typed_finding(finding)
+    typed_findings=[typed_finding(finding) for finding in findings]
     if not integration_confirmed or not publication_confirmed or not durable_confirmation:return False
     if evolution_disposition in ("stale","recovery"):return False
-    if blocked_results(findings):return False
+    if any(finding["impact"] in ("acceptance_falsifying","unknown") for finding in typed_findings):return False
     if any(not effect_complete(effect) for effect in effects):return False
     return True
 
