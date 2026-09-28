@@ -5,9 +5,10 @@ from tools.pwv22_native_foundation import NativeFoundationError
 from tools.pwv22_parallel import *
 I=lambda n:{"repository":"R","commit":n*40,"path":"p","blob":n*40}
 A=I("a"); B=I("b"); ADM=I("c"); ACC=I("d"); RED=I("e"); STALE=I("f"); AACC=I("g"); BACC=I("h"); CA=I("i"); CB=I("j")
-def admission(cards=("a","b"),revoked=(),subjects=None):
+def admission(cards=("a","b"),revoked=(),subjects=None,owners=None):
  subjects={"a":CA,"b":CB} if subjects is None else subjects
- return {"type":"pwv2.2-admission","admission_id":"x","cards":list(cards),"subjects":{cid:subjects[cid] for cid in cards},"revoked":list(revoked)}
+ owners={"a":"main","b":"main"} if owners is None else owners
+ return {"type":"pwv2.2-admission","admission_id":"x","cards":list(cards),"subjects":{cid:subjects[cid] for cid in cards},"mutating_owners":{cid:owners[cid] for cid in cards},"revoked":list(revoked)}
 def claims(card,owner="main",writes=("w",),resources=("r",),semantics=("s",),effects=("e",),subject=None):
  subject={"a":CA,"b":CB}.get(card,I("k")) if subject is None else subject
  return {"card_id":card,"subject":subject,"mutating_owner":owner,"writes":list(writes),"resources":list(resources),"semantics":list(semantics),"effects":list(effects)}
@@ -96,6 +97,12 @@ class ParallelTests(unittest.TestCase):
  def test_one_mutating_owner(self):
   self.assertTrue(one_mutating_owner([claims("a","x"),claims("a","x")]))
   self.assertFalse(one_mutating_owner([claims("a","x"),claims("a","y")]))
+ def test_durable_admission_owner_rejects_later_different_mutator(self):
+  self.assertTrue(legal(claims("a","main"),claims("b","main",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",))))
+  self.assertFalse(legal(claims("a","other"),claims("b","main",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",))))
+ def test_admission_owner_binding_is_exact_and_nonempty(self):
+  with self.assertRaises(NativeFoundationError): typed_admission(admission(owners={"a":"","b":"main"}))
+  with self.assertRaises(NativeFoundationError): typed_admission({**admission(),"mutating_owners":{"a":"main"}})
  def test_exact_ordered_fan_in(self):
   out=fan(compatibility=lambda xs:[x["result_id"] for x in xs]==["ra","rb"])
   self.assertEqual([x["result_id"] for x in out],["ra","rb"])
