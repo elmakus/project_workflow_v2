@@ -1,5 +1,5 @@
 workstream_id = "issue-handoff-determinism"
-revision = 2
+revision = 3
 
 [execution_ref]
 branch = "work/pwv2-handoff-determinism"
@@ -8,6 +8,12 @@ branch = "work/pwv2-handoff-determinism"
 id = "M01-T01"
 status = "in_progress"
 review_attempts = []
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-handoff-determinism/results/M01-T01.md"
+commit = "5cf28e4a9456e5889e5ce51215a3708f409b47f7"
+blob = "23886091d1b34874d49b56657208f9fe0ddf5ee3"
 
 [cards.contract]
 class = "task_card"
