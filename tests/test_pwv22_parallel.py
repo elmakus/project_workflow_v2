@@ -4,11 +4,13 @@ import unittest
 from tools.pwv22_native_foundation import NativeFoundationError
 from tools.pwv22_parallel import *
 I=lambda n:{"repository":"R","commit":n*40,"path":"p","blob":n*40}
-A=I("a"); B=I("b"); ADM=I("c"); ACC=I("d"); RED=I("e"); STALE=I("f"); AACC=I("g"); BACC=I("h")
-def admission(cards=("a","b"),revoked=()):
- return {"type":"pwv2.2-admission","admission_id":"x","cards":list(cards),"revoked":list(revoked)}
-def claims(card,owner="main",writes=("w",),resources=("r",),semantics=("s",),effects=("e",)):
- return {"card_id":card,"mutating_owner":owner,"writes":list(writes),"resources":list(resources),"semantics":list(semantics),"effects":list(effects)}
+A=I("a"); B=I("b"); ADM=I("c"); ACC=I("d"); RED=I("e"); STALE=I("f"); AACC=I("g"); BACC=I("h"); CA=I("i"); CB=I("j")
+def admission(cards=("a","b"),revoked=(),subjects=None):
+ subjects={"a":CA,"b":CB} if subjects is None else subjects
+ return {"type":"pwv2.2-admission","admission_id":"x","cards":list(cards),"subjects":{cid:subjects[cid] for cid in cards},"revoked":list(revoked)}
+def claims(card,owner="main",writes=("w",),resources=("r",),semantics=("s",),effects=("e",),subject=None):
+ subject={"a":CA,"b":CB}.get(card,I("k")) if subject is None else subject
+ return {"card_id":card,"subject":subject,"mutating_owner":owner,"writes":list(writes),"resources":list(resources),"semantics":list(semantics),"effects":list(effects)}
 def result(rid,artifact):
  return {"type":"pwv2.2-result","result_id":rid,"result_artifact":artifact,"implementation_subject":artifact,"material_inputs":[]}
 def acc(subject): return {"verdict":"green","subject":subject}
@@ -29,12 +31,12 @@ def legal(left,right,adm_ref=ADM,adm_acc=ACC):
 def fan(card_ids=("a","b"),adm_ref=ADM,adm_acc=ACC,compatibility=lambda xs:True,sibling_accs=None):
  rs=[result("ra",A),result("rb",B)]
  sibling_accs={"ra":AACC,"rb":BACC} if sibling_accs is None else sibling_accs
- return compatible_fan_in(card_ids,[A,B],rs,sibling_accs,adm_ref,read_admission,adm_acc,read_acceptance,verify,compatibility)
+ return compatible_fan_in(card_ids,{cid:{"a":CA,"b":CB}.get(cid,I("k")) for cid in card_ids},[A,B],rs,sibling_accs,adm_ref,read_admission,adm_acc,read_acceptance,verify,compatibility)
 
 class ParallelTests(unittest.TestCase):
  def test_explicit_finite_admission_and_revocation(self):
-  self.assertTrue(admitted("a",admission()))
-  self.assertFalse(admitted("a",admission(revoked=("a",))))
+  self.assertTrue(admitted("a",CA,admission()))
+  self.assertFalse(admitted("a",CA,admission(revoked=("a",))))
   with self.assertRaises(NativeFoundationError):
    typed_admission({"type":"pwv2.2-admission","admission_id":"x","cards":[]})
  def test_hashable_admission_payload_is_bound_by_external_locator(self):
@@ -68,6 +70,10 @@ class ParallelTests(unittest.TestCase):
   fabricated=I("9")
   with self.assertRaises(NativeFoundationError): legal(claims("a"),claims("z",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",)),adm_ref=fabricated)
   with self.assertRaises(NativeFoundationError): fan(card_ids=("a","z"),adm_ref=fabricated)
+ def test_stale_card_subject_rejected(self):
+  self.assertFalse(legal(claims("a",subject=I("z")),claims("b",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",))))
+  with self.assertRaises(NativeFoundationError):
+   compatible_fan_in(("a","b"),{"a":I("z"),"b":CB},[A,B],[result("ra",A),result("rb",B)],{"ra":AACC,"rb":BACC},ADM,read_admission,ACC,read_acceptance,verify,lambda xs:True)
  def test_disjoint_claims_parallel(self):
   self.assertTrue(legal(claims("a"),claims("b",writes=("w2",),resources=("r2",),semantics=("s2",),effects=("e2",))))
  def test_overlap_serializes(self):
