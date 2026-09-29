@@ -1,12 +1,12 @@
 workstream_id = "issue-ci-pending-continuation"
-revision = 3
+revision = 4
 
 [execution_ref]
 branch = "work/pwv2-ci-pending-continuation"
 
 [[cards]]
 id = "M01-T01"
-status = "in_progress"
+status = "done"
 
 [cards.contract]
 class = "task_card"
