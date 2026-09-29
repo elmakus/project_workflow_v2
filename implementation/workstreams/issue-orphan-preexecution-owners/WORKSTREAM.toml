@@ -25,3 +25,7 @@ path = "implementation/workstreams/issue-orphan-preexecution-owners/TRACKER.toml
 [research]
 class = "research"
 path = "implementation/workstreams/issue-orphan-preexecution-owners/RESEARCH.toml"
+
+[brainstorm]
+class = "brainstorm"
+path = "implementation/workstreams/issue-orphan-preexecution-owners/BRAINSTORM.toml"
