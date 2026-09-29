@@ -20,6 +20,10 @@ path = "implementation/workstreams/issue-paseo-child-delegation/INTAKE.toml"
 class = "research"
 path = "implementation/workstreams/issue-paseo-child-delegation/RESEARCH.toml"
 
+[brainstorm]
+class = "brainstorm"
+path = "implementation/workstreams/issue-paseo-child-delegation/BRAINSTORM.toml"
+
 [tracker]
 class = "tracker"
 path = "implementation/workstreams/issue-paseo-child-delegation/TRACKER.toml"
