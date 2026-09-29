@@ -35,3 +35,7 @@ path = "implementation/workstreams/issue-execution-research-return-shadow/BRAINS
 [definition]
 class = "definition"
 path = "implementation/workstreams/issue-execution-research-return-shadow/DEFINITION.toml"
+
+[planning]
+class = "planning"
+path = "implementation/workstreams/issue-execution-research-return-shadow/PLANNING.toml"
