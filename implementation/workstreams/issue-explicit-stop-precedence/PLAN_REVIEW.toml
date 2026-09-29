@@ -1,0 +1,21 @@
+workstream_id = "issue-explicit-stop-precedence"
+plan_revision = "P1"
+planning_cycle = 1
+attempt = "R01"
+verdict = "pending"
+evidence_path = ""
+
+[subject]
+class = "git_blob"
+repository = "elmakus/project_workflow_v2"
+commit = "bfb9b9158877256e6342d3c157b092dd3e05fb1b"
+path = "planning/ISSUE_33_EXPLICIT_STOP_PRECEDENCE_PLAN.md"
+blob = "de15400f6c8cb70d00fc41cc4516bad055658afa"
+
+[acceptance]
+class = "authority"
+path = "requirements/ISSUE_33_EXPLICIT_STOP_PRECEDENCE.md"
+
+[independence]
+materially_produced_or_repaired_subject = false
+basis = "Fresh independent Premium B receiving context; did not materially author or repair the frozen P1 subject."

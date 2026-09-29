@@ -40,3 +40,7 @@ path = "implementation/workstreams/issue-explicit-stop-precedence/DEFINITION.tom
 [planning]
 class = "planning"
 path = "implementation/workstreams/issue-explicit-stop-precedence/PLANNING.toml"
+
+[plan_review]
+class = "plan_review"
+path = "implementation/workstreams/issue-explicit-stop-precedence/PLAN_REVIEW.toml"
