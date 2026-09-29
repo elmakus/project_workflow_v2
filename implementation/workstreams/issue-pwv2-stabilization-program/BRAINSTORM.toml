@@ -1,12 +1,12 @@
 workstream_id = "issue-pwv2-stabilization-program"
 scope_id = "pwv2-stabilization-program"
 revision = 1
-state = "ready_for_definition"
+state = "promoted"
 challenge_audit = "green"
 explicit_user_stop = false
-promotion_state = "pending"
-promotion_subject = ""
+promotion_state = "authorized"
+promotion_subject = "pwv2-stabilization-program@1"
 source_subject = "PWV2-STAB-P1"
 scope = "Dedicated pre-execution stabilization scope formalization. One proposed core set: #23, #25-#40, #18 and #14; #20 narrow side track. Every distinct invariant/acceptance remains separate; W0-W7 remain provisional. Exact scope: implementation/workstreams/issue-pwv2-stabilization-program/evidence/SCOPE_REVISION_1.md@aefce92718705aab806897f97f619b3b697b0722:b5b96eec1f23bb12d4cf2bf849ca21ca8aebde34."
 non_goals = "No repair implementation, consumer mutation, live migration, issue closure, merge, PR #9 adoption or deployment. No changed #23/#20 subjects, issue absorption, history rewrite, transferred approval, Plan/Card/Task Board or premium satisfaction. #25 formal Research remains unresolved before its Definition/repair approval."
-challenge = "GREEN bounded scope challenge: explicit membership, alternatives/tradeoffs, separate acceptance requirements, provenance and dependency refinements. Definition preparation only; exact pwv2-stabilization-program@1 promotion remains pending. Not Plan Review or global stability certification."
+challenge = "GREEN bounded scope challenge: explicit membership, alternatives/tradeoffs, separate acceptance requirements, provenance and dependency refinements. U02 authorizes exact pwv2-stabilization-program@1 promotion for Definition formalization only. Not Plan Review or global stability certification."
