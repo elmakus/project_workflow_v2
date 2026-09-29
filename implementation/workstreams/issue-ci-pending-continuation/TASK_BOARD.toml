@@ -1,19 +1,26 @@
 workstream_id = "issue-ci-pending-continuation"
-revision = 1
+revision = 2
 
 [execution_ref]
 branch = "work/pwv2-ci-pending-continuation"
 
 [[cards]]
 id = "M01-T01"
-status = "review_pending"
-
-result_path = "implementation/workstreams/issue-ci-pending-continuation/results/M01-T01.md"
-review_requirement = "required"
+status = "in_progress"
 
 [cards.contract]
 class = "task_card"
 path = "implementation/workstreams/issue-ci-pending-continuation/cards/M01-T01.md"
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-ci-pending-continuation/results/M01-T01.md"
+commit = "51c5ebccca4ea1b4e1fd60b3f36dddc5fb2e72d2"
+blob = "162769647a94e10ed72bd46b1577a1145dad8b9d"
+
+[[cards.review_attempts]]
+class = "review_attempt"
+path = "implementation/workstreams/issue-ci-pending-continuation/reviews/M01-T01-R01.toml"
 
 [[jit_triggers]]
 id = "after-M01-T01"
