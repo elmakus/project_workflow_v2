@@ -1,5 +1,5 @@
 workstream_id = "issue-handoff-receive-continuation"
-revision = 9
+revision = 10
 
 [execution_ref]
 branch = "work/pwv2-handoff-receive-continuation"
@@ -36,7 +36,7 @@ blob = "48ba09f33975fcc9e21e30153bfbe1d70d3a1cf7"
 
 [[cards]]
 id = "M06-T03"
-status = "READY"
+status = "in_progress"
 review_attempts = []
 
 [cards.contract]
