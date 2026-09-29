@@ -5,11 +5,11 @@ verdict = "pending"
 evidence_path = ""
 
 [subject]
-class = "git_commit"
+class = "git_blob"
 repository = "elmakus/project_workflow_v2"
-commit = "32e7971f96e76a403de6bc5cd7b8d5979ac0dfe2"
-path = "tools/continuation_contract.py"
-blob = "a68e7211cbbebe07b4d6cf04e18eaa000b76c3ad"
+commit = "51c5ebccca4ea1b4e1fd60b3f36dddc5fb2e72d2"
+path = "implementation/workstreams/issue-ci-pending-continuation/results/M01-T01.md"
+blob = "162769647a94e10ed72bd46b1577a1145dad8b9d"
 
 [acceptance]
 class = "task_card"
@@ -17,4 +17,4 @@ path = "implementation/workstreams/issue-ci-pending-continuation/cards/M01-T01.m
 
 [independence]
 materially_produced_or_repaired_subject = false
-basis = "Pending independent review obligation; verdict must be issued by a context that did not materially produce or repair the exact implementation subject."
+basis = "Pending independent review obligation recovered without changing the accepted implementation subject; reviewer did not materially produce or repair implementation subject 32e7971f96e76a403de6bc5cd7b8d5979ac0dfe2."
