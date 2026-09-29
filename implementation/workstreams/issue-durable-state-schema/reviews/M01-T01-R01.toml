@@ -1,8 +1,8 @@
 workstream_id = "issue-durable-state-schema"
 card_id = "M01-T01"
 attempt = "R01"
-verdict = "pending"
-evidence_path = ""
+verdict = "green"
+evidence_path = "implementation/workstreams/issue-durable-state-schema/reviews/M01-T01-R01-evidence.md"
 
 [subject]
 class = "git_blob"
@@ -17,4 +17,4 @@ path = "implementation/workstreams/issue-durable-state-schema/cards/M01-T01.md"
 
 [independence]
 materially_produced_or_repaired_subject = false
-basis = "R01 is reserved for a fresh independent review context; the context that materially produced M01-T01 and its exact Result will not issue the verdict."
+basis = "Fresh independent exact-subject review; the reviewing context did not materially produce or repair M01-T01 or its Result."
