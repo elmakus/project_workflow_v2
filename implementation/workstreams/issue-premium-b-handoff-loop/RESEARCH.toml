@@ -1,0 +1,30 @@
+workstream_id = "issue-premium-b-handoff-loop"
+origin_role = "intake"
+origin_subject = "Define canonical exact-subject-bound Premium B handoff receipt so an eligible semantically independent receiver consumes the exact current transferable Premium B boundary, establishes one exact pending Plan Review admission, and canonically reroutes into Plan Review without replaying the producer stop, while preserving stale/replay/concurrency, Recovery, and Stage-6 independence safety."
+state = "consumed"
+return_target = "intake"
+return_reconciliation = "applied"
+return_result = "project-research:projects/project_workflow_v2/issues/issue-25-premium-b-handoff-loop/FINAL_SYNTHESIS.md@research/issue25-premium-b-loop-integration"
+finding = "Issue #25 is supported: a valid transferable Premium B receipt has no canonical exact-subject-bound consume-and-advance edge into Plan Review admission; existing qualification injects the successor route instead of proving production composition."
+limitations = "Research is evidence only and does not select a repair family or authorize implementation. Frozen consumer subject was d3ab917f02e4de91b7dbb17915c2287c2387333e."
+conflicts = "none material after ten-lane independent integration"
+
+[[sources]]
+class = "official_upstream"
+status = "checked"
+weight = "high"
+
+[[sources]]
+class = "project_runtime"
+status = "checked"
+weight = "high"
+
+[[sources]]
+class = "tracker_discussion"
+status = "checked"
+weight = "medium"
+
+[[sources]]
+class = "practitioner_community"
+status = "not_relevant"
+weight = "none"
