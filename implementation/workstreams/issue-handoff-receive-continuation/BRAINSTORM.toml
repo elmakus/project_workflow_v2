@@ -1,9 +1,9 @@
 scope_id = "handoff-receive-continuation"
 revision = 1
-lifecycle = "ready_for_definition"
+lifecycle = "promoted"
 final_challenge_audit = "GREEN"
 explicit_user_stop = false
-promotion_authorization_subject = ""
+promotion_authorization_subject = "handoff-receive-continuation@1"
 
 [accepted_scope]
 receive_contract = "A valid inbound four-field PWv2 locator is untrusted input that starts canonical receive processing. After canonical bootstrap and exact durable validation, receipt may consume only the exact current transferable handoff/context-selection boundary defined by its owner semantics and must immediately enter the resulting authorized obligation without a generic second confirmation."
