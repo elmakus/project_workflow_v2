@@ -12,6 +12,8 @@ authority = [
   { class = "authority", path = "workflow/STATE.md" },
   { class = "authority", path = "workflow/AUTHORITY.md" },
   { class = "authority", path = "workflow/CONTINUATION.md" },
+  { class = "authority", path = "requirements/ISSUE_36_ORPHAN_PREEXECUTION_OWNERS.md" },
+  { class = "authority", path = "decisions/ISSUE_36_ORPHAN_PREEXECUTION_OWNERS.md" },
 ]
 
 [intake]
@@ -29,3 +31,7 @@ path = "implementation/workstreams/issue-orphan-preexecution-owners/RESEARCH.tom
 [brainstorm]
 class = "brainstorm"
 path = "implementation/workstreams/issue-orphan-preexecution-owners/BRAINSTORM.toml"
+
+[definition]
+class = "definition"
+path = "implementation/workstreams/issue-orphan-preexecution-owners/DEFINITION.toml"
