@@ -36,3 +36,7 @@ path = "implementation/workstreams/issue-explicit-stop-precedence/BRAINSTORM.tom
 [definition]
 class = "definition"
 path = "implementation/workstreams/issue-explicit-stop-precedence/DEFINITION.toml"
+
+[planning]
+class = "planning"
+path = "implementation/workstreams/issue-explicit-stop-precedence/PLANNING.toml"
