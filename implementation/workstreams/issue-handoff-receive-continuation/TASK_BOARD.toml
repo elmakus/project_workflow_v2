@@ -1,5 +1,5 @@
 workstream_id = "issue-handoff-receive-continuation"
-revision = 13
+revision = 14
 
 [execution_ref]
 branch = "work/pwv2-handoff-receive-continuation"
@@ -52,13 +52,13 @@ blob = "1952ada2fe6f71c58869d9b5236b83b35827582b"
 [[cards]]
 id = "M06-T04"
 status = "implemented"
-review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-handoff-receive-continuation/reviews/M06-T04-R01.toml" }]
+review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-handoff-receive-continuation/reviews/M06-T04-R01.toml" }, { class = "review_attempt", path = "implementation/workstreams/issue-handoff-receive-continuation/reviews/M06-T04-R02.toml" }]
 
 [cards.result]
 class = "result"
 path = "implementation/workstreams/issue-handoff-receive-continuation/results/M06-T04.md"
-commit = "238617f6acd5764d7b3b80e372c592c35b08f105"
-blob = "d19adffa951a02a88de0c76c119bd218eced1aa9"
+commit = "4d70e7b49e661a46a0394e18a07da47d42c35145"
+blob = "ef461be3994140f42c45e56b923ad740e18a9161"
 
 [cards.contract]
 class = "task_card"
