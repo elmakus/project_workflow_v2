@@ -30,3 +30,7 @@ path = "implementation/workstreams/issue-handoff-receive-continuation/DEFINITION
 [planning]
 class = "planning"
 path = "implementation/workstreams/issue-handoff-receive-continuation/PLANNING.toml"
+
+[tracker]
+class = "tracker"
+path = "implementation/workstreams/issue-handoff-receive-continuation/TRACKER.toml"
