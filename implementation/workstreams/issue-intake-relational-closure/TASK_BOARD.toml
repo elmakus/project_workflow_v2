@@ -1,12 +1,12 @@
 workstream_id = "issue-intake-relational-closure"
-revision = 4
+revision = 5
 
 [execution_ref]
 branch = "work/issue-32-intake-relational-closure"
 
 [[cards]]
 id = "M01-T01"
-status = "in_progress"
+status = "done"
 
 [cards.contract]
 class = "task_card"
