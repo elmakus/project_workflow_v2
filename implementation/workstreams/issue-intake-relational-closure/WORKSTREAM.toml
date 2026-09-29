@@ -35,3 +35,7 @@ path = "implementation/workstreams/issue-intake-relational-closure/BRAINSTORM.to
 [definition]
 class = "definition"
 path = "implementation/workstreams/issue-intake-relational-closure/DEFINITION.toml"
+
+[planning]
+class = "planning"
+path = "implementation/workstreams/issue-intake-relational-closure/PLANNING.toml"
