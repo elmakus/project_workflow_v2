@@ -31,3 +31,7 @@ path = "implementation/workstreams/issue-ci-pending-continuation/BRAINSTORM.toml
 [definition]
 class = "definition"
 path = "implementation/workstreams/issue-ci-pending-continuation/DEFINITION.toml"
+
+[planning]
+class = "planning"
+path = "implementation/workstreams/issue-ci-pending-continuation/PLANNING.toml"
