@@ -1,17 +1,25 @@
 workstream_id = "issue-paseo-child-delegation"
-source_scope = "temporary-paseo-create-agent-readiness@1"
-revision = 1
-state = "GREEN"
-requirements_locator = "implementation/workstreams/issue-paseo-child-delegation/BRAINSTORM.toml#scope"
-accepted_decision_locators = [
-  "implementation/workstreams/issue-paseo-child-delegation/INTAKE.toml#repair_subject",
-  "implementation/workstreams/issue-paseo-child-delegation/RESEARCH.toml#finding",
-  "implementation/workstreams/issue-paseo-child-delegation/BRAINSTORM.toml#non_goals",
-  "implementation/workstreams/issue-paseo-child-delegation/BRAINSTORM.toml#future_direction",
-]
-completeness_audit = "GREEN"
-unresolved_user_choices = false
-premium_a_state = "satisfied"
-requirements = "Implement only a temporary readiness/configuration repair for the current Paseo/Pi deployment. Use the official caller-scoped Paseo create_agent capability. Ensure or verify the supported agent-tool injection prerequisites and provide a specific fail-closed diagnostic when that capability is unavailable."
+source_scope_subject = "temporary-paseo-create-agent-readiness@1"
+revision = "R1"
+state = "green"
+completeness_audit = "green"
+premium_a = "satisfied"
+requirements_text = "Implement only a temporary readiness/configuration repair for the current Paseo/Pi deployment. Use the official caller-scoped Paseo create_agent capability. Ensure or verify the supported agent-tool injection prerequisites and provide a specific fail-closed diagnostic when that capability is unavailable."
 non_goals = "Do not add a PWv2 child spawner, shell/daemon spawn bypass, alternate child lifecycle/readback, fallback delegation implementation, or the final PWv2.2 helper."
 future_compatibility = "The final PWv2.2 runtime-neutral helper remains separate; its Paseo realization should call the official Paseo child-delegation capability rather than inherit a temporary spawn workaround."
+
+[requirements]
+class = "authority"
+path = "implementation/workstreams/issue-paseo-child-delegation/BRAINSTORM.toml"
+
+[[decisions]]
+class = "authority"
+path = "implementation/workstreams/issue-paseo-child-delegation/INTAKE.toml"
+
+[[decisions]]
+class = "authority"
+path = "implementation/workstreams/issue-paseo-child-delegation/RESEARCH.toml"
+
+[[decisions]]
+class = "authority"
+path = "implementation/workstreams/issue-paseo-child-delegation/BRAINSTORM.toml"
