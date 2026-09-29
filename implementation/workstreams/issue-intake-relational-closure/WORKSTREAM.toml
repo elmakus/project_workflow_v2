@@ -43,3 +43,7 @@ path = "implementation/workstreams/issue-intake-relational-closure/PLANNING.toml
 [plan_review]
 class = "plan_review"
 path = "implementation/workstreams/issue-intake-relational-closure/PLAN_REVIEW.toml"
+
+[task_board]
+class = "task_board"
+path = "implementation/workstreams/issue-intake-relational-closure/TASK_BOARD.toml"
