@@ -1,6 +1,6 @@
 workstream_id = "change-adversarial-stabilization-bug-hunt"
 kind = "change"
-state = "active"
+state = "complete"
 diagnosis_revision = 1
 repair_subject = ""
 diagnosis_prior_art_subject = ""
