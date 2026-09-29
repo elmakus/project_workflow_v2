@@ -66,6 +66,18 @@ class Issue17QualificationTests(unittest.TestCase):
         )
         self.assertEqual((stopped.continuation_action, stopped.restart_action), ("return", "no_replay"))
 
+        end_of_scope = consume_handoff_and_classify(
+            locator,
+            self.expectation(),
+            receiver_semantically_independent=True,
+            freshly_routed_disposition="stop",
+            freshly_routed_obligation="end_of_approved_scope",
+        )
+        self.assertEqual(
+            (end_of_scope.continuation_action, end_of_scope.restart_action),
+            ("return", "no_replay"),
+        )
+
     def test_premium_transfer_and_independent_review_matrix(self) -> None:
         for entry in ("Premium A", "Premium B", "Premium C", "independent Review — M06-T04-R01"):
             independent = entry in ("Premium B", "independent Review — M06-T04-R01")
@@ -105,6 +117,27 @@ class Issue17QualificationTests(unittest.TestCase):
                     freshly_routed_disposition="route",
                     freshly_routed_obligation="execution_prep",
                 )
+
+        first_receipt = consume_handoff_and_classify(
+            locator,
+            self.expectation(),
+            receiver_semantically_independent=True,
+            freshly_routed_disposition="route",
+            freshly_routed_obligation="execution_prep",
+        )
+        self.assertEqual(first_receipt.receive_action, "consume_handoff")
+
+        # Durable advancement changes the canonical route away from the handoff stop.
+        # Re-submitting the old locator must fail before continuation/replay.
+        with self.assertRaises(ReceiveContractError):
+            consume_handoff_and_classify(
+                locator,
+                self.expectation(disposition="route"),
+                receiver_semantically_independent=True,
+                freshly_routed_disposition="route",
+                freshly_routed_obligation="execution",
+                durable_semantic_result=True,
+            )
 
     def test_recovery_readback_and_durable_result_restart_safety(self) -> None:
         locator = self.locator()
