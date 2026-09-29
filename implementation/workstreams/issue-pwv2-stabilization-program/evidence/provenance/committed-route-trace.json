@@ -1,0 +1,151 @@
+{
+  "canonical_base": "d3ab917f02e4de91b7dbb17915c2287c2387333e",
+  "purpose": "bounded formalization transition readback; not end-to-end repair certification",
+  "exact_prior_art_object_verified": true,
+  "steps": [
+    {
+      "commit": "2daa77e27e95ca7836a580f22601df65719252ec",
+      "fresh_process_route": {
+        "disposition": "route",
+        "obligation": "intake",
+        "subject": "PWV2-STAB-P1",
+        "owner_module": "workflow/INTAKE.md",
+        "reason": "Concrete issue diagnosis must materialize and consume proportional prior-art Research for the exact current repair subject before repair alignment can proceed",
+        "read_set": [
+          "package:workflow/ROUTER.md",
+          "project:PROJECT.md",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/WORKSTREAM.toml",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/INTAKE.toml"
+        ],
+        "handoff_policy": "none"
+      }
+    },
+    {
+      "commit": "cbabd7b4b1a7def7533f573324e3342a1c281313",
+      "fresh_process_route": {
+        "disposition": "route",
+        "obligation": "research",
+        "subject": "PWV2-STAB-P1",
+        "owner_module": "workflow/RESEARCH.md",
+        "reason": "Active Research owns the next factual obligation",
+        "read_set": [
+          "package:workflow/ROUTER.md",
+          "project:PROJECT.md",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/WORKSTREAM.toml",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/RESEARCH.toml"
+        ],
+        "handoff_policy": "none"
+      }
+    },
+    {
+      "commit": "82f4e5bd4e449c6180d167bf70e44ad8f05b036d",
+      "fresh_process_route": {
+        "disposition": "route",
+        "obligation": "intake",
+        "subject": "PWV2-STAB-P1",
+        "owner_module": "workflow/INTAKE.md",
+        "reason": "Completed Research must be reconciled by its exact return owner",
+        "read_set": [
+          "package:workflow/ROUTER.md",
+          "project:PROJECT.md",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/WORKSTREAM.toml",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/RESEARCH.toml"
+        ],
+        "handoff_policy": "none"
+      }
+    },
+    {
+      "commit": "a4ddb77abc59c501a2b120472435729929145462",
+      "fresh_process_route": {
+        "disposition": "route",
+        "obligation": "intake",
+        "subject": "PWV2-STAB-P1",
+        "owner_module": "workflow/INTAKE.md",
+        "reason": "Research result is already applied; return owner may only consume/clear it",
+        "read_set": [
+          "package:workflow/ROUTER.md",
+          "project:PROJECT.md",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/WORKSTREAM.toml",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/RESEARCH.toml"
+        ],
+        "handoff_policy": "none"
+      }
+    },
+    {
+      "commit": "74a446a14b2a1fe6ddc68493f5cd467be1b5db35",
+      "fresh_process_route": {
+        "disposition": "route",
+        "obligation": "brainstorming",
+        "subject": "issue",
+        "owner_module": "workflow/BRAINSTORMING.md",
+        "reason": "Completed pre-execution Intake continues to common Brainstorming",
+        "read_set": [
+          "package:workflow/ROUTER.md",
+          "project:PROJECT.md",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/WORKSTREAM.toml",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/RESEARCH.toml",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/INTAKE.toml"
+        ],
+        "handoff_policy": "none"
+      }
+    },
+    {
+      "commit": "8937c242e75a964d8368a0e082a165e921425ca3",
+      "fresh_process_route": {
+        "disposition": "route",
+        "obligation": "github_issues",
+        "subject": "project-workflow:issue-pwv2-stabilization-program",
+        "owner_module": "workflow/GITHUB_ISSUES.md",
+        "reason": "Tracker discovery/dedup must complete before any create",
+        "read_set": [
+          "package:workflow/ROUTER.md",
+          "project:PROJECT.md",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/WORKSTREAM.toml",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/RESEARCH.toml",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/INTAKE.toml",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/TRACKER.toml"
+        ],
+        "handoff_policy": "none"
+      }
+    },
+    {
+      "commit": "ab2810bb75afa5935c6c5c3db768b580a3b48653",
+      "fresh_process_route": {
+        "disposition": "route",
+        "obligation": "github_issues",
+        "subject": "project-workflow:issue-pwv2-stabilization-program",
+        "owner_module": "workflow/GITHUB_ISSUES.md",
+        "reason": "Interrupted/uncertain Issue create requires exact readback before any retry",
+        "read_set": [
+          "package:workflow/ROUTER.md",
+          "project:PROJECT.md",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/WORKSTREAM.toml",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/RESEARCH.toml",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/INTAKE.toml",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/TRACKER.toml"
+        ],
+        "handoff_policy": "none"
+      }
+    },
+    {
+      "commit": "7ff3d2a9334b67c264789bc59405a9058de23ee8",
+      "fresh_process_route": {
+        "disposition": "route",
+        "obligation": "brainstorming",
+        "subject": "pwv2-stabilization-program@1",
+        "owner_module": "workflow/BRAINSTORMING.md",
+        "reason": "Active exploratory scope owns the next product/strategy clarification",
+        "read_set": [
+          "package:workflow/ROUTER.md",
+          "project:PROJECT.md",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/WORKSTREAM.toml",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/RESEARCH.toml",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/INTAKE.toml",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/TRACKER.toml",
+          "project:implementation/workstreams/issue-pwv2-stabilization-program/BRAINSTORM.toml"
+        ],
+        "handoff_policy": "none"
+      }
+    }
+  ]
+}
