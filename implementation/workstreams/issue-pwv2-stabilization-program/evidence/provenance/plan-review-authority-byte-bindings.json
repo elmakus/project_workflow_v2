@@ -1,0 +1,29 @@
+[
+  {
+    "path": "requirements/PWV2_STABILIZATION_PROGRAM_FORMALIZATION.md",
+    "blob": "850c50ead032e731637ca60aaa93de46486d1b6d",
+    "unchanged_from_frozen_subject_commit": true
+  },
+  {
+    "path": "decisions/PWV2_STABILIZATION_PROGRAM_FORMALIZATION.md",
+    "blob": "4d5f861add6d9509e2d6f5a56d0707ed5e6cb754",
+    "unchanged_from_frozen_subject_commit": true
+  },
+  {
+    "path": "requirements/PWV2_STABILIZATION_PROGRAM_FORMALIZATION.md",
+    "blob": "850c50ead032e731637ca60aaa93de46486d1b6d",
+    "unchanged_from_frozen_subject_commit": true
+  },
+  {
+    "path": "implementation/workstreams/issue-pwv2-stabilization-program/evidence/SCOPE_REVISION_1.md",
+    "commit": "aefce92718705aab806897f97f619b3b697b0722",
+    "blob": "b5b96eec1f23bb12d4cf2bf849ca21ca8aebde34",
+    "current_bytes_match_bound_objects": true
+  },
+  {
+    "path": "implementation/workstreams/issue-pwv2-stabilization-program/evidence/INTAKE_PRIOR_ART.md",
+    "commit": "82f4e5bd4e449c6180d167bf70e44ad8f05b036d",
+    "blob": "1bd95e6ddbfc65b1262266eeff5d1bd4b4b663cd",
+    "current_bytes_match_bound_objects": true
+  }
+]
