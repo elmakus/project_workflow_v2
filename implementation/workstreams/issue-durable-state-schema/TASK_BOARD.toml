@@ -1,5 +1,5 @@
 workstream_id = "issue-durable-state-schema"
-revision = 2
+revision = 3
 
 [execution_ref]
 branch = "work/pwv2-durable-state-schema"
@@ -11,6 +11,12 @@ status = "in_progress"
 [cards.contract]
 class = "task_card"
 path = "implementation/workstreams/issue-durable-state-schema/cards/M01-T01.md"
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-durable-state-schema/results/M01-T01.md"
+commit = "d15defabd601348bfba68db89941ee755f855367"
+blob = "aedcd2262a1b0a01ebde710ea186e2d65498dd0b"
 
 [[jit_triggers]]
 id = "after-M01-T01-materialize-M02"
