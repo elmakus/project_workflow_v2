@@ -1,30 +1,30 @@
 workstream_id = "issue-intake-relational-closure"
-state = "active"
+state = "complete"
 origin_role = "intake"
 origin_subject = "repair:intake-relational-closure:v1"
 return_target = "intake"
 return_reconciliation = "pending"
 return_result = ""
-finding = ""
-limitations = ""
-conflicts = ""
+finding = "Current production accepts an empty issue repair subject and then emits an empty alignment stop; it also selects Intake issue semantics when the stable manifest says change. The bounded repair outcome is concrete-subject gating plus manifest/Intake kind agreement, with separate negative and positive controls. See evidence/INTAKE_PRIOR_ART.md."
+limitations = "No repair is authorized or implemented. Historical c94a348 closes only the empty-subject half on a broad unaccepted branch; exact API placement, accepted requirements/decisions, clean-consumer qualification and independent implementation review remain future obligations."
+conflicts = "No material source conflict. Canonical contracts and current reproducers agree. Historical c94a348 supports the empty-subject behavior but lacks the kind relation and is not an accepted current-main Result; issue #23 remains broader schema-evolution work."
 
 [[sources]]
 class = "official_upstream"
-status = "pending"
+status = "checked"
 weight = "canonical workflow and state contracts control intended semantics"
 
 [[sources]]
 class = "project_runtime"
-status = "pending"
-weight = "current production validator/router behavior and exact reproducers control defect evidence"
+status = "checked"
+weight = "current production validator/router behavior, exact reproducers and repository history control defect evidence"
 
 [[sources]]
 class = "tracker_discussion"
-status = "pending"
-weight = "current issue readback supports deduplication and diagnosis only"
+status = "checked"
+weight = "current issue readback supports deduplication and diagnosis only; never authorization"
 
 [[sources]]
 class = "practitioner_community"
-status = "pending"
-weight = "secondary evidence only; use only if material to this internal relational invariant"
+status = "not_relevant"
+weight = "the defect is an internal deterministic state relation with direct canonical and executable evidence"
