@@ -1,5 +1,5 @@
 workstream_id = "issue-durable-state-schema"
-revision = 3
+revision = 4
 
 [execution_ref]
 branch = "work/pwv2-durable-state-schema"
@@ -17,6 +17,10 @@ class = "result"
 path = "implementation/workstreams/issue-durable-state-schema/results/M01-T01.md"
 commit = "d15defabd601348bfba68db89941ee755f855367"
 blob = "aedcd2262a1b0a01ebde710ea186e2d65498dd0b"
+
+[[cards.review_attempts]]
+class = "review_attempt"
+path = "implementation/workstreams/issue-durable-state-schema/reviews/M01-T01-R01.toml"
 
 [[jit_triggers]]
 id = "after-M01-T01-materialize-M02"
