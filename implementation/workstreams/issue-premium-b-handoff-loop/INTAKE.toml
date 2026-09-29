@@ -1,0 +1,12 @@
+workstream_id = "issue-premium-b-handoff-loop"
+kind = "issue"
+state = "active"
+diagnosis_revision = 1
+repair_subject = "Define a canonical exact-subject-bound Premium B receive admission transition so a valid semantically independent receiver consumes the specific transferable Premium B boundary and establishes the exact pending Plan Review admission before ordinary rerouting, while preserving producer-side Premium B as a real stop, stale/replay/concurrency safety, Recovery precedence, and runtime-neutral independence."
+diagnosis_prior_art_subject = "Define a canonical exact-subject-bound Premium B receive admission transition so a valid semantically independent receiver consumes the specific transferable Premium B boundary and establishes the exact pending Plan Review admission before ordinary rerouting, while preserving producer-side Premium B as a real stop, stale/replay/concurrency safety, Recovery precedence, and runtime-neutral independence."
+diagnosis_prior_art_result = "project-research:projects/project_workflow_v2/issues/issue-25-premium-b-handoff-loop/FINAL_SYNTHESIS.md@blob:bf9e47106542699dc09636df3d7a81d60c8da3f3"
+response_kind = "alternative"
+response_observed = true
+alignment_state = "pending"
+alignment_subject = ""
+micro_fix_candidate = false
