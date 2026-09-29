@@ -1,0 +1,21 @@
+workstream_id = "issue-intake-relational-closure"
+plan_revision = "P1"
+planning_cycle = 1
+attempt = "R01"
+verdict = "pending"
+evidence_path = ""
+
+[subject]
+class = "git_blob"
+repository = "elmakus/project_workflow_v2"
+commit = "27fd8bf60f0f577484163367fc4fe20914752a0f"
+path = "planning/ISSUE_32_INTAKE_RELATIONAL_CLOSURE_PLAN.md"
+blob = "64838b0cf251f851ef0331bbf82959e1c2325001"
+
+[acceptance]
+class = "authority"
+path = "requirements/ISSUE_32_INTAKE_RELATIONAL_CLOSURE.md"
+
+[independence]
+materially_produced_or_repaired_subject = false
+basis = "Fresh independent Premium B review context; this context did not materially produce or repair the exact frozen plan subject."

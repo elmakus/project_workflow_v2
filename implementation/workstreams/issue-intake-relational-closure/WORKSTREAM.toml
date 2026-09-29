@@ -39,3 +39,7 @@ path = "implementation/workstreams/issue-intake-relational-closure/DEFINITION.to
 [planning]
 class = "planning"
 path = "implementation/workstreams/issue-intake-relational-closure/PLANNING.toml"
+
+[plan_review]
+class = "plan_review"
+path = "implementation/workstreams/issue-intake-relational-closure/PLAN_REVIEW.toml"
