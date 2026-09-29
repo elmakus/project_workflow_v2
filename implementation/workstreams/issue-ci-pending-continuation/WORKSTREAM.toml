@@ -2,36 +2,20 @@ kind = "issue"
 workstream_id = "issue-ci-pending-continuation"
 branch = "work/pwv2-ci-pending-continuation"
 integration_target = "main"
+created_from = "0c01bc0b888a0f42114924ed852a9afe930eb5a8"
 authority = [
   { class = "authority", path = "requirements/PROJECT_WORKFLOW_V2.md" },
   { class = "authority", path = "workflow/ROUTER.md" },
-  { class = "authority", path = "workflow/INTAKE.md" },
-  { class = "authority", path = "workflow/RESEARCH.md" },
   { class = "authority", path = "workflow/CONTINUATION.md" },
   { class = "authority", path = "workflow/EXECUTION.md" },
+  { class = "authority", path = "workflow/REVIEW.md" },
   { class = "authority", path = "workflow/RECOVERY.md" },
 ]
-
-[intake]
-class = "intake"
-path = "implementation/workstreams/issue-ci-pending-continuation/INTAKE.toml"
-
-[research]
-class = "research"
-path = "implementation/workstreams/issue-ci-pending-continuation/RESEARCH.toml"
 
 [tracker]
 class = "tracker"
 path = "implementation/workstreams/issue-ci-pending-continuation/TRACKER.toml"
 
-[brainstorm]
-class = "brainstorm"
-path = "implementation/workstreams/issue-ci-pending-continuation/BRAINSTORM.toml"
-
-[definition]
-class = "definition"
-path = "implementation/workstreams/issue-ci-pending-continuation/DEFINITION.toml"
-
-[planning]
-class = "planning"
-path = "implementation/workstreams/issue-ci-pending-continuation/PLANNING.toml"
+[task_board]
+class = "task_board"
+path = "implementation/workstreams/issue-ci-pending-continuation/TASK_BOARD.toml"
