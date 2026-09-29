@@ -27,3 +27,7 @@ path = "implementation/workstreams/issue-ci-pending-continuation/TRACKER.toml"
 [brainstorm]
 class = "brainstorm"
 path = "implementation/workstreams/issue-ci-pending-continuation/BRAINSTORM.toml"
+
+[definition]
+class = "definition"
+path = "implementation/workstreams/issue-ci-pending-continuation/DEFINITION.toml"
