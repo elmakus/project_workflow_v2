@@ -1,12 +1,12 @@
 workstream_id = "issue-explicit-stop-precedence"
-revision = 1
+revision = 2
 
 [execution_ref]
 branch = "work/issue-33-explicit-stop-precedence"
 
 [[cards]]
 id = "M01-T01"
-status = "ready"
+status = "in_progress"
 review_attempts = []
 
 [cards.contract]
