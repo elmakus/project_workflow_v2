@@ -1,12 +1,12 @@
 workstream_id = "issue-durable-state-schema"
-revision = 4
+revision = 5
 
 [execution_ref]
 branch = "work/pwv2-durable-state-schema"
 
 [[cards]]
 id = "M01-T01"
-status = "in_progress"
+status = "done"
 
 [cards.contract]
 class = "task_card"
@@ -25,5 +25,5 @@ path = "implementation/workstreams/issue-durable-state-schema/reviews/M01-T01-R0
 [[jit_triggers]]
 id = "after-M01-T01-materialize-M02"
 after_card = "M01-T01"
-state = "waiting"
+state = "satisfied"
 condition = "When M01-T01 is DONE with a durable result, materialize the M02 reconciliation Card using that exact result path@commit:blob as its dependency."
