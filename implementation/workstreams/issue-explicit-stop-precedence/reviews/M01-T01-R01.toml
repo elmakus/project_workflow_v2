@@ -1,0 +1,20 @@
+workstream_id = "issue-explicit-stop-precedence"
+card_id = "M01-T01"
+attempt = "R01"
+verdict = "pending"
+evidence_path = ""
+
+[subject]
+class = "git_blob"
+repository = "elmakus/project_workflow_v2"
+commit = "b1a418a5a9d0a18741855ad98e68cc2040d21fb1"
+path = "implementation/workstreams/issue-explicit-stop-precedence/results/M01-T01.md"
+blob = "32bdbe6f925625a8e278aed4ef7b4ca7165991e1"
+
+[acceptance]
+class = "task_card"
+path = "implementation/workstreams/issue-explicit-stop-precedence/cards/M01-T01.md"
+
+[independence]
+materially_produced_or_repaired_subject = false
+basis = "Reserved for a fresh independent reviewer that did not implement or repair the exact M01-T01 subject."

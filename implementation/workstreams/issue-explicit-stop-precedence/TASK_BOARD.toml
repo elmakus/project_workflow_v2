@@ -1,5 +1,5 @@
 workstream_id = "issue-explicit-stop-precedence"
-revision = 3
+revision = 4
 
 [execution_ref]
 branch = "work/issue-33-explicit-stop-precedence"
@@ -7,7 +7,7 @@ branch = "work/issue-33-explicit-stop-precedence"
 [[cards]]
 id = "M01-T01"
 status = "in_progress"
-review_attempts = []
+review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-explicit-stop-precedence/reviews/M01-T01-R01.toml" }]
 
 [cards.contract]
 class = "task_card"
