@@ -1,0 +1,12 @@
+workstream_id = "issue-paseo-child-delegation"
+kind = "issue"
+state = "alignment_pending"
+diagnosis_revision = 1
+repair_subject = "repair:runtime-neutral-verified-child-delegation-fallback:v1"
+diagnosis_prior_art_subject = "repair:runtime-neutral-verified-child-delegation-fallback:v1"
+diagnosis_prior_art_result = "implementation/workstreams/issue-paseo-child-delegation/RESEARCH.toml#finding"
+response_kind = "none"
+response_observed = false
+alignment_state = "pending"
+alignment_subject = "repair:runtime-neutral-verified-child-delegation-fallback:v1"
+micro_fix_candidate = false
