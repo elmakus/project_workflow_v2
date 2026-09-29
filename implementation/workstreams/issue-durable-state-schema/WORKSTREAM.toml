@@ -27,6 +27,10 @@ path = "implementation/workstreams/issue-durable-state-schema/DEFINITION.toml"
 class = "planning"
 path = "implementation/workstreams/issue-durable-state-schema/PLANNING.toml"
 
+[plan_review]
+class = "plan_review"
+path = "implementation/workstreams/issue-durable-state-schema/PLAN_REVIEW.toml"
+
 [research]
 class = "research"
 path = "implementation/workstreams/issue-durable-state-schema/RESEARCH.toml"
