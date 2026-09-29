@@ -1,0 +1,8 @@
+workstream_id = "issue-paseo-child-delegation"
+provider = "github"
+repository = "elmakus/project_workflow_v2"
+dedup_key = "pwv2:paseo-temporary-child-delegation-capability"
+state = "linked"
+issue_number = 20
+candidate_issue_numbers = []
+readback_state = "verified"
