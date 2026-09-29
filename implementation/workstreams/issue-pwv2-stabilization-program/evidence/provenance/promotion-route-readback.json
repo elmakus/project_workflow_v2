@@ -1,0 +1,22 @@
+{
+  "commit": "7134ff44116864653edb51dba9eff85ec8170ebe",
+  "fresh_process": true,
+  "scope_bytes_unchanged": true,
+  "route": {
+    "disposition": "route",
+    "obligation": "definition",
+    "subject": "pwv2-stabilization-program@1",
+    "owner_module": "workflow/DEFINITION.md",
+    "reason": "Exact current exploratory revision is authorized for Definition",
+    "read_set": [
+      "package:workflow/ROUTER.md",
+      "project:PROJECT.md",
+      "project:implementation/workstreams/issue-pwv2-stabilization-program/WORKSTREAM.toml",
+      "project:implementation/workstreams/issue-pwv2-stabilization-program/RESEARCH.toml",
+      "project:implementation/workstreams/issue-pwv2-stabilization-program/INTAKE.toml",
+      "project:implementation/workstreams/issue-pwv2-stabilization-program/TRACKER.toml",
+      "project:implementation/workstreams/issue-pwv2-stabilization-program/BRAINSTORM.toml"
+    ],
+    "handoff_policy": "none"
+  }
+}

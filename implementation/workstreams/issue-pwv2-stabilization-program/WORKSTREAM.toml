@@ -12,6 +12,8 @@ authority = [
   { class = "authority", path = "workflow/STATE.md" },
   { class = "authority", path = "workflow/AUTHORITY.md" },
   { class = "authority", path = "workflow/CONTINUATION.md" },
+  { class = "authority", path = "requirements/PWV2_STABILIZATION_PROGRAM_FORMALIZATION.md" },
+  { class = "authority", path = "decisions/PWV2_STABILIZATION_PROGRAM_FORMALIZATION.md" },
 ]
 
 [intake]
@@ -29,3 +31,7 @@ path = "implementation/workstreams/issue-pwv2-stabilization-program/TRACKER.toml
 [brainstorm]
 class = "brainstorm"
 path = "implementation/workstreams/issue-pwv2-stabilization-program/BRAINSTORM.toml"
+
+[definition]
+class = "definition"
+path = "implementation/workstreams/issue-pwv2-stabilization-program/DEFINITION.toml"
