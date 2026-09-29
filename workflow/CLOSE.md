@@ -79,3 +79,7 @@ Close reports completion and stops only when durable project/workstream truth pr
 Deployment/live-write status alone never creates a human gate. An exact accepted authorization boundary still does and must stop before the gated mutation.
 
 `tools/close_contract.py` owns the deterministic continuation oracle. True end of scope returns `end_of_scope_stop`; it is never inferred merely from an empty current Card queue.
+
+## Validated durable-state write boundary
+
+Canonical TOML state creation or mutation owned by this module (task_board/tracker/external-effect records it mutates) is successfully reconciled only from `tools.state_contract.render_validated_state_record` or `write_validated_state_record`. The shared boundary dispatches to the production validator, generically renders the already-validated data, parses it back, and validates it again before persistence; hand-written or guessed TOML must not be treated as a successful canonical transition. An external repository writer may persist only the validated rendered bytes and must retain its normal exact readback/uncertainty handling.
