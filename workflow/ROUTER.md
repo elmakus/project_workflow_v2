@@ -26,6 +26,7 @@ The router is one small runtime-neutral obligation selector. Product/model/sessi
 - tracker create_pending_readback -> GitHub Issues readback before any retry;
 - ambiguous tracker -> Recovery; duplicate create is forbidden;
 - linked/unavailable tracker -> continue without treating tracker as authority;
+- locally valid selected Brainstorm explicit stop -> Brainstorm-owned explicit stop before Definition and later pre-execution reads/dispatch;
 - active Brainstorming -> Brainstorming;
 - ready Brainstorming without exact promotion -> Definition-promotion stop;
 - exact promoted revision -> Definition;

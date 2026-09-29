@@ -315,6 +315,13 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
         if "brainstorm" in workstream:
             brainstorm = read_toml(reads.project(workstream["brainstorm"]["path"]))
             validate_brainstorm(brainstorm, workstream["workstream_id"])
+            if brainstorm["explicit_user_stop"]:
+                exact_scope = f"{brainstorm['scope_id']}@{brainstorm['revision']}"
+                return result(
+                    reads, "stop", "explicit_user_stop",
+                    "Brainstorming carries an explicit user stop",
+                    subject=exact_scope, owner_module="workflow/BRAINSTORMING.md",
+                )
 
         definition = None
         if "definition" in workstream:
@@ -439,12 +446,6 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
 
         if not plan_gate_passed_with_board and brainstorm is not None:
             exact_scope = f"{brainstorm['scope_id']}@{brainstorm['revision']}"
-            if brainstorm["explicit_user_stop"]:
-                return result(
-                    reads, "stop", "explicit_user_stop",
-                    "Brainstorming carries an explicit user stop",
-                    subject=exact_scope, owner_module="workflow/BRAINSTORMING.md",
-                )
             if brainstorm["state"] == "active":
                 return result(
                     reads, "route", "brainstorming",
