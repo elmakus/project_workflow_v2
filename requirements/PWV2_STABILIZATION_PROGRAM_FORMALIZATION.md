@@ -66,7 +66,7 @@ issue-body breadth does not supersede it). No fallback spawn, broader runtime
 helper, spawner, daemon/shell bypass, or final PWv2.2 helper. #20 never
 justifies semantic-layer changes.
 
-## R4 — Separately preserved acceptance obligations (every row survives verbatim)
+## R4 — Separately preserved acceptance obligations (every invariant remains traceable)
 
 | Issue | Independent invariant / acceptance need (unchanged) |
 |---|---|

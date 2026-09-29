@@ -1,9 +1,9 @@
 workstream_id = "issue-pwv2-stabilization-program"
 source_scope_subject = "pwv2-stabilization-program@1"
 revision = "R1"
-state = "active"
-completeness_audit = "pending"
-premium_a = "not_due"
+state = "green"
+completeness_audit = "green"
+premium_a = "due"
 decisions = [
   { class = "authority", path = "decisions/PWV2_STABILIZATION_PROGRAM_FORMALIZATION.md" },
 ]
