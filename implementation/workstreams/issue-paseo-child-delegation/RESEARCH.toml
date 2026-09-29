@@ -1,34 +1,34 @@
 workstream_id = "issue-paseo-child-delegation"
-state = "consumed"
+state = "complete"
 origin_role = "intake"
-origin_subject = "repair:runtime-neutral-verified-child-delegation-fallback:v1"
+origin_subject = "repair:temporary-paseo-create-agent-readiness:v2"
 return_target = "intake"
-return_reconciliation = "applied"
-return_result = "implementation/workstreams/issue-paseo-child-delegation/RESEARCH.toml#finding"
-finding = "PWv2 correctly requires semantic independence and runtime-neutral authority, but a receiving Paseo/Pi context can falsely classify delegation as unavailable when it tests only for an exposed native agent-scoped create_agent/MCP surface. Upstream Paseo v0.9.2 defines create_agent in its caller-scoped Paseo tool catalog and Pi receives that catalog through its MCP adapter path; project runtime evidence separately proves Paseo daemon -> Pi-provider child launch. The bounded repair is capability-based: permit an evidence-bound fallback child-launch/delegation path only when it can preserve exact subject, independent context, lifecycle/readback and fail-closed semantics. A mere spawned pi process is not by itself equivalent to create_agent."
-limitations = "The current pi-unraid evidence proves daemon-parented Pi agent launch, not that the exact production Paseo session exposes create_agent inside Pi. The fallback therefore must verify its usable delegation surface and child/result binding at runtime rather than infer capability from process presence. No claim is made that CLI launch and native create_agent are identical implementations."
-conflicts = "No authority conflict. Upstream supports both Pi process-backed agents and caller-scoped Paseo tools, while project evidence proves child launch but not in-agent tool exposure. The apparent conflict is resolved by distinguishing launch capability from agent-scoped delegation capability."
+return_reconciliation = "pending"
+return_result = ""
+finding = "The previously proposed child-delegation fallback is unnecessary for the observed Paseo/Pi failure. Live runtime diagnosis established that pi-mcp-adapter was loaded while daemon mcp.injectIntoAgents was false; after enabling the supported injection path, a fresh Pi caller received Paseo's caller-scoped create_agent and an end-to-end native child test succeeded with managed parent-child identity, configured model/thinking, finish notification and status readback. The bounded temporary repair is therefore readiness/configuration only: ensure the official Paseo agent-tool injection path is enabled and fail clearly when the required create_agent capability is unavailable. Do not add a PWv2 child spawner, daemon bypass, alternate lifecycle, or fallback delegation mechanism."
+limitations = "The successful live E2E establishes the current Paseo/Pi official create_agent path for the tested deployment. This temporary repair does not define the final PWv2.2 helper API; canonical PWv2 remains runtime-neutral, and the later Paseo adapter/helper should consume the official Paseo child-delegation capability rather than shell/daemon spawn workarounds."
+conflicts = "The prior fallback-oriented diagnosis is superseded by stronger live runtime evidence showing that the official Paseo create_agent path works once MCP agent injection is enabled. No authority conflict remains; the defect is deployment/readiness configuration and diagnostics, not absence of child delegation."
 
 [[sources]]
 class = "official_upstream"
 status = "checked"
 weight = "primary"
-reference = "getpaseo/paseo@v0.9.2 docs/providers.md"
+reference = "getpaseo/paseo@v0.9.2 provider/MCP/create_agent behavior and mcp.injectIntoAgents configuration"
 
 [[sources]]
 class = "project_runtime"
 status = "checked"
 weight = "primary"
-reference = "elmakus/pi-unraid@24a45813094a22e2a189692204804a54a51c0a6a M06-T01 Paseo/Pi spawn evidence"
+reference = "Live Paseo 0.9.2 / Pi runtime diagnosis plus fresh native create_agent E2E: caller-scoped tool visible, managed child created, parent relation verified, terminal result PASEO_CHILD_OK read back"
 
 [[sources]]
 class = "tracker_discussion"
 status = "checked"
 weight = "direct"
-reference = "elmakus/project_workflow_v2#20"
+reference = "elmakus/project_workflow_v2#20; original fallback direction is superseded by live E2E evidence"
 
 [[sources]]
 class = "practitioner_community"
 status = "not_relevant"
 weight = "none"
-reference = "Issue is an exact local runtime/contract mismatch; community opinion cannot establish the required capability or independence semantics."
+reference = "Exact local configuration/runtime behavior is established by upstream implementation and direct runtime evidence; community opinion cannot strengthen this diagnosis."
