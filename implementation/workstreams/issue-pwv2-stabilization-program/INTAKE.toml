@@ -1,12 +1,12 @@
 workstream_id = "issue-pwv2-stabilization-program"
 kind = "issue"
-state = "active"
+state = "complete"
 diagnosis_revision = 1
 repair_subject = "PWV2-STAB-P1"
-diagnosis_prior_art_subject = ""
-diagnosis_prior_art_result = ""
+diagnosis_prior_art_subject = "PWV2-STAB-P1"
+diagnosis_prior_art_result = "implementation/workstreams/issue-pwv2-stabilization-program/evidence/INTAKE_PRIOR_ART.md@82f4e5bd4e449c6180d167bf70e44ad8f05b036d:1bd95e6ddbfc65b1262266eeff5d1bd4b4b663cd"
 response_kind = "authorization"
 response_observed = true
-alignment_state = "pending"
-alignment_subject = ""
+alignment_state = "authorized"
+alignment_subject = "PWV2-STAB-P1"
 micro_fix_candidate = false

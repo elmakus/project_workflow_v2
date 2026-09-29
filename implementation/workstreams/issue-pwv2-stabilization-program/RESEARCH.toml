@@ -1,5 +1,5 @@
 workstream_id = "issue-pwv2-stabilization-program"
-state = "complete"
+state = "consumed"
 origin_role = "intake"
 origin_subject = "PWV2-STAB-P1"
 return_target = "intake"
