@@ -1,0 +1,5 @@
+workstream_id = "issue-durable-state-schema"
+card_id = "M02-T01"
+class = "human_authority"
+summary = "The exact #20/#22 M02 profiles cannot satisfy accepted #23 fixture/authority requirements without an unauthorized subject or scope change; clarification of accepted #23 authority is required."
+evidence_path = "implementation/workstreams/issue-durable-state-schema/evidence/M02_REAL_SOURCE_AUTHORITY_CONFLICT.md"

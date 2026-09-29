@@ -1,5 +1,5 @@
 workstream_id = "issue-durable-state-schema"
-revision = 7
+revision = 8
 
 [execution_ref]
 branch = "work/pwv2-durable-state-schema"
@@ -24,11 +24,15 @@ path = "implementation/workstreams/issue-durable-state-schema/reviews/M01-T01-R0
 
 [[cards]]
 id = "M02-T01"
-status = "in_progress"
+status = "blocked"
 
 [cards.contract]
 class = "task_card"
 path = "implementation/workstreams/issue-durable-state-schema/cards/M02-T01.md"
+
+[cards.blocker]
+class = "blocker"
+path = "implementation/workstreams/issue-durable-state-schema/blockers/M02-T01.toml"
 
 [[jit_triggers]]
 id = "after-M01-T01-materialize-M02"
