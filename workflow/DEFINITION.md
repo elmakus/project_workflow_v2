@@ -31,3 +31,7 @@ Definition GREEN does not automatically enter Strategic Planning.
 When Definition becomes GREEN, premium stop A is a real human-facing boundary before material Strategic Planning. The stop must recommend using the best available model/context for Strategic Planning. Staying in the current context is allowed when it already satisfies that recommendation, but the stop must also render the optional ready-to-copy locator-only handoff defined by `workflow/USER_STOP.md` so Strategic Planning can be moved to another context or harness without another prompt request. That recommendation is presentation guidance only: canonical state records semantic gate state, never a product/model/session identity or a hard-coded product model name.
 
 After A is durably satisfied, Strategic Planning owns continuation; full Planning semantics arrive in M02-T03.
+
+## Validated durable-state write boundary
+
+Canonical TOML state creation or mutation owned by this module (definition) is successfully reconciled only from `tools.state_contract.render_validated_state_record` or `write_validated_state_record`. The shared boundary dispatches to the production validator, generically renders the already-validated data, parses it back, and validates it again before persistence; hand-written or guessed TOML must not be treated as a successful canonical transition. An external repository writer may persist only the validated rendered bytes and must retain its normal exact readback/uncertainty handling.

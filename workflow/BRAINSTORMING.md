@@ -41,3 +41,7 @@ Ready-for-definition is not permission to enter Definition by itself.
 - exact promoted revision -> Definition owns continuation.
 
 Research may temporarily own fact gathering and must return to its exact recorded target once.
+
+## Validated durable-state write boundary
+
+Canonical TOML state creation or mutation owned by this module (brainstorm) is successfully reconciled only from `tools.state_contract.render_validated_state_record` or `write_validated_state_record`. The shared boundary dispatches to the production validator, generically renders the already-validated data, parses it back, and validates it again before persistence; hand-written or guessed TOML must not be treated as a successful canonical transition. An external repository writer may persist only the validated rendered bytes and must retain its normal exact readback/uncertainty handling.
