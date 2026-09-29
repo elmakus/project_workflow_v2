@@ -9,5 +9,5 @@ decision_locators = [
 ]
 completeness_audit = "GREEN"
 unresolved_user_product_choice = false
-premium_a = "due"
+premium_a = "satisfied"
 premium_a_subject = "ci-pending-deterministic-continuation@1"
