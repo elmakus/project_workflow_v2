@@ -4,10 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import json
+import math
 import re
+import tempfile
 import tomllib
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, Callable
 
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 CARD_STATUSES = {"planned", "ready", "in_progress", "blocked", "done"}
@@ -874,6 +877,231 @@ def validate_external_effect(data: dict[str, Any], workstream_id: str) -> None:
         _require(observation != "unknown",
                  "external_effect: verified readback requires a concrete observation")
     validate_locator(data.get("evidence"), "evidence", "external_effect.evidence", workstream_id)
+
+
+_BARE_TOML_KEY = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def _toml_key(value: str) -> str:
+    _require(isinstance(value, str) and value, "toml renderer: keys must be non-empty strings")
+    if _BARE_TOML_KEY.fullmatch(value):
+        return value
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _toml_scalar(value: Any) -> str:
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False)
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        _require(math.isfinite(value), "toml renderer: non-finite floats are not supported")
+        return repr(value)
+    if isinstance(value, list):
+        _require(
+            not any(isinstance(item, dict) for item in value),
+            "toml renderer: arrays containing tables must be emitted structurally",
+        )
+        return "[" + ", ".join(_toml_scalar(item) for item in value) + "]"
+    raise ValidationError(f"toml renderer: unsupported value type {type(value).__name__}")
+
+
+def _toml_table_path(parts: tuple[str, ...]) -> str:
+    return ".".join(_toml_key(part) for part in parts)
+
+
+def _append_toml_section(lines: list[str], header: str) -> None:
+    if lines and lines[-1] != "":
+        lines.append("")
+    lines.append(header)
+
+
+def _render_toml_table(data: dict[str, Any], path: tuple[str, ...], lines: list[str]) -> None:
+    scalars: list[tuple[str, Any]] = []
+    tables: list[tuple[str, dict[str, Any]]] = []
+    table_arrays: list[tuple[str, list[dict[str, Any]]]] = []
+
+    for key, value in data.items():
+        _require(isinstance(key, str) and key, "toml renderer: keys must be non-empty strings")
+        if isinstance(value, dict):
+            tables.append((key, value))
+            continue
+        if isinstance(value, list) and any(isinstance(item, dict) for item in value):
+            _require(
+                all(isinstance(item, dict) for item in value),
+                f"toml renderer: mixed scalar/table array at {key!r}",
+            )
+            table_arrays.append((key, value))
+            continue
+        scalars.append((key, value))
+
+    for key, value in scalars:
+        lines.append(f"{_toml_key(key)} = {_toml_scalar(value)}")
+
+    for key, value in tables:
+        child_path = path + (key,)
+        _append_toml_section(lines, f"[{_toml_table_path(child_path)}]")
+        _render_toml_table(value, child_path, lines)
+
+    for key, values in table_arrays:
+        child_path = path + (key,)
+        for value in values:
+            _append_toml_section(lines, f"[[{_toml_table_path(child_path)}]]")
+            _render_toml_table(value, child_path, lines)
+
+
+def render_toml(data: dict[str, Any]) -> str:
+    """Render generic TOML without carrying a second durable-state schema."""
+
+    _require(isinstance(data, dict), "toml renderer: top-level record must be a table")
+    lines: list[str] = []
+    _render_toml_table(data, (), lines)
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _context_workstream_id(context: dict[str, Any]) -> str:
+    workstream_id = context.get("workstream_id")
+    if isinstance(workstream_id, str) and workstream_id:
+        return workstream_id
+    workstream = context.get("workstream")
+    if isinstance(workstream, dict):
+        candidate = workstream.get("workstream_id")
+        if isinstance(candidate, str) and candidate:
+            return candidate
+    raise ValidationError("state writer: current workstream_id context is required")
+
+
+def _dispatch_workstream(data: dict[str, Any], context: dict[str, Any]) -> None:
+    validate_workstream(data)
+
+
+def _dispatch_intake(data: dict[str, Any], context: dict[str, Any]) -> None:
+    validate_intake(data, _context_workstream_id(context))
+
+
+def _dispatch_brainstorm(data: dict[str, Any], context: dict[str, Any]) -> None:
+    validate_brainstorm(data, _context_workstream_id(context))
+
+
+def _dispatch_research(data: dict[str, Any], context: dict[str, Any]) -> None:
+    validate_research(data, _context_workstream_id(context))
+
+
+def _dispatch_definition(data: dict[str, Any], context: dict[str, Any]) -> None:
+    validate_definition(data, _context_workstream_id(context))
+
+
+def _dispatch_planning(data: dict[str, Any], context: dict[str, Any]) -> None:
+    validate_planning(data, _context_workstream_id(context))
+
+
+def _dispatch_plan_review(data: dict[str, Any], context: dict[str, Any]) -> None:
+    planning = context.get("planning")
+    _require(isinstance(planning, dict), "state writer: plan_review requires current planning context")
+    validate_plan_review(data, _context_workstream_id(context), planning)
+
+
+def _dispatch_tracker(data: dict[str, Any], context: dict[str, Any]) -> None:
+    validate_tracker(data, _context_workstream_id(context))
+
+
+def _dispatch_task_board(data: dict[str, Any], context: dict[str, Any]) -> None:
+    workstream = context.get("workstream")
+    _require(isinstance(workstream, dict), "state writer: task_board requires current workstream context")
+    validate_board(data, workstream, context.get("expected_revision"))
+
+
+def _dispatch_blocker(data: dict[str, Any], context: dict[str, Any]) -> None:
+    card_id = context.get("card_id")
+    _require(isinstance(card_id, str) and card_id, "state writer: blocker requires card_id context")
+    validate_blocker(data, _context_workstream_id(context), card_id)
+
+
+def _dispatch_review_attempt(data: dict[str, Any], context: dict[str, Any]) -> None:
+    card_id = context.get("card_id")
+    _require(isinstance(card_id, str) and card_id, "state writer: review_attempt requires card_id context")
+    validate_review_history(
+        [data],
+        expected_card_id=card_id,
+        workstream_id=_context_workstream_id(context),
+    )
+
+
+def _dispatch_external_effect(data: dict[str, Any], context: dict[str, Any]) -> None:
+    validate_external_effect(data, _context_workstream_id(context))
+
+
+StateRecordValidator = Callable[[dict[str, Any], dict[str, Any]], None]
+
+STATE_RECORD_VALIDATORS: dict[str, StateRecordValidator] = {
+    "workstream": _dispatch_workstream,
+    "intake": _dispatch_intake,
+    "brainstorm": _dispatch_brainstorm,
+    "research": _dispatch_research,
+    "definition": _dispatch_definition,
+    "planning": _dispatch_planning,
+    "plan_review": _dispatch_plan_review,
+    "tracker": _dispatch_tracker,
+    "task_board": _dispatch_task_board,
+    "blocker": _dispatch_blocker,
+    "review_attempt": _dispatch_review_attempt,
+    "external_effect": _dispatch_external_effect,
+}
+
+
+def validate_state_record(kind: str, data: dict[str, Any], **context: Any) -> None:
+    """Dispatch one canonical TOML record to its production validator."""
+
+    _require(isinstance(data, dict), "state writer: durable record must be a table")
+    validator = STATE_RECORD_VALIDATORS.get(kind)
+    _require(validator is not None, f"state writer: unsupported record kind {kind!r}")
+    validator(data, context)
+
+
+def render_validated_state_record(kind: str, data: dict[str, Any], **context: Any) -> str:
+    """Validate, generically serialize, parse, and validate one durable record."""
+
+    validate_state_record(kind, data, **context)
+    rendered = render_toml(data)
+    try:
+        round_tripped = tomllib.loads(rendered)
+    except tomllib.TOMLDecodeError as exc:
+        raise ValidationError(f"state writer: rendered TOML is invalid: {exc}") from exc
+    _require(round_tripped == data, "state writer: TOML serialization changed record semantics")
+    validate_state_record(kind, round_tripped, **context)
+    return rendered
+
+
+def write_validated_state_record(
+    path: Path,
+    kind: str,
+    data: dict[str, Any],
+    **context: Any,
+) -> str:
+    """Atomically persist only bytes that pass the production contract twice."""
+
+    rendered = render_validated_state_record(kind, data, **context)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="\n",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            handle.write(rendered)
+            temp_path = Path(handle.name)
+        temp_path.replace(path)
+    finally:
+        if temp_path is not None and temp_path.exists():
+            temp_path.unlink()
+    return rendered
 
 
 def validate_bundle(
