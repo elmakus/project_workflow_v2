@@ -1,9 +1,28 @@
-+++
-workstream_id = "issue-handoff-receive-continuation"
 kind = "issue"
-lifecycle = "active"
-tracker_issue = 17
-+++
-# Issue #17 — handoff receive continuation
+workstream_id = "issue-handoff-receive-continuation"
+branch = "work/pwv2-handoff-receive-continuation"
+created_from = "dde078d7b2d340cd100b33c9e03c9add6d959eb1"
+integration_target = "main"
+authority = [
+  { class = "authority", path = "requirements/ISSUE_17_HANDOFF_RECEIVE_CONTINUATION.md" },
+  { class = "authority", path = "decisions/ISSUE_17_HANDOFF_RECEIVE_CONTINUATION.md" },
+  { class = "authority", path = "workflow/ROUTER.md" },
+  { class = "authority", path = "workflow/CONTINUATION.md" },
+  { class = "authority", path = "workflow/USER_STOP.md" },
+]
 
-Intake-owned issue workstream for the receive/bootstrap contract gap where a valid PWv2 NEW CHAT START PROMPT can cause a redundant second confirmation instead of immediate execution of its canonically validated transferable entry boundary.
+[intake]
+class = "intake"
+path = "implementation/workstreams/issue-handoff-receive-continuation/INTAKE.toml"
+
+[research]
+class = "research"
+path = "implementation/workstreams/issue-handoff-receive-continuation/RESEARCH.toml"
+
+[brainstorm]
+class = "brainstorm"
+path = "implementation/workstreams/issue-handoff-receive-continuation/BRAINSTORM.toml"
+
+[definition]
+class = "definition"
+path = "implementation/workstreams/issue-handoff-receive-continuation/DEFINITION.toml"
