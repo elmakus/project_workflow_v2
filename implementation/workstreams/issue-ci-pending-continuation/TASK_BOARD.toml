@@ -6,7 +6,10 @@ branch = "work/pwv2-ci-pending-continuation"
 
 [[cards]]
 id = "M01-T01"
-status = "in_progress"
+status = "review_pending"
+
+result_path = "implementation/workstreams/issue-ci-pending-continuation/results/M01-T01.md"
+review_requirement = "required"
 
 [cards.contract]
 class = "task_card"
