@@ -1,0 +1,20 @@
+workstream_id = "issue-ci-pending-continuation"
+card_id = "M01-T01"
+attempt = "R01"
+verdict = "red"
+evidence_path = "implementation/workstreams/issue-ci-pending-continuation/evidence/M01-T01-R01.md"
+
+[subject]
+class = "git_blob"
+repository = "elmakus/project_workflow_v2"
+commit = "51c5ebccca4ea1b4e1fd60b3f36dddc5fb2e72d2"
+path = "implementation/workstreams/issue-ci-pending-continuation/results/M01-T01.md"
+blob = "162769647a94e10ed72bd46b1577a1145dad8b9d"
+
+[acceptance]
+class = "task_card"
+path = "implementation/workstreams/issue-ci-pending-continuation/cards/M01-T01.md"
+
+[independence]
+materially_produced_or_repaired_subject = false
+basis = "Pending independent review obligation recovered without changing the accepted implementation subject; reviewer did not materially produce or repair implementation subject 32e7971f96e76a403de6bc5cd7b8d5979ac0dfe2."

@@ -51,6 +51,18 @@ It does not record runtime/provider/model/session/worker/invocation identity.
 
 Once a valid result locator is durable on the active Card, runtime/session disappearance must not cause implementation replay. Later review/finalization/recovery starts from that durable result.
 
+## Required exact-subject external evidence
+
+When a Card requires external CI/check evidence, Main classifies that evidence against the exact immutable implementation subject before accepting the Card result, using the common continuation classification.
+
+- terminal success may satisfy the evidence gate only when the terminal evidence carries a supported positive conclusion;
+- terminal failure remains bounded correction/recovery evidence and cannot satisfy acceptance;
+- queued/requested/waiting/pending/in-progress evidence keeps the Card `in_progress` without claiming semantic reconciliation;
+- temporary absence immediately after a known trigger requires bounded exact-subject readback/observation and is not success;
+- malformed, unsupported, or wrong-subject evidence fails closed.
+
+Pending/readback observation is runtime evidence only. It does not create a durable polling/session ledger, a new workflow phase, provider authority, semantic completion, or a user stop. Runtime observation/time limits may abort technically but cannot convert pending evidence into an accepted Card result.
+
 ## Concurrency boundary
 
 Runtime-internal concurrency does not relax the one-Card invariant and does not create competing shared-state writers. Mutating parallel workers require runtime/filesystem isolation appropriate to their environment; that isolation topology is runtime configuration, not Project Workflow state.

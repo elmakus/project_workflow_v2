@@ -43,3 +43,10 @@ Review verdicts remain owned by `workflow/REVIEW.md`. GREEN routes through deter
 Exact-subject independence is evaluated for every review subject. A context that produced or repaired subject S cannot independently verdict S. If correction creates S2, the repairing context is likewise non-independent for S2. A genuinely independent internal review context may satisfy the review without an external handoff; when qualifying independence cannot be realized, the existing fresh independent-review boundary is a real stop.
 
 `workflow/USER_STOP.md` is applied only after such a boundary (or another canonical real stop) already exists. Its handoff is a delivery postcondition, never a continuation decision. Non-boundary GREEN, RED, Card and Research transitions therefore emit no synthetic handoff.
+
+
+## Pending exact-subject external evidence
+
+Required external CI/check evidence is observed against the exact immutable implementation subject before consumption. Terminal success requires a positive terminal conclusion; a completed/terminal status by itself is not success. Negative terminal conclusions such as failure, cancelled, timed_out or action_required remain correction evidence. Queued, requested, waiting, pending and in-progress observations are pending external evidence and do not claim semantic reconciliation. Temporary absence immediately after a known trigger requires bounded exact-subject readback rather than success.
+
+Pending observation therefore does not invoke the successful-reconciliation no-progress fuse merely because durable workflow state is unchanged. A claimed reconciliation with unchanged authoritative fingerprint and accepted evidence epoch still fails closed. Pending observation is ephemeral and creates no durable polling/session state or new authority.

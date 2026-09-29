@@ -1,0 +1,52 @@
+workstream_id = "issue-ci-pending-continuation"
+revision = 8
+
+[execution_ref]
+branch = "work/pwv2-ci-pending-continuation"
+
+[[cards]]
+id = "M01-T01"
+status = "done"
+
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/issue-ci-pending-continuation/cards/M01-T01.md"
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-ci-pending-continuation/results/M01-T01.md"
+commit = "a4ad1db53dddfa31f8024f2e13e4a182cc710474"
+blob = "fd4c35e544bfb7a237389f156c7d6fdbeaa4cfb4"
+
+[[cards.review_attempts]]
+class = "review_attempt"
+path = "implementation/workstreams/issue-ci-pending-continuation/reviews/M01-T01-R01.toml"
+
+[[cards.review_attempts]]
+class = "review_attempt"
+path = "implementation/workstreams/issue-ci-pending-continuation/reviews/M01-T01-R02.toml"
+
+[[jit_triggers]]
+id = "after-M01-T01"
+after_card = "M01-T01"
+state = "consumed"
+condition = "Materialize the downstream Execution/evidence-composition Card from the accepted M01 result, then retain bounded integration qualification."
+
+
+[[cards]]
+id = "M02-T01"
+status = "done"
+
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/issue-ci-pending-continuation/cards/M02-T01.md"
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-ci-pending-continuation/results/M02-T01.md"
+commit = "f1bf2d4a2e490455b069ded1d614562db6628cdf"
+blob = "a8ae2997550a18b116536bcb2572a08d24a8b1c4"
+
+[[cards.review_attempts]]
+class = "review_attempt"
+path = "implementation/workstreams/issue-ci-pending-continuation/reviews/M02-T01-R01.toml"

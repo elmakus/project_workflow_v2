@@ -1,0 +1,15 @@
+workstream_id = "issue-ci-pending-continuation"
+cycle = 1
+entry_subject = "ci-pending-deterministic-continuation@1"
+revision = 1
+state = "approved"
+plan_artifact = "implementation/workstreams/issue-ci-pending-continuation/PLAN.md"
+planner_audit = "GREEN"
+premium_a = "satisfied"
+premium_a_subject = "ci-pending-deterministic-continuation@1"
+frozen_subject = "git-blob:9d6e15a7e8c57c4a4a10d7c25b66f2404784509c"
+premium_b = "satisfied"
+premium_b_subject = "git-blob:9d6e15a7e8c57c4a4a10d7c25b66f2404784509c"
+premium_c = "satisfied"
+premium_c_subject = "git-blob:9d6e15a7e8c57c4a4a10d7c25b66f2404784509c"
+review_mode = "normal"

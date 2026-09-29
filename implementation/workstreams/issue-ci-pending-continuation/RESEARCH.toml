@@ -1,0 +1,30 @@
+workstream_id = "issue-ci-pending-continuation"
+origin_role = "intake"
+origin_subject = "repair:ci-pending-deterministic-continuation:v1"
+state = "consumed"
+return_target = "intake"
+return_reconciliation = "applied"
+return_result = "implementation/workstreams/issue-ci-pending-continuation/evidence/INTAKE_PRIOR_ART.md"
+finding = "Issue #16 lacks a pending-external-evidence state: required CI queued/in_progress can leave the durable semantic fingerprint unchanged, which current progress/cycle fencing cannot distinguish from no progress."
+limitations = "Historical API readback proves the timing window and terminal outcomes; GitHub does not preserve a time-series snapshot of each transient queued/in_progress observation."
+conflict_summary = "none"
+
+[[source_classes]]
+class = "official_upstream"
+status = "checked"
+weight = "high"
+
+[[source_classes]]
+class = "actual_project_runtime"
+status = "checked"
+weight = "highest"
+
+[[source_classes]]
+class = "issue_discussion_tracker"
+status = "checked"
+weight = "high"
+
+[[source_classes]]
+class = "practitioner_community"
+status = "not_relevant"
+weight = "low"

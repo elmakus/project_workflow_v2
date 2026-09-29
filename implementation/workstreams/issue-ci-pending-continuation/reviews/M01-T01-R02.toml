@@ -1,0 +1,20 @@
+workstream_id = "issue-ci-pending-continuation"
+card_id = "M01-T01"
+attempt = "R02"
+verdict = "green"
+evidence_path = "implementation/workstreams/issue-ci-pending-continuation/evidence/M01-T01-R02.md"
+
+[subject]
+class = "git_blob"
+repository = "elmakus/project_workflow_v2"
+commit = "a4ad1db53dddfa31f8024f2e13e4a182cc710474"
+path = "implementation/workstreams/issue-ci-pending-continuation/results/M01-T01.md"
+blob = "fd4c35e544bfb7a237389f156c7d6fdbeaa4cfb4"
+
+[acceptance]
+class = "task_card"
+path = "implementation/workstreams/issue-ci-pending-continuation/cards/M01-T01.md"
+
+[independence]
+materially_produced_or_repaired_subject = false
+basis = "Fresh independent reviewer must not have materially produced or repaired implementation subject 6bbb1316ce511fa98d50b6a941599ea928cc4b92 or its exact current result subject."

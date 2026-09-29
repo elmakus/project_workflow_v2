@@ -1,0 +1,33 @@
+workstream_id = "issue-ci-pending-continuation"
+scope_id = "ci-pending-deterministic-continuation"
+revision = 1
+state = "promoted"
+final_challenge = "complete"
+user_stop = false
+promotion_authorization = "authorized"
+promotion_subject = "ci-pending-deterministic-continuation@1"
+
+problem = "Required CI can be non-terminal after an authorized Card repair while deterministic continuation is still active; current progress/cycle fencing cannot distinguish pending exact-subject external evidence from semantic no-progress."
+authorized_repair_subject = "repair:ci-pending-deterministic-continuation:v1"
+research_result = "implementation/workstreams/issue-ci-pending-continuation/evidence/INTAKE_PRIOR_ART.md"
+selected_direction = "Extend the existing continuation/execution evidence boundary with an ephemeral exact-subject pending-external-evidence observation state. Non-terminal CI remains a continuation obligation, not semantic completion or a user stop; terminal CI becomes accepted evidence; progress/cycle fencing applies to semantic no-progress but must not reject a legal pending external observation."
+required_invariants = [
+ "workflow behavior is independent of agent speed relative to CI",
+ "terminal CI is consumed as evidence before result acceptance",
+ "queued/requested/waiting/pending and in_progress are non-terminal external evidence states",
+ "temporary absence immediately after push is handled by exact-subject bounded readback, never assumed success",
+ "pending external evidence does not create durable session/runtime state or new workflow authority",
+ "semantic progress/cycle fencing remains fail-closed for true no-progress/cycles",
+ "external evidence remains bound to the exact immutable subject",
+ "CI failure remains execution/correction evidence rather than a user stop"
+]
+rejected_alternatives = [
+ "sleep for a fixed duration",
+ "increase runtime timeout and rely on CI usually finishing",
+ "treat queued or in_progress as success",
+ "treat non-terminal CI as a user stop",
+ "disable progress/cycle fencing",
+ "persist runtime polling/session identity as workflow authority"
+]
+final_challenge_note = "The diagnosis covers terminal, queued, in_progress and immediate post-push absence. Fixed sleeps and speed assumptions are rejected; exact-subject observation preserves the existing authority and external-effect boundaries."
+research_needed = false
