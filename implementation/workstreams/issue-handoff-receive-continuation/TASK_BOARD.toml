@@ -1,5 +1,5 @@
 workstream_id = "issue-handoff-receive-continuation"
-revision = 14
+revision = 15
 
 [execution_ref]
 branch = "work/pwv2-handoff-receive-continuation"
@@ -51,7 +51,7 @@ blob = "1952ada2fe6f71c58869d9b5236b83b35827582b"
 
 [[cards]]
 id = "M06-T04"
-status = "implemented"
+status = "DONE"
 review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-handoff-receive-continuation/reviews/M06-T04-R01.toml" }, { class = "review_attempt", path = "implementation/workstreams/issue-handoff-receive-continuation/reviews/M06-T04-R02.toml" }]
 
 [cards.result]
