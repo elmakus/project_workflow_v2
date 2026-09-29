@@ -1,5 +1,5 @@
 workstream_id = "issue-explicit-stop-precedence"
-revision = 2
+revision = 3
 
 [execution_ref]
 branch = "work/issue-33-explicit-stop-precedence"
@@ -12,3 +12,9 @@ review_attempts = []
 [cards.contract]
 class = "task_card"
 path = "implementation/workstreams/issue-explicit-stop-precedence/cards/M01-T01.md"
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-explicit-stop-precedence/results/M01-T01.md"
+commit = "b1a418a5a9d0a18741855ad98e68cc2040d21fb1"
+blob = "32bdbe6f925625a8e278aed4ef7b4ca7165991e1"
