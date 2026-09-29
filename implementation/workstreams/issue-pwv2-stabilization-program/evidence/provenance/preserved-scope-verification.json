@@ -1,0 +1,107 @@
+[
+  {
+    "source_commit": "95d74bad11115419696a684c8eef11fda076f92f",
+    "source_path": "implementation/workstreams/change-adversarial-stabilization-bug-hunt/BRAINSTORM.toml",
+    "blob": "9ce00ca503b0a51f4ca2ed5a7513a2545022d6ba",
+    "preserved_path": "implementation/workstreams/issue-pwv2-stabilization-program/evidence/provenance/scope-snapshots/change-adversarial-stabilization-bug-hunt/BRAINSTORM.toml",
+    "exact_bytes": true
+  },
+  {
+    "source_commit": "95d74bad11115419696a684c8eef11fda076f92f",
+    "source_path": "implementation/workstreams/change-adversarial-stabilization-bug-hunt/INTAKE.toml",
+    "blob": "b504a3eb810d1653f25a654695cdc4701affd115",
+    "preserved_path": "implementation/workstreams/issue-pwv2-stabilization-program/evidence/provenance/scope-snapshots/change-adversarial-stabilization-bug-hunt/INTAKE.toml",
+    "exact_bytes": true
+  },
+  {
+    "source_commit": "95d74bad11115419696a684c8eef11fda076f92f",
+    "source_path": "implementation/workstreams/change-adversarial-stabilization-bug-hunt/RESEARCH.toml",
+    "blob": "a349c4c691b648edf70e9ba03917c41623f1b565",
+    "preserved_path": "implementation/workstreams/issue-pwv2-stabilization-program/evidence/provenance/scope-snapshots/change-adversarial-stabilization-bug-hunt/RESEARCH.toml",
+    "exact_bytes": true
+  },
+  {
+    "source_commit": "95d74bad11115419696a684c8eef11fda076f92f",
+    "source_path": "implementation/workstreams/change-adversarial-stabilization-bug-hunt/WORKSTREAM.toml",
+    "blob": "57853779e0fca7d01f2f9dac214c483bab1bc61c",
+    "preserved_path": "implementation/workstreams/issue-pwv2-stabilization-program/evidence/provenance/scope-snapshots/change-adversarial-stabilization-bug-hunt/WORKSTREAM.toml",
+    "exact_bytes": true
+  },
+  {
+    "source_commit": "b076e081fb91815ff570fb70566e71f8cc53154e",
+    "source_path": "implementation/workstreams/issue-durable-state-schema/BRAINSTORM.toml",
+    "blob": "a8a01daf3c134ccbb4856955b810889ca13d09a2",
+    "preserved_path": "implementation/workstreams/issue-pwv2-stabilization-program/evidence/provenance/scope-snapshots/issue-durable-state-schema/BRAINSTORM.toml",
+    "exact_bytes": true
+  },
+  {
+    "source_commit": "b076e081fb91815ff570fb70566e71f8cc53154e",
+    "source_path": "implementation/workstreams/issue-durable-state-schema/DEFINITION.toml",
+    "blob": "b0d40533ad2b565c7278438d9d675859c7bf5084",
+    "preserved_path": "implementation/workstreams/issue-pwv2-stabilization-program/evidence/provenance/scope-snapshots/issue-durable-state-schema/DEFINITION.toml",
+    "exact_bytes": true
+  },
+  {
+    "source_commit": "b076e081fb91815ff570fb70566e71f8cc53154e",
+    "source_path": "implementation/workstreams/issue-durable-state-schema/INTAKE.toml",
+    "blob": "2697ea89abab45c35f0565e4ab5dac644cae4740",
+    "preserved_path": "implementation/workstreams/issue-pwv2-stabilization-program/evidence/provenance/scope-snapshots/issue-durable-state-schema/INTAKE.toml",
+    "exact_bytes": true
+  },
+  {
+    "source_commit": "b076e081fb91815ff570fb70566e71f8cc53154e",
+    "source_path": "implementation/workstreams/issue-durable-state-schema/PLANNING.toml",
+    "blob": "0d513a5bad4dc0260c5db15398d7c1fe5ff4a6f6",
+    "preserved_path": "implementation/workstreams/issue-pwv2-stabilization-program/evidence/provenance/scope-snapshots/issue-durable-state-schema/PLANNING.toml",
+    "exact_bytes": true
+  },
+  {
+    "source_commit": "b076e081fb91815ff570fb70566e71f8cc53154e",
+    "source_path": "implementation/workstreams/issue-durable-state-schema/RESEARCH.toml",
+    "blob": "5d8996edaadd1c505694695b52c7f0a8bd20b234",
+    "preserved_path": "implementation/workstreams/issue-pwv2-stabilization-program/evidence/provenance/scope-snapshots/issue-durable-state-schema/RESEARCH.toml",
+    "exact_bytes": true
+  },
+  {
+    "source_commit": "b076e081fb91815ff570fb70566e71f8cc53154e",
+    "source_path": "implementation/workstreams/issue-durable-state-schema/WORKSTREAM.toml",
+    "blob": "46959b9038522a5d28b1433dd14d6f47dcd8b9b3",
+    "preserved_path": "implementation/workstreams/issue-pwv2-stabilization-program/evidence/provenance/scope-snapshots/issue-durable-state-schema/WORKSTREAM.toml",
+    "exact_bytes": true
+  },
+  {
+    "source_commit": "c5e9ba1d3da8d339e882b43b86b4e8a8dd2e9a28",
+    "source_path": "implementation/workstreams/issue-paseo-child-delegation/BRAINSTORM.toml",
+    "blob": "5b8cff4de25abc95b8b4c4a81886393830f53c0e",
+    "preserved_path": "implementation/workstreams/issue-pwv2-stabilization-program/evidence/provenance/scope-snapshots/issue-paseo-child-delegation/BRAINSTORM.toml",
+    "exact_bytes": true
+  },
+  {
+    "source_commit": "c5e9ba1d3da8d339e882b43b86b4e8a8dd2e9a28",
+    "source_path": "implementation/workstreams/issue-paseo-child-delegation/DEFINITION.toml",
+    "blob": "4721b6cb7cbe8812bcd719ba016e6316bedfc62b",
+    "preserved_path": "implementation/workstreams/issue-pwv2-stabilization-program/evidence/provenance/scope-snapshots/issue-paseo-child-delegation/DEFINITION.toml",
+    "exact_bytes": true
+  },
+  {
+    "source_commit": "c5e9ba1d3da8d339e882b43b86b4e8a8dd2e9a28",
+    "source_path": "implementation/workstreams/issue-paseo-child-delegation/INTAKE.toml",
+    "blob": "cb3c1538e7cd33e1225d016837d3cdd1e6c462e8",
+    "preserved_path": "implementation/workstreams/issue-pwv2-stabilization-program/evidence/provenance/scope-snapshots/issue-paseo-child-delegation/INTAKE.toml",
+    "exact_bytes": true
+  },
+  {
+    "source_commit": "c5e9ba1d3da8d339e882b43b86b4e8a8dd2e9a28",
+    "source_path": "implementation/workstreams/issue-paseo-child-delegation/PLANNING.toml",
+    "blob": "3982b2adcc5f2b53eee2a874f364b291ad35f96d",
+    "preserved_path": "implementation/workstreams/issue-pwv2-stabilization-program/evidence/provenance/scope-snapshots/issue-paseo-child-delegation/PLANNING.toml",
+    "exact_bytes": true
+  },
+  {
+    "source_commit": "c5e9ba1d3da8d339e882b43b86b4e8a8dd2e9a28",
+    "source_path": "implementation/workstreams/issue-paseo-child-delegation/WORKSTREAM.toml",
+    "blob": "9b5f022eade3e71c7312e3721b1e65c80a05373d",
+    "preserved_path": "implementation/workstreams/issue-pwv2-stabilization-program/evidence/provenance/scope-snapshots/issue-paseo-child-delegation/WORKSTREAM.toml",
+    "exact_bytes": true
+  }
+]

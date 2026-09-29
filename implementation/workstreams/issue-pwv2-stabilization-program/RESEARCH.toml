@@ -1,30 +1,30 @@
 workstream_id = "issue-pwv2-stabilization-program"
-state = "active"
+state = "complete"
 origin_role = "intake"
 origin_subject = "PWV2-STAB-P1"
 return_target = "intake"
 return_reconciliation = "pending"
 return_result = ""
-finding = ""
-limitations = ""
-conflicts = ""
+finding = "Evidence supports bounded PWV2-STAB-P1 formalization only. ChatGPT new defects #27-#33 and Pi/Paseo new defects #34-#40 are distinct provenance sets with independent invariants; no encompassing common cause is established. Preserve #23/#20 scopes, all issue-specific acceptance and provisional W0-W7. See evidence/INTAKE_PRIOR_ART.md."
+limitations = "No repair implementation or promotion is authorized. #25 substantial formal Research remains unsatisfied before its Definition/repair authorization; #14 inclusion remains a proposed scope choice. Audit unit success is not connected-runtime qualification; live CI/merge/race tests remain unperformed."
+conflicts = "Corrected candidate audit-set conflation and categorical root-cause wording. #23 supplied reproductions show drift, not demonstrated evolution. #20 durable narrow scope controls. Shared infrastructure never absorbs distinct issues into #23/#26. Existing workstream strategies cannot be reordered by proposed waves. No additional community conflict."
 
 [[sources]]
 class = "official_upstream"
-status = "pending"
+status = "checked"
 weight = "canonical policy and official contract evidence dominate scope and legality"
 
 [[sources]]
 class = "project_runtime"
-status = "pending"
+status = "checked"
 weight = "exact independent audit observations and committed subjects dominate defect evidence"
 
 [[sources]]
 class = "tracker_discussion"
-status = "pending"
+status = "checked"
 weight = "dedup and issue-specific invariants; never authorization"
 
 [[sources]]
 class = "practitioner_community"
-status = "pending"
+status = "not_relevant"
 weight = "proportional secondary evidence only; never scope or approval authority"

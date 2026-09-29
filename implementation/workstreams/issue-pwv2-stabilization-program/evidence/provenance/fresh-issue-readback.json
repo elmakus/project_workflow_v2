@@ -1,0 +1,513 @@
+[
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "## Correlation marker\n\n`pwv2-plan-review-in-progress-red-misdispatch`\n\nDiagnosis/research only. No repair/implementation authorization.\n\n## Canonical authority and invariant\n\n`elmakus/project_workflow_v2`, default `main@d3ab917f02e4de91b7dbb17915c2287c2387333e`.\n\n`workflow/PLAN_REVIEW.md` declares pending/GREEN/RED review semantics. Pending review belongs to the independent reviewer; only a terminal RED returns to Planning correction. A nonterminal Review cannot be fabricated into RED correction by selector fallback. If in_progress is unsupported for Stage-6, it must be rejected fail closed rather than accepted and called RED.\n\n## Exact reproducer\n\nIn a disposable copy of `tests/fixtures/router/valid-project`:\n\n```python\nfrom tests.test_router import RouterTests\nT = RouterTests()\nT.install_green_definition(project)\nT.install_state_record(project, 'planning', 'planning', 'PLANNING.toml',\n    T.planning_content(state='frozen', premium_b='satisfied'))\ntext = T.plan_review_content('pending').replace(\n    'verdict = \"pending\"', 'verdict = \"in_progress\"')\nT.install_state_record(project, 'plan_review', 'plan_review', 'PLAN_REVIEW.toml', text)\n```\n\nCommit, clone to a fresh directory and run:\n\n```\nPYTHONPATH=<canonical-checkout> python3 -m tools.router <fresh-clone> --workstream implementation/workstreams/sample-workstream/WORKSTREAM.toml\n```\n\nActual: exit 0, `route/planning`, reason `RED Plan Review returns to Planning for correction classification`, although durable verdict is `in_progress` and evidence_path remains empty.\n\nControls with otherwise identical records:\n- pending -> `plan_review`;\n- green -> Planning GREEN consumption;\n- red -> Planning RED correction.\n\n`validate_plan_review` calls shared `validate_review`, which accepts in_progress. The frozen-plan selector handles only pending and green explicitly, then labels every remaining accepted verdict RED.\n\n## Durable synthetic evidence\n\nLocal audit subject: `/tmp/pwv2-runtime-audit/subjects/plan-review-in_progress`; exact committed HEAD/output in `/tmp/pwv2-runtime-audit/results.json`, case `plan-review-in_progress`. Reproducer: `/tmp/pwv2-runtime-audit/harness.py`.\n\nThese are local synthetic commits, not product-remote commits. Canonical files were not changed. No downstream Planning mutation was performed.\n\n## Lifecycle / runtime / severity\n\nStage-6 independent Plan Review start -> fresh resume/parent reroute. Runtime-independent; Pi/Paseo agents using the common Review in_progress vocabulary expose it. Moderate-to-high invariant risk: unfinished independent review is classified as terminal correction and handed to the wrong owner.\n\n## Dedup and classification\n\nClass C. Read back all relevant open/closed issues, bodies and comments before creation, including initial #11\u2013#33 and this independent audit's #34\u2013#39. No match.\n\n#23 concerns producer output rejected by consumers; this validatable nonterminal attempt is instead positively accepted and semantically misdispatched. #25 is Premium-B receiver looping while B is due; this reproduction has B satisfied and an existing attempt. #31 is missing Stage-6 append-only storage. #16 concerns stopping after actual RED; here no RED exists. Do not silently widen those issues or assume their root causes are shared.\n",
+    "createdAt": "2026-09-29T03:42:30Z",
+    "number": 40,
+    "state": "OPEN",
+    "title": "In-progress Stage-6 Plan Review is accepted but routed as terminal RED correction",
+    "updatedAt": "2026-09-29T03:42:30Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/40",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "# Correlation marker\n\n`pwv2-card-result-implementation-subject-unvalidated`\n\nDiagnosis/research only. No repair or implementation authorization. No canonical workflow files changed.\n\nCanonical authority: `elmakus/project_workflow_v2`, default branch `main@d3ab917f02e4de91b7dbb17915c2287c2387333e`, `workflow/ROUTER.md` and current executable contracts.\n\nDedup: read back all 19 open/closed issues (#11\u2013#33, including withdrawn #15), their bodies and every comment, then refreshed the all-state issue list before creation. Issues were used only for dedup, not as correctness authority. Independent production-contract reproductions preceded classification. Native Pi/Paseo diagnosis children used the guarded Muse Spark contributor/max profile and separate fixture spaces; Main reran findings from durable diagnostic files rather than trusting child chat.\n\nThe synthetic Git subjects below are LOCAL audit repositories, not commits on the product remote. No claim that a live Pi agent performed unauthorized downstream implementation: the confirmed observation is canonical consumer selection/validation accepting or dispatching the bad state.\n\n## Severity (diagnostic only)\nHigh: implementation recovery truth need not identify any immutable implementation.\n\n## Violated invariant\n`workflow/EXECUTION.md` requires an exact immutable implementation subject in every accepted semantic Result; `workflow/RECOVERY.md` uses a valid durable semantic Result to prevent replay. A nonempty arbitrary sentence cannot satisfy an immutable implementation identity.\n\n## Exact reproduction\n```python\nfrom tools.execution_contract import parse_card_result\ntext = \"\"\"# Card Result\n- Card ID: M01-T04\n- Implementation subject: not a Git subject; CI completed with failure\n- Evidence refs: implementation/workstreams/sample-workstream/evidence/M01-T04.md\n- Tests/readback summary: GREEN\n\"\"\"\nprint(parse_card_result(text, \"M01-T04\", \"sample-workstream\"))\n```\nActual: parser accepts and returns the sentence unchanged as `implementation_subject`.\nIntegration: create a disposable `RouterTests.install_reviewable_result(...,\"none\")` fixture, replace its Implementation subject with that sentence, commit/clone/freshly invoke production router. Actual: exit 0, `result_reconciliation`, reason 'A valid semantic result is already durable ... do not replay implementation'.\n`tools/execution_contract.py` only requires a nonempty non-placeholder string; no syntax, repository, exact commit or artifact binding is required for that field. This is separate from verification of the Result artifact's own Board/Review commit/blob identity.\n\n## Durable synthetic evidence\nLocal `subjects/result-free-text@84a0ed53708bde9e1d070a30ed9b9253c9208c59`; case `result-free-text-subject` in `results.json`; reproducer `harness.py`.\n\n## Boundary / relationship\nExecution producer \u2192 durable Result \u2192 fresh-session reconciliation/no-replay; runtime-independent.\nClass C. #23/#26 producer output is rejected for schema/raw-ref incompatibility; here the consumer positively accepts an invalid semantic implementation identity. #22 is CI observation classification, which passes its negative-conclusion tests; this path does not invoke that helper. Missing evidence and Result artifact object-resolution findings are different checks and not assumed to have the same root cause.\n",
+    "createdAt": "2026-09-29T03:39:47Z",
+    "number": 39,
+    "state": "OPEN",
+    "title": "Card Result parser accepts arbitrary non-Git implementation subject as valid recovery truth",
+    "updatedAt": "2026-09-29T03:39:47Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/39",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "# Correlation marker\n\n`pwv2-durable-evidence-locator-existence-gap`\n\nDiagnosis/research only. No repair or implementation authorization. No canonical workflow files changed.\n\nCanonical authority: `elmakus/project_workflow_v2`, default branch `main@d3ab917f02e4de91b7dbb17915c2287c2387333e`, `workflow/ROUTER.md` and current executable contracts.\n\nDedup: read back all 19 open/closed issues (#11\u2013#33, including withdrawn #15), their bodies and every comment, then refreshed the all-state issue list before creation. Issues were used only for dedup, not as correctness authority. Independent production-contract reproductions preceded classification. Native Pi/Paseo diagnosis children used the guarded Muse Spark contributor/max profile and separate fixture spaces; Main reran findings from durable diagnostic files rather than trusting child chat.\n\nThe synthetic Git subjects below are LOCAL audit repositories, not commits on the product remote. No claim that a live Pi agent performed unauthorized downstream implementation: the confirmed observation is canonical consumer selection/validation accepting or dispatching the bad state.\n\n## Severity (diagnostic only)\nHigh: review/finalization proof can consist of nonexistent evidence locators.\n\n## Violated invariant\n`workflow/AUTHORITY.md` requires missing required evidence references to fail closed; `workflow/EXECUTION.md` calls for durable evidence refs and verified readback; terminal Review must retain durable verdict evidence. A path-shaped string without its artifact is not reconstructible proof in a fresh session.\n\n## Exact reproduction\n1. Disposable valid required-review Result/GREEN fixture (use `RouterTests.install_reviewable_result(...,\"required\")` and `add_review_attempt(...,\"green\")`). Bind Result coordinates to real committed objects.\n2. Remove every workstream `evidence/*.md` file, leaving Result `Evidence refs` and Review `evidence_path` unchanged. Commit/clone/freshly run production router.\nActual: exit 0, `post_review_finalization`. Missing Result evidence AND missing terminal Review evidence are not read or rejected.\n3. Isolate independently: remove only Result evidence, then only terminal Review evidence. Each path check remains syntactic only (`parse_card_result`, `validate_review`); neither consumer resolves the evidence locator.\nExpected: Recovery or a reconstructible outstanding evidence obligation; never call these artifacts valid semantic Result/terminal proof from the absent evidence.\nProduction locators: `tools/execution_contract.py:parse_card_result`, `tools/state_contract.py:validate_review`, `tools/router.py` active Result/Review branch. These are separate consumer paths; a single shared implementation root cause is NOT assumed.\n\n## Durable synthetic evidence\nLocal `subjects/missing-evidence@b32505dae92385e48a516f0a447d5b83c3b4bcb5`; fresh case `missing-review-and-result-evidence` in `results.json`. Source reproducer `harness.py`.\n\n## Boundary / relationship\nChild evidence return \u2192 normalized Result \u2192 Review verdict \u2192 parent/fresh-session finalization; runtime-independent.\nClass C. #27 skips terminal DONE proof entirely; this active in_progress Card goes through Result and Review validation. #23/#26 concern serialization rejected by canonical consumers; these records parse/validate. #30 acceptance drift and Result Git object-resolution are unchanged in this reproduction. No live CI run or inference result is invented.\n",
+    "createdAt": "2026-09-29T03:39:46Z",
+    "number": 38,
+    "state": "OPEN",
+    "title": "Canonical Result and terminal Review consumption accept missing durable evidence files",
+    "updatedAt": "2026-09-29T03:39:46Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/38",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "# Correlation marker\n\n`pwv2-terminal-review-history-overwrite`\n\nDiagnosis/research only. No repair or implementation authorization. No canonical workflow files changed.\n\nCanonical authority: `elmakus/project_workflow_v2`, default branch `main@d3ab917f02e4de91b7dbb17915c2287c2387333e`, `workflow/ROUTER.md` and current executable contracts.\n\nDedup: read back all 19 open/closed issues (#11\u2013#33, including withdrawn #15), their bodies and every comment, then refreshed the all-state issue list before creation. Issues were used only for dedup, not as correctness authority. Independent production-contract reproductions preceded classification. Native Pi/Paseo diagnosis children used the guarded Muse Spark contributor/max profile and separate fixture spaces; Main reran findings from durable diagnostic files rather than trusting child chat.\n\nThe synthetic Git subjects below are LOCAL audit repositories, not commits on the product remote. No claim that a live Pi agent performed unauthorized downstream implementation: the confirmed observation is canonical consumer selection/validation accepting or dispatching the bad state.\n\n## Severity (diagnostic only)\nHigh: terminal verdict/history can be replaced without a new attempt.\n\n## Violated invariant\n`workflow/REVIEW.md`: existing terminal attempts remain immutable history; a new verdict attempt is a new append-only attempt; a later attempt never overwrites a prior GREEN/RED file. A fresh consumer must not treat a changed terminal R01 as the original frozen history.\n\n## Exact reproduction\n1. Disposable Git fixture: create required-review Card + Result, bind Board/Review to real Result commit/blob, commit R01 `verdict=\"green\"` with evidence and valid independence.\n2. Keep exact Result, acceptance, attempt ID, Review path and Board locator list unchanged. Rewrite the existing R01 file to `verdict=\"red\"`, commit.\n3. Fresh process/clone invokes production router.\nActual: previously `post_review_finalization`, now `execution_resolution`; `validate_review_history` accepts the single overwritten R01. No replacement/supersession/history rejection occurs.\nThe reverse RED\u2192GREEN rewrite likewise replaces the historical verdict rather than adding R02.\nProduction: `tools/state_contract.py:validate_review_history` validates only current records, not transition/terminal immutability; Board attempt locators are paths only; router reads current Review file bytes.\n\n## Durable synthetic evidence\n`/tmp/pwv2-runtime-audit/identity-extra/terminal-review-overwrite`; before/after commits and outputs in `identity-extra-results.json` case `terminal-R01-overwrite`. Reproducer script: `identity-extra.py`.\n\n## Boundary / relationship\nTerminal Review \u2192 repair/re-review \u2192 fresh resume; runtime-independent. Shared mutable files permit the same failure independent of child completion order.\nClass C. #18 concerns a pre-existing internally invalid GREEN and lack of a lawful append-only supersession route, not detection of rewriting a previously valid terminal attempt. #31 concerns Stage-6's singleton history model, not implementation Review's existing ordered history. #30 acceptance and the new Result object-resolution finding are unchanged here. Do not merge root causes or widen those scopes implicitly.\nThis is not a claim that terminal history was overwritten in a live managed workstream during this audit; the confirmed history change is in a committed synthetic fixture.\n",
+    "createdAt": "2026-09-29T03:39:45Z",
+    "number": 37,
+    "state": "OPEN",
+    "title": "Terminal implementation Review can be rewritten in place without append-only rejection",
+    "updatedAt": "2026-09-29T03:39:45Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/37",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "# Correlation marker\n\n`pwv2-orphan-preexecution-owner-gate-bypass`\n\nDiagnosis/research only. No repair or implementation authorization. No canonical workflow files changed.\n\nCanonical authority: `elmakus/project_workflow_v2`, default branch `main@d3ab917f02e4de91b7dbb17915c2287c2387333e`, `workflow/ROUTER.md` and current executable contracts.\n\nDedup: read back all 19 open/closed issues (#11\u2013#33, including withdrawn #15), their bodies and every comment, then refreshed the all-state issue list before creation. Issues were used only for dedup, not as correctness authority. Independent production-contract reproductions preceded classification. Native Pi/Paseo diagnosis children used the guarded Muse Spark contributor/max profile and separate fixture spaces; Main reran findings from durable diagnostic files rather than trusting child chat.\n\nThe synthetic Git subjects below are LOCAL audit repositories, not commits on the product remote. No claim that a live Pi agent performed unauthorized downstream implementation: the confirmed observation is canonical consumer selection/validation accepting or dispatching the bad state.\n\n## Severity (diagnostic only)\nHigh: a current premium-A-due record or missing upstream owner is bypassed.\n\n## Violated invariant\n`workflow/WORKSTREAMS.md` requires Plan Review to have matching Planning; missing/contradictory owners fail closed. `workflow/PLANNING.md` requires a material-cycle premium A gate before Planning resumes. The router cannot silently discard materialized current owner records because their prerequisite owner is absent.\n\n## Exact reproduction\nFrom `tests/fixtures/router/valid-project` in a disposable Git repo, use `RouterTests.install_state_record`:\nA. Add manifest `[plan_review]` pointing to `.../PLAN_REVIEW.toml`, with `RouterTests.plan_review_content(\"pending\")`; do NOT add Planning/Definition. Commit/clone/freshly run the production router.\nB. In another fixture add manifest `[planning]` + `RouterTests.planning_content(state=\"draft\", premium_a=\"due\")`; do NOT add Definition. Commit/clone/freshly route.\nBoth actual: exit 0, `route/execution` for the existing in_progress M01-T04. Neither named state file is in router `read_set`.\nExpected: fail closed on missing prerequisite ownership; never bypass the materialized gate by ignoring the record.\nProduction: `tools/router.py` loads Planning only inside the Definition branch and Plan Review only inside the frozen/approved Planning branch; `validate_workstream` checks locator class/path but not these relational prerequisites.\n\n## Durable synthetic evidence\n- orphan Plan Review: `subjects/orphan-plan-review@9b8b770098f682d29850e8f0bea6dadfe1564d74`;\n- orphan Planning A due: `subjects/orphan-planning@2cbb8e71f9af8a15fb253a8e742d603d6120529d`.\nExact case outputs: `orphan-plan-review-without-planning`, `orphan-planning-A-due-without-definition` in `results.json`.\n\n## Boundary / relationship\nPartial writer transition \u2192 fresh pre-execution/execution resume; runtime-independent.\nClass C. #25 requires complete frozen Planning + eligible handoff receiver; #28 is Research return-target shadowing; #33 bypasses an explicit Brainstorm stop in a complete Definition chain. This defect has different prerequisites, branch conditions and missing-owner invariant. #23 producer drift is adjacent but these individual records use current schemas; relational ownership is absent.\n",
+    "createdAt": "2026-09-29T03:39:43Z",
+    "number": 36,
+    "state": "OPEN",
+    "title": "Orphan Planning and Plan Review locators can be ignored while router selects Execution",
+    "updatedAt": "2026-09-29T03:39:43Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/36",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "# Correlation marker\n\n`pwv2-active-card-resume-authority-validation`\n\nDiagnosis/research only. No repair or implementation authorization. No canonical workflow files changed.\n\nCanonical authority: `elmakus/project_workflow_v2`, default branch `main@d3ab917f02e4de91b7dbb17915c2287c2387333e`, `workflow/ROUTER.md` and current executable contracts.\n\nDedup: read back all 19 open/closed issues (#11\u2013#33, including withdrawn #15), their bodies and every comment, then refreshed the all-state issue list before creation. Issues were used only for dedup, not as correctness authority. Independent production-contract reproductions preceded classification. Native Pi/Paseo diagnosis children used the guarded Muse Spark contributor/max profile and separate fixture spaces; Main reran findings from durable diagnostic files rather than trusting child chat.\n\nThe synthetic Git subjects below are LOCAL audit repositories, not commits on the product remote. No claim that a live Pi agent performed unauthorized downstream implementation: the confirmed observation is canonical consumer selection/validation accepting or dispatching the bad state.\n\n## Severity (diagnostic only)\nHigh: invalid/missing execution authority is not rejected at canonical selection.\n\n## Violated invariant\n`workflow/AUTHORITY.md` requires fail-closed missing required authority; `workflow/EXECUTION_PREP.md` requires a complete stable contract and launch refresh; `workflow/ROUTER.md` says invalid/missing/stale binding fails closed to Recovery. A fresh in_progress resume must reconstruct authority rather than depend on a past session having performed launch refresh.\n\n## Exact reproduction\n1. Copy `tests/fixtures/router/valid-project` to a disposable Git repo. Keep M01-T04 `status=\"in_progress\"` and no Result.\n2. Replace `cards/M01-T04.md` with `partial Card with no scope or authority` and commit.\n3. Clone that commit to a fresh directory. Run `PYTHONPATH=<canonical> python3 -m tools.router <fresh-clone> --workstream implementation/workstreams/sample-workstream/WORKSTREAM.toml`.\nActual: exit 0, `route/execution`.\n4. Control: change only status to `ready`, commit/clone/rerun. Actual: exit 2, Recovery for missing stable Card fields.\n5. Separate reproduction: use `RouterTests.task_card_content()` for a parse-valid Card naming `requirements/REQUIREMENTS.md`, but remove/omit that authority file. in_progress still selects Execution; ready rejects missing authority.\nProduction: `tools/router.py` active no-Result branch only reads the Card text; `refresh_ready_card` is used on the single-READY path, not this fresh active resume path.\n\n## Durable synthetic evidence\n- malformed active Card: local `subjects/active-malformed-card@dd325fd352dc4138e580922293babf9f12cf2baf`;\n- missing authority: local `subjects/active-missing-authority@a1cf986f71f21a64053eb24d02ab7203f5babd62`;\n- READY controls and outputs in `harness.py/results.json`.\n\n## Boundary / relationship\nCard launch \u2192 fresh-session Card Execution resume; runtime-independent. Pi/Paseo session replacement exposes the missing reconstruction step.\nClass C. #23/#26 concern serialized producer-schema drift; this is a status-dependent consumer validation bypass. #27 is terminal DONE \u2192 Close, not active Execution. #30 requires Result/GREEN acceptance drift, absent here.\nAn Execution owner may still perform its prescribed refresh and block; the issue establishes the executable selector is not closed over the invalid state, not that downstream implementation was observed.\n",
+    "createdAt": "2026-09-29T03:39:42Z",
+    "number": 35,
+    "state": "OPEN",
+    "title": "Fresh active-Card resume selects Execution without validating its stable contract or authority",
+    "updatedAt": "2026-09-29T03:39:42Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/35",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "# Correlation marker\n\n`pwv2-result-git-object-resolution-gap`\n\nDiagnosis/research only. No repair or implementation authorization. No canonical workflow files changed.\n\nCanonical authority: `elmakus/project_workflow_v2`, default branch `main@d3ab917f02e4de91b7dbb17915c2287c2387333e`, `workflow/ROUTER.md` and current executable contracts.\n\nDedup: read back all 19 open/closed issues (#11\u2013#33, including withdrawn #15), their bodies and every comment, then refreshed the all-state issue list before creation. Issues were used only for dedup, not as correctness authority. Independent production-contract reproductions preceded classification. Native Pi/Paseo diagnosis children used the guarded Muse Spark contributor/max profile and separate fixture spaces; Main reran findings from durable diagnostic files rather than trusting child chat.\n\nThe synthetic Git subjects below are LOCAL audit repositories, not commits on the product remote. No claim that a live Pi agent performed unauthorized downstream implementation: the confirmed observation is canonical consumer selection/validation accepting or dispatching the bad state.\n\n## Severity (diagnostic only)\nHigh: stale/fabricated GREEN coverage can be selected for finalization.\n\n## Violated invariant\n`workflow/RECOVERY.md` requires GREEN to cover the exact still-current immutable Result; `workflow/REVIEW.md` requires one immutable Git subject. Claimed commit/path/blob coordinates must identify the actual subject consumed, not merely match other strings.\n\n## Exact reproduction\nFrom a checkout of the canonical snapshot, run the following against a disposable copy of `tests/fixtures/router/valid-project` (no product writes):\n1. Use `tests.test_router.RouterTests.install_reviewable_result(project, \"required\")` to create M01-T04 Result/Card/evidence.\n2. In the disposable repo, `git init`, commit the produced files, and obtain `H=git rev-parse HEAD`, `B=git rev-parse H:implementation/workstreams/sample-workstream/results/M01-T04.md`.\n3. Set Board `[cards.result] commit=H, blob=B`; use `add_review_attempt(project,\"green\")` and bind its `[subject]` to H/B. Commit.\n4. Change only the same-path Result `Tests/readback summary: GREEN` to `Tests/readback summary: FAILURE after repair`, leaving Board/Review bindings unchanged. Commit. Clone to a new directory.\n5. In a fresh process run `PYTHONPATH=<canonical-checkout> python3 -m tools.router <fresh-clone> --workstream implementation/workstreams/sample-workstream/WORKSTREAM.toml`.\nActual: exit 0, `route/post_review_finalization`. The router parses the changed working-tree Result, but compares the old Board/Review coordinate strings.\n6. Set BOTH Board and Review blob to 40 `f` characters (a nonexistent object in the fixture). Commit/clone/rerun. Actual: still exit 0, `post_review_finalization`.\nControl: changing Board coordinates alone while preserving terminal Review selects `review_freeze`; pending/in_progress stale coordinates select Recovery. This isolates missing object/content resolution from the existing string-mismatch check.\n\nProduction locators: `tools/router.py:526-595`, `tools/recovery_contract.py:exact_result_subject,review_subject`, `tools/state_contract.py:validate_locator`. No actual Git lookup or byte-to-binding check occurs.\n\n## Durable synthetic evidence\n`/tmp/pwv2-runtime-audit/subjects/result-binding`:\n- valid GREEN: `ffc1401545186dd184258903ac25e3d526485d81`;\n- changed Result, unchanged bindings: `65601e4524845cfcf09d73eb417c47bdf1fded59`;\n- fabricated matching blob: `d242efa41f12f39bd58385e8f94ffb16719de6fc`.\nCases and exact outputs: `harness.py` / `results.json`, `result-green-valid`, `result-changed-same-ref`, `result-forged-nonexistent-blob`.\n\n## Boundary / relationship\nExecution Result \u2192 independent Review \u2192 finalization/repair; runtime-independent, reproduced through fresh Pi/Paseo audit contexts.\nClass C. #30 is mutable/unrelated **acceptance** identity; this reproduction keeps acceptance unchanged. #18 concerns supersession of an internally invalid terminal attempt. #26's pending-reservation evidence concerns legitimately changed coordinates becoming stale; here coordinate strings still match but consumed content does not. #27 concerns DONE validation; these Cards remain in_progress.\nNo shared root cause with those issues is assumed.\n",
+    "createdAt": "2026-09-29T03:39:41Z",
+    "number": 34,
+    "state": "OPEN",
+    "title": "Canonical Review consumption never verifies claimed Result Git objects or consumed bytes",
+    "updatedAt": "2026-09-29T03:39:41Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/34",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "## Correlation marker\n\n`pwv2-brainstorm-explicit-stop-precedence`\n\nExternal bookkeeping only. Diagnosis only; no implementation authorization.\n\n## Canonical snapshot\n\nCurrent default branch `main@d3ab917f02e4de91b7dbb17915c2287c2387333e`.\n\n## Invariant\n\n`workflow/BRAINSTORMING.md` declares `explicit user stop -> real stop`. The router priority foundation places explicit human/premium boundaries ahead of the next legal stage. A contradictory durable state must fail closed rather than silently bypass the stop.\n\n## Concrete reproducer\n\nMaterialize valid records:\n\n`BRAINSTORM.toml`\n```toml\nworkstream_id = \"sample-workstream\"\nscope_id = \"scope-a\"\nrevision = 1\nstate = \"promoted\"\nchallenge_audit = \"green\"\nexplicit_user_stop = true\npromotion_state = \"authorized\"\npromotion_subject = \"scope-a@1\"\n```\n\n`DEFINITION.toml`\n```toml\nworkstream_id = \"sample-workstream\"\nsource_scope_subject = \"scope-a@1\"\nrevision = \"R1\"\nstate = \"active\"\ncompleteness_audit = \"pending\"\npremium_a = \"not_due\"\ndecisions = []\n\n[requirements]\nclass = \"authority\"\npath = \"requirements/REQUIREMENTS.md\"\n```\n\nBoth validators accept these records and the Definition source binding matches.\n\nFreshly route.\n\nActual:\n- router processes Definition before reaching the later Brainstorming `explicit_user_stop` check;\n- it returns `(\"route\", \"definition\")`.\n\nExpected: preserve the explicit real stop, or fail closed if `promoted + explicit_user_stop` is considered contradictory. It must not continue Definition silently.\n\n## Existing-issue relationship\n\nAdjacent to #16 deterministic continuation and #11 stop delivery, but distinct: this is selector precedence/state-consistency. The stop already exists durably; the selector bypasses it before USER_STOP delivery is considered.\n\nDiagnosis only; no repair is authorized by this tracker.",
+    "createdAt": "2026-09-29T03:20:30Z",
+    "number": 33,
+    "state": "OPEN",
+    "title": "Promoted Brainstorm explicit user stop can be bypassed by Definition routing",
+    "updatedAt": "2026-09-29T03:20:30Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/33",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "## Correlation marker\n\n`pwv2-intake-relational-closure-gap`\n\nExternal bookkeeping only. Diagnosis only; no implementation authorization.\n\n## Canonical snapshot\n\nCurrent default branch `main@d3ab917f02e4de91b7dbb17915c2287c2387333e`.\n\n## Invariant\n\nIssue alignment begins only after diagnosis has produced a concrete repair subject and its exact prior-art binding. The selected workstream and its Intake record must also agree on managed-intent kind.\n\nCanonical basis: `workflow/INTAKE.md`, `workflow/WORKSTREAMS.md`, `workflow/STATE.md`.\n\n## Reproducer A \u2014 alignment stop with no repair subject\n\nUse a schema-valid Intake record:\n\n```toml\nworkstream_id = \"sample-workstream\"\nkind = \"issue\"\nstate = \"active\"\ndiagnosis_revision = 0\nrepair_subject = \"\"\ndiagnosis_prior_art_subject = \"\"\ndiagnosis_prior_art_result = \"\"\nresponse_kind = \"none\"\nresponse_observed = false\nalignment_state = \"pending\"\nalignment_subject = \"\"\nmicro_fix_candidate = false\n```\n\n`validate_intake` accepts it.\n\nFreshly route it.\n\nActual:\n- the prior-art branch is skipped because `repair_subject` is empty;\n- the active issue/pending branch returns a real `issue_alignment` stop with `subject=\"\"` and reason \u201cIssue diagnosis has a proposed repair...\u201d.\n\nExpected: Intake diagnosis remains active until a concrete repair subject exists; there is nothing to authorize yet.\n\n## Reproducer B \u2014 manifest/Intake kind contradiction\n\nUse:\n- `WORKSTREAM.toml: kind = \"change\"`;\n- its exact `INTAKE.toml: kind = \"issue\"`.\n\nBoth records validate independently. No cross-record kind check exists. Router semantics then follow the Intake issue path even though stable workstream identity says change.\n\nExpected: fail closed on contradictory workstream/Intake identity rather than silently selecting one owner value.\n\n## Existing-issue relationship\n\n#23 concerns incompatible producer/consumer schema shapes. These two reproductions are current-schema-valid relational state, so adding them to #23 would widen that scope.\n\nDiagnosis only; no repair is authorized by this tracker.",
+    "createdAt": "2026-09-29T03:20:27Z",
+    "number": 32,
+    "state": "OPEN",
+    "title": "Intake can emit an empty repair alignment stop and disagree with manifest kind",
+    "updatedAt": "2026-09-29T03:20:27Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/32",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "## Correlation marker\n\n`pwv2-plan-review-append-only-history-gap`\n\nExternal bookkeeping only. Diagnosis only; no implementation authorization.\n\n## Canonical snapshot\n\nCurrent default branch `main@d3ab917f02e4de91b7dbb17915c2287c2387333e`.\n\n## Invariant\n\nPlan Review attempts are exact-subject records. RED history must remain attached to the failed subject; a changed material plan subject requires a new attempt rather than replacement.\n\nCanonical basis: `workflow/PLAN_REVIEW.md`, `workflow/PLANNING.md`, `workflow/STATE.md`.\n\n## Concrete reproducer\n\n1. Freeze Planning cycle P1 and create terminal RED attempt R01.\n2. Follow canonical RED handling: material correction creates a new Planning cycle/revision P2 and repeats A/B/C.\n3. Freeze P2 and attempt to persist a new Stage-6 review while preserving P1/R01.\n\nCurrent durable model provides only one manifest locator:\n\n```toml\n[plan_review]\nclass = \"plan_review\"\npath = \"implementation/workstreams/<id>/PLAN_REVIEW.toml\"\n```\n\n`validate_locator(..., \"plan_review\")` requires that exact fixed filename. `validate_plan_review` validates one attempt only. There is no ordered Plan Review history or append-only locator list analogous to implementation `review_attempts`.\n\nTherefore the P2 attempt must replace/overwrite the selected `PLAN_REVIEW.toml` record (or become unreachable from canonical state), and the prior RED attempt is no longer represented in the current durable state even though policy says RED history remains attached.\n\nThe template comment itself says \u201cappend a new attempt for a changed exact plan subject\u201d, but the executable locator contract permits only the singleton `PLAN_REVIEW.toml`.\n\n## Existing-issue relationship\n\n- #14 concerns Plan Review legality across composed dependency/acceptance gates.\n- #18 concerns append-only supersession for **implementation Review** attempts.\n\nThis is a distinct Stage-6 Planning/Plan-Review storage/history defect.\n\nDiagnosis only; no repair is authorized by this tracker.",
+    "createdAt": "2026-09-29T03:20:02Z",
+    "number": 31,
+    "state": "OPEN",
+    "title": "Stage-6 Plan Review has no append-only attempt history across replans",
+    "updatedAt": "2026-09-29T03:20:02Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/31",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "## Correlation marker\n\n`pwv2-review-acceptance-identity-drift`\n\nExternal bookkeeping only. Diagnosis only; no implementation authorization.\n\n## Canonical snapshot\n\nCurrent default branch `main@d3ab917f02e4de91b7dbb17915c2287c2387333e`.\n\n## Invariant\n\nEvery Review attempt must bind one exact immutable subject **and one exact acceptance surface**. A GREEN verdict may be consumed only while both identities still match.\n\nCanonical basis: `workflow/REVIEW.md`, `workflow/PLAN_REVIEW.md`, `workflow/STATE.md`.\n\n## Reproducer A \u2014 implementation Review acceptance drift\n\n1. Have an active Card with a durable Result and REQUIRED review.\n2. Freeze a valid GREEN review whose `[acceptance]` is:\n   ```toml\n   class = \"task_card\"\n   path = \"implementation/workstreams/sample-workstream/cards/M01-T04.md\"\n   ```\n3. Keep the Result subject unchanged.\n4. Mutate the Task Card at the same path so its Acceptance or Required tests/readback changes materially, while retaining `Review requirement: required`.\n5. Freshly route.\n\nActual:\n- `validate_review` binds Task Card acceptance only by path + card_id;\n- no commit/blob/content identity for the acceptance Card is stored;\n- router reparses the changed Card, validates the old GREEN attempt, sees the same Result subject, and routes `post_review_finalization`.\n\nThe old GREEN verdict therefore covers a different acceptance surface than the one it actually reviewed.\n\n## Reproducer B \u2014 Plan Review acceptance is unbound to current Definition authority\n\nConstruct a valid frozen plan and matching GREEN `PLAN_REVIEW.toml`, but set:\n\n```toml\n[acceptance]\nclass = \"authority\"\npath = \"workflow/ROUTER.md\"\n```\n\n(or another syntactically valid unrelated authority path).\n\nActual:\n- `validate_plan_review` verifies subject/revision/cycle but does not bind `acceptance` to the current Definition requirements/decisions;\n- the review validates and GREEN can be consumed by Planning.\n\n## Existing-issue relationship\n\n- #14 concerns cycles spanning execution dependencies and acceptance gates.\n- #18 concerns supersession of an internally invalid terminal GREEN attempt.\n- #23 concerns state producer/consumer schema drift.\n\nThis defect is distinct: the exact reviewed Git subject may be correct and the review record schema-valid, while the acceptance surface itself is mutable or unrelated.\n\nDiagnosis only; no repair is authorized by this tracker.",
+    "createdAt": "2026-09-29T03:19:58Z",
+    "number": 30,
+    "state": "OPEN",
+    "title": "GREEN Review can survive acceptance-surface drift because acceptance identity is not immutable",
+    "updatedAt": "2026-09-29T03:19:58Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/30",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "## Correlation marker\n\n`pwv2-close-terminal-resume-state`\n\nExternal bookkeeping only. Diagnosis only; no implementation authorization.\n\n## Canonical snapshot\n\nCurrent default branch `main@d3ab917f02e4de91b7dbb17915c2287c2387333e`.\n\n## Invariant\n\nA true end-of-approved-scope stop must be reconstructible from durable repository truth after a fresh context/restart. Finishing Close once must not depend on ephemeral caller knowledge.\n\nCanonical basis: `workflow/ROUTER.md`, `workflow/CONTINUATION.md`, `workflow/CLOSE.md`, and `tools/close_contract.py`.\n\n## Concrete repository reproducer\n\nUse the already-completed target-side workstream on current main:\n\n`implementation/workstreams/feature-common-preexecution-core/WORKSTREAM.toml`\n\nIts Task Board has only `M07-T09 = done`. Durable Close evidence explicitly states:\n\n- `M07-close-postmerge-2026-09-23.md`: `Status: GREEN / APPROVED SCOPE COMPLETE`;\n- `Close continuation is end_of_scope_stop`;\n- `handoffs/M07_ADOPTION_SCOPE_COMPLETE.md`: `CLOSED / INTEGRATED / END-OF-SCOPE READY`.\n\nFreshly select that workstream through the production router.\n\nActual selector semantics:\n- all Cards DONE -> always `(\"route\", \"close\")`;\n- there is no Close/closed/completion locator or state in `WORKSTREAM.toml` / `state_contract.py`;\n- no router branch can reconstruct `end_of_scope_stop` from the durable completed package.\n\n`tools/close_contract.close_continuation()` can return `end_of_scope_stop`, but only when a caller already supplies booleans `approved_scope_durably_complete=True` and `next_authorized_obligation=False`; those facts are not selected through a canonical durable Close record.\n\nExpected: a fresh resume after completed Close reconstructs the same terminal end-of-scope stop rather than re-entering undifferentiated Close reconciliation.\n\n## Existing-issue relationship\n\n- #11 concerns rendering a handoff after a stop is already established.\n- #16 concerns continuing through non-stops.\n- #23 concerns durable-state schema producer/consumer drift.\n\nThis is distinct: the terminal Close outcome itself lacks a router-consumable durable binding, so restart equivalence cannot be established.\n\nDiagnosis only; no repair is authorized by this tracker.",
+    "createdAt": "2026-09-29T03:19:30Z",
+    "number": 29,
+    "state": "OPEN",
+    "title": "Close completion is not reconstructible from durable state on fresh resume",
+    "updatedAt": "2026-09-29T03:19:30Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/29",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "## Correlation marker\n\n`pwv2-execution-research-return-shadow`\n\nExternal bookkeeping only. Diagnosis only; no implementation authorization.\n\n## Canonical snapshot\n\nCurrent default branch `main@d3ab917f02e4de91b7dbb17915c2287c2387333e`.\n\n## Invariant\n\nA completed Research obligation must return once to its exact recorded owner. Execution/Execution Prep/Execution Resolution Research is explicitly supported by `validate_research` and by the Task-Board Research branch in `tools/router.py`.\n\n## Concrete reproducer\n\nCreate a current-schema-valid workstream with both:\n- manifest `[research]` -> `.../RESEARCH.toml`;\n- manifest `[task_board]` -> `.../TASK_BOARD.toml`.\n\nMake `TASK_BOARD.toml` point `[research_obligation]` to the same Research record. Use:\n\n```toml\nstate = \"complete\"\nworkstream_id = \"sample-workstream\"\norigin_role = \"execution_resolution\"\norigin_subject = \"M01-T04\"\nreturn_target = \"execution_resolution:M01-T04\"\nreturn_reconciliation = \"pending\"\nreturn_result = \"\"\nfinding = \"Exact missing fact recovered.\"\nlimitations = \"none\"\nconflicts = \"none\"\n# plus all four required source classes, none pending\n```\n\n`validate_research` accepts that return target.\n\nCall `select_route(..., entry=\"continue\")`.\n\nActual:\n- the early manifest-level Research branch runs before Task Board routing;\n- for `state == \"complete\"` it indexes an owner map containing only `intake | brainstorming | definition`;\n- `execution_resolution:M01-T04` raises `KeyError`;\n- the outer fail-closed handler returns generic Recovery.\n\nThe later Task-Board Research branch already contains the correct prefix handling for `execution_resolution:`, `execution_prep:`, and `execution:`, but is unreachable in this state.\n\nExpected: the exact execution Research return owner is selected once, not shadowed by the same manifest locator.\n\n## Reachability evidence\n\nCurrent `main` already contains workstreams such as `issue-deterministic-continuation` with both `[research]` and `[task_board]` locators. Reusing the single Research slot later for execution/recovery Research therefore makes this collision reachable without malformed state.\n\n## Existing-issue relationship\n\nAdjacent to #16 continuation/recovery and #23 durable-state drift, but distinct: all participating records can satisfy the current executable schema; the defect is precedence/return-target handling inside the canonical selector.\n\nDiagnosis only; no repair is authorized by this tracker.",
+    "createdAt": "2026-09-29T03:19:28Z",
+    "number": 28,
+    "state": "OPEN",
+    "title": "Manifest Research locator can shadow valid execution Research return routing",
+    "updatedAt": "2026-09-29T03:19:28Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/28",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "## Correlation marker\n\n`pwv2-terminal-card-close-semantic-closure`\n\nExternal bookkeeping only. This report does not authorize implementation or widen any existing issue scope.\n\n## Canonical snapshot\n\nDiagnosed against current default branch `main@d3ab917f02e4de91b7dbb17915c2287c2387333e`.\n\n## Invariant\n\nA Card may become terminal only after its exact semantic Result is valid and every REQUIRED/activated RECOMMENDED review for the current exact Result is GREEN. RED/pending/in-progress review blocks terminal completion. Close must not be reachable through a Card that cannot reconstruct those proofs.\n\nCanonical basis: `workflow/STATE.md`, `workflow/REVIEW.md`, `workflow/RECOVERY.md`, `workflow/ROUTER.md`.\n\n## Concrete reproducer\n\nUse `tests/fixtures/router/valid-project`:\n\n1. Change the fixture Card status from `in_progress` to `done`.\n2. Give it a Result locator containing only:\n   ```toml\n   [cards.result]\n   class = \"result\"\n   path = \"implementation/workstreams/sample-workstream/results/M01-T04.md\"\n   ```\n   The result file may be missing.\n3. Set the stable Task Card to `Review requirement: required`.\n4. Leave `review_attempts` empty (or reference only a terminal RED attempt).\n5. Call `select_route(..., entry=\"continue\")`.\n\nActual current behavior:\n- `validate_board` accepts a path-only Result because commit/blob are required only if either key is already present;\n- `status = \"done\"` requires only that a `result` table exists;\n- the all-DONE router branch does not reread/parse the Card, Result, or Review history;\n- route becomes `(\"route\", \"close\")`.\n\nExpected: fail closed or reconstruct the exact outstanding Result/Review obligation; never enter Close from a terminal Card whose semantic completion proof is absent or RED.\n\n## Current-repository evidence\n\n`implementation/workstreams/issue-deterministic-continuation/TASK_BOARD.toml` on main is all-DONE, while historical Result/Review artifacts such as `results/M05-T01.md` and `reviews/M05-T01-R02.toml` use older formats not accepted by the current Result/Review parsers. The terminal route does not parse them before Close.\n\n## Existing-issue relationship\n\n- #23 covers producer/consumer durable-schema drift and supported intra-V2 reconciliation.\n- #26 covers malformed Planning/Task-Board serialization and continuation despite invalid state.\n- #18 covers append-only supersession of an invalid terminal GREEN review.\n\nThis report is distinct: the reproducer is a **current-schema-valid Task Board** whose terminal Card semantics are incomplete, and the selector reaches Close because terminal-state validation is not closed over Result/Card/Review invariants.\n\nDiagnosis only; no repair is authorized by this tracker.",
+    "createdAt": "2026-09-29T03:18:56Z",
+    "number": 27,
+    "state": "OPEN",
+    "title": "Terminal DONE Cards can reach Close without valid Result/Review proof",
+    "updatedAt": "2026-09-29T03:18:56Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/27",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "## Correlation marker\n\n`pwv2-planning-gate-binding-validation-gap`\n\nExternal bookkeeping only. No implementation authorization. No repair approval.\n\n## Dedup\n\nSearched open/closed issues in `elmakus/project_workflow_v2` before create; no exact match. Checked:\n\n- OPEN 25 (Premium B handoff loop), 23 (new-workstream schema drift), 20 (Paseo child delegation), 18 (invalid terminal GREEN supersession), 14 (Plan Review cross-gate cycle)\n- CLOSED 22, 17, 16, 15, 13, 11\n- Marker search `pwv2-planning-gate-binding-validation-gap`: no hits.\n\n#23 is adjacent (producer/consumer schema drift) but does not cover short B/C gate bindings vs full `repo@commit:path@blob` key, literal backslash-n board corruption, or missing/ineffective continuation-time validation. This is a distinct focused report.\n\n## Canonical basis (independently read)\n\n- `workflow/ROUTER.md` + `workflow/GITHUB_ISSUES.md` from current default-branch snapshot, commit `d3ab917f02e4de91b7dbb17915c2287c2387333e` (read-only snapshot `/tmp/pwv22-canonical-d3ab917f`, history clone `/tmp/pwv2-rca-ro`).\n- Full-key planning validation predates the defect: `7cd4617c5bfcbbc9de9adaf550387191cf3896a6`, 2026-09-22, `feat(M02-T03): validate premium planning and plan review`.\n\n## Consumer evidence (immutable Git objects only, not working files)\n\n- Repo: `elmakus/chatgpt-codex-project-workflow`\n- Branch: `work/pwv22-program-brainstorming`\n- Tip verified: `8a655411d0ac55964df411ebea992830a152b741` (\u201cexec: route S11 exact Result to independent R06 review\u201d)\n- File: `implementation/workstreams/change-pwv22-program-brainstorming/PLANNING.toml` at that tip.\n- File: `implementation/workstreams/change-pwv22-program-brainstorming/TASK_BOARD.toml` at that tip.\n\n### Confirmed defect 1: B/C satisfied with short binding, required full key\n\nAt tip immutable `PLANNING.toml`:\n\n```toml\npremium_b = \"satisfied\"\npremium_b_subject = \"plan:P3@3a16c2e6623f89f1b0c8c2a096b13d6cc6028b0f\"\npremium_c = \"satisfied\"\npremium_c_subject = \"plan:P3@3a16c2e6623f89f1b0c8c2a096b13d6cc6028b0f\"\n```\n\nCorrect `[subject]` in same file:\n\n```toml\n[subject]\nrepository = \"elmakus/chatgpt-codex-project-workflow\"\ncommit = \"126a59634ede5b51f6f2fc669028e4ec4b253584\"\npath = \"planning/PWV22_PROGRAM_MASTER_PLAN_P3.md\"\nblob = \"3a16c2e6623f89f1b0c8c2a096b13d6cc6028b0f\"\n```\n\nRequired canonical key per `tools/state_contract.py` `_git_blob_subject_key` (`{repository}@{commit}:{path}@{blob}`):\n\n```\nelmakus/chatgpt-codex-project-workflow@126a59634ede5b51f6f2fc669028e4ec4b253584:planning/PWV22_PROGRAM_MASTER_PLAN_P3.md@3a16c2e6623f89f1b0c8c2a096b13d6cc6028b0f\n```\n\n`premium_b_subject` / `premium_c_subject` do NOT equal that key. Correct `[subject]` proves the writer knew the full coordinates but serialized B/C in a different short `plan:P3@blob` form.\n\nContrast: `premium_a_subject` correctly equals `entry_subject` (`plan:P2@552487...|correction:S07-S08-R03-order|planning-cycle:3`). So A=entry_subject vs B/C=full-key is the exact contrast the writer missed.\n\nOrigin (immutable):\n\n- `44f85e23` (2026-09-28): freeze P3, B short binding introduced as `due`\n- `97685cdc` (2026-09-28): B `satisfied` preserving short binding\n- `c716d642` (2026-09-28): consume GREEN review, C `due` with same short binding\n- `eedfa8e3` (2026-09-29): C `satisfied` preserving short binding\n\nAll author labels are `elmakus <...@users.noreply.github.com>`; no Main/worker attribution is derivable from Git.\n\nValidated readback against canonical `d3ab917f:tools/state_contract.py`:\n\n- `validate_planning(...)` FAILS: `planning: frozen subject requires exact premium B gate subject`\n- Note the diagnostic names the frozen path even when `state=\"approved\"`, and does not distinguish format-mismatch vs unsatisfied gate. It misleadingly suggests missing B.\n\nDocs gap (confirmed):\n\n- `workflow/PLANNING.md` (48 lines at `d3ab917f`) states B \u201cfor that exact subject\u201d / C \u201cfor the same exact subject\u201d but never shows the explicit serialized B/C format nor contrasts it with `A=entry_subject`.\n- `templates/PLANNING.toml` at `d3ab917f` is draft-only (`premium_b=\"not_due\"`, empty `[subject]`); no frozen/approved example with full-key B/C.\n- Current `tools/state_contract.py ~488` rejects B before board parse is even reached.\n\n### Confirmed defect 2: TASK_BOARD.toml literal backslash-n corruption\n\nAt tip immutable, `M02-S10-T02` / `M02-S10-T03` tables contain literal `\\n` inside the `path` string instead of new TOML tables:\n\n```toml\npath = \"implementation/workstreams/change-pwv22-program-brainstorming/cards/M02-S10-T02.md\"\\n[cards.result]\\nclass = \"result\"\\npath = \"implementation/workstreams/change-pwv22-program-brainstorming/results/M02-S10-T02.md\"\\ncommit = \"93c734675a06f0d22b16042c71fa90967b071b02\"\\nblob = \"2ec923ee4346eff0468aa0a23822f16e5ca86a23\"\n```\n\nSame pattern for `M02-S10-T03` with commit `b91f4d2c...` / blob `91f220ff...`.\n\nIntroduced by:\n\n- `ff494842` (2026-09-29): reconcile M02-S10-T02\n- `50961231` (2026-09-29): reconcile M02-S10-T03\n\nTOML parse of the tip file fails: `Expected newline or end of document after a statement (at line 387, column 92)`.\n\n### Confirmed consequence: progression despite invalid state\n\nDurable consumer history progresses after `eedfa8e3` (invalid B/C) through S08 execution, multiple RED/repair cycles, S10/S11, up to tip `8a655411`. Board corruption from `ff494842`/`50961231` likewise persists to tip. This implies missing or ineffective canonical parse+state validation before continuation. Exact mechanism is NOT established (see hypotheses).\n\n## Expected vs actual\n\nExpected:\n\n- Frozen/approved `PLANNING.toml` carries B/C subjects exactly equal to `_git_blob_subject_key([subject])` (`repo@commit:path@blob`).\n- `TASK_BOARD.toml` parses as TOML with real `[cards.result]` tables.\n- Continuation fails closed on either violation before producing downstream Cards/results/reviews.\n- Diagnostics distinguish \u201cgate unsatisfied\u201d from \u201cgate subject format/mismatch\u201d and show expected vs actual key.\n\nActual:\n\n- B/C satisfied with `plan:P3@blob`; validator would reject, yet downstream progression occurred.\n- Board has literal `\\n` corruption; TOML parse fails, yet tip still advances to S11/R06.\n- PLANNING.md/template give no frozen/approved full-key example; error text obscures the format mismatch.\n\n## Minimal reproduction (read-only)\n\n```sh\ngit -C <consumer-clone> show 8a655411d0ac55964df411ebea992830a152b741:implementation/workstreams/change-pwv22-program-brainstorming/PLANNING.toml | grep premium\ngit -C <consumer-clone> show 8a655411d0ac55964df411ebea992830a152b741:implementation/workstreams/change-pwv22-program-brainstorming/TASK_BOARD.toml | sed -n '380,400p'\npython3 -c \"import tomllib,sys; sys.path.insert(0,'<canonical>/tools'); import state_contract,subprocess; d=tomllib.loads(subprocess.check_output(['git','-C','<consumer-clone>','show','8a655411:implementation/workstreams/change-pwv22-program-brainstorming/PLANNING.toml']).decode()); print(state_contract._git_blob_subject_key(d['subject'],'planning.subject')); state_contract.validate_planning(d,'change-pwv22-program-brainstorming')\"\n# expect FAIL: planning: frozen subject requires exact premium B gate subject\npython3 -c \"import tomllib,subprocess; b=subprocess.check_output(['git','-C','<consumer-clone>','show','8a655411:implementation/workstreams/change-pwv22-program-brainstorming/TASK_BOARD.toml']).decode(); tomllib.loads(b)\"\n# expect FAIL at line 387 col 92\n```\n\n## Hypotheses (explicitly NOT confirmed)\n\n- Whether the router omitted validation, an older validator version was used at write time, or a validation failure was ignored.\n- No attribution to Main vs worker; Git author labels are uniform.\n- Reporter notes recurrence across projects, but only this consumer/branch/commit chain is proved here. Do not generalize beyond this evidence.\n\nNo need to repeat already-satisfied gates (Definition GREEN, P3 planner audit GREEN, P3 independent review GREEN as durable facts); the issue is binding serialization + continuation-time enforcement, not re-litigating those approvals.\n\n## Proposed guardrails (for triage, not authorization)\n\n1. Deterministic key construction helper used by all writers (single function producing `repo@commit:path@blob` for B/C; reject `plan:P*@blob` short form at write time).\n2. Explicit frozen + approved `PLANNING.toml` examples in `workflow/PLANNING.md` showing A=`entry_subject` vs B/C=full-key, plus template comments.\n3. Mandatory TOML parse + `state_contract` validation before any continuation step that consumes PLANNING/TASK_BOARD; fail closed to Recovery.\n4. Separate diagnostics: `mismatch (expected <full-key> vs actual <short>)` vs `unsatisfied (due/not_due)`; include both values.\n5. Regression fixtures: short-binding PLANNING (B/C satisfied, correct `[subject]`), literal-backslash-n TASK_BOARD (M02-S10-T02/T03 pattern), and mixed case (B fails before board); assert fail-closed with the new diagnostics.\n",
+    "createdAt": "2026-09-29T02:56:36Z",
+    "number": 26,
+    "state": "OPEN",
+    "title": "Planning-state writing/validation gap: short B/C bindings + literal backslash-n board corruption pass continuation",
+    "updatedAt": "2026-09-29T03:15:04Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/26",
+    "comments": [
+      {
+        "url": "https://api.github.com/repos/elmakus/project_workflow_v2/issues/comments/5882768197",
+        "html_url": "https://github.com/elmakus/project_workflow_v2/issues/26#issuecomment-5882768197",
+        "issue_url": "https://api.github.com/repos/elmakus/project_workflow_v2/issues/26",
+        "id": 5882768197,
+        "node_id": "IC_kwDOUk7qC88AAAABXqPrRQ",
+        "user": {
+          "login": "elmakus",
+          "id": 76910687,
+          "node_id": "MDQ6VXNlcjc2OTEwNjg3",
+          "avatar_url": "https://avatars.githubusercontent.com/u/76910687?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/elmakus",
+          "html_url": "https://github.com/elmakus",
+          "followers_url": "https://api.github.com/users/elmakus/followers",
+          "following_url": "https://api.github.com/users/elmakus/following{/other_user}",
+          "gists_url": "https://api.github.com/users/elmakus/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/elmakus/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/elmakus/subscriptions",
+          "organizations_url": "https://api.github.com/users/elmakus/orgs",
+          "repos_url": "https://api.github.com/users/elmakus/repos",
+          "events_url": "https://api.github.com/users/elmakus/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/elmakus/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "created_at": "2026-09-29T02:57:16Z",
+        "updated_at": "2026-09-29T02:57:16Z",
+        "body": "## Update: third malformed-write class unmasked after B/C + board fix\n\n`pwv2-planning-gate-binding-validation-gap` \u2014 bounded factual evidence only, same issue, no duplicate. No source/workstream writes by this report; local continuation owned by Main.\n\n### Independently reconciled recovery (immutable)\n\n- Recovery commit: `b65c8e2227c53d06c1948fd2070c67201ee53875` (\u201crecovery: normalize P3 B/C gate subjects and board serialization\u201d, 2026-09-29).\n- `PLANNING.toml`: `premium_b_subject` / `premium_c_subject` `plan:P3@3a16c2e...` \u2192 full frozen key `elmakus/chatgpt-codex-project-workflow@126a59634ede5b51f6f2fc669028e4ec4b253584:planning/PWV22_PROGRAM_MASTER_PLAN_P3.md@3a16c2e6623f89f1b0c8c2a096b13d6cc6028b0f`, derived verbatim from existing `[subject]`; `satisfied`/`approved` preserved, P3 GREEN review/evidence untouched.\n- `TASK_BOARD.toml`: `M02-S10-T02`/`M02-S10-T03` literal-backslash-n result tables restored to real TOML lines with identical `path`/`commit`/`blob` (`93c73467:2ec923ee`, `b91f4d2c:91f220ff`); `revision 67\u219268`; no status/contract/result semantics changed.\n\n### New blocker exposed (confirmed)\n\nAfter that fix, canonical validation now reaches the board and rejects:\n\n```\ntask_board.cards[15] (M02-S11-T01): invalid status 'review'\n```\n\n- Canonical `CARD_STATUSES` at `d3ab917f:tools/state_contract.py:13,693` = `{planned, ready, in_progress, blocked, done}` \u2014 never `review` (since `24bf91ce`, 2026-09-22).\n- Durable origin: `bbe7f009` inserted S11 as `ready` (valid); `8a655411d0ac55964df411ebea992830a152b741` (\u201cexec: route S11 exact Result to independent R06 review\u201d) changed it to `review` with result + `R01` attempt. Recovery `b65c8e22` intentionally preserved S11 untouched as outside its narrow authorization.\n\n### Interpretation (confirmed vs hypothesis)\n\n- Confirmed: this is a third malformed-write class in the same workstream, previously masked because planning validation (`~488`) failed before board parse, and board parse failed before card-schema validation. Fixing the first two layers deterministically exposed the third.\n- Confirmed usefulness: strengthens the original guardrail proposal \u2014 mandatory TOML parse + `state_contract` validation before any continuation, plus regression fixtures for each masking layer (short B/C \u2192 literal `\\n` board \u2192 invalid Card status).\n- Hypothesis only: whether each layer was produced by omitted validation, older validator, or ignored failure; no Main/worker attribution from Git author labels. Only this consumer chain (`change-pwv22-program-brainstorming`, `work/pwv22-program-brainstorming`, `8a655411` \u2192 `b65c8e22`) is proved.\n\nNo re-litigation of satisfied gates; no implementation authorization.\n",
+        "author_association": "OWNER",
+        "pin": null,
+        "reactions": {
+          "url": "https://api.github.com/repos/elmakus/project_workflow_v2/issues/comments/5882768197/reactions",
+          "total_count": 0,
+          "+1": 0,
+          "-1": 0,
+          "laugh": 0,
+          "hooray": 0,
+          "confused": 0,
+          "heart": 0,
+          "rocket": 0,
+          "eyes": 0
+        },
+        "performed_via_github_app": null,
+        "minimized": null
+      },
+      {
+        "url": "https://api.github.com/repos/elmakus/project_workflow_v2/issues/comments/5882937264",
+        "html_url": "https://github.com/elmakus/project_workflow_v2/issues/26#issuecomment-5882937264",
+        "issue_url": "https://api.github.com/repos/elmakus/project_workflow_v2/issues/26",
+        "id": 5882937264,
+        "node_id": "IC_kwDOUk7qC88AAAABXqZ_sA",
+        "user": {
+          "login": "elmakus",
+          "id": 76910687,
+          "node_id": "MDQ6VXNlcjc2OTEwNjg3",
+          "avatar_url": "https://avatars.githubusercontent.com/u/76910687?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/elmakus",
+          "html_url": "https://github.com/elmakus",
+          "followers_url": "https://api.github.com/users/elmakus/followers",
+          "following_url": "https://api.github.com/users/elmakus/following{/other_user}",
+          "gists_url": "https://api.github.com/users/elmakus/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/elmakus/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/elmakus/subscriptions",
+          "organizations_url": "https://api.github.com/users/elmakus/orgs",
+          "repos_url": "https://api.github.com/users/elmakus/repos",
+          "events_url": "https://api.github.com/users/elmakus/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/elmakus/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "created_at": "2026-09-29T03:15:03Z",
+        "updated_at": "2026-09-29T03:15:03Z",
+        "body": "## Update 2: S11 result-envelope raw-ref gate + pending-reservation authority gap\n\n`pwv2-planning-gate-binding-validation-gap` \u2014 bounded evidence only, same issue #26, no duplicate/new issue. Read issue + 1 existing comment before posting; this covers a distinct fourth layer (result-envelope parse + unstarted-pending lifecycle gap), not a repeat of B/C, `\\n` board, or `review`-status classes. No managed repo/file writes by this report; no secrets/logs; no policy implementation. Main owns local continuation. Immutable Git locators only (worktree may drift via separate blocker-evidence worker).\n\n### Canonical basis independently read (current `d3ab917f`)\n\n- `workflow/ROUTER.md` (probe `PWV2_M05_UPDATE_SENTINEL_92AF`), `workflow/REVIEW.md` (M03-T03), `workflow/RECOVERY.md` (M03-T04), `workflow/STATE.md`, `workflow/EXECUTION.md` (M03-T02) from read-only snapshot `/tmp/pwv22-canonical-d3ab917f` / history clone `/tmp/pwv2-rca-ro`.\n- `tools/execution_contract.py:parse_card_result` (raw `evidence refs` must be `implementation/workstreams/<ws>/evidence/*.md`, no backticks/period), `tools/router.py:526-600` (active-Card result/attempt precedence; parse failure \u2192 `recovery_boundary`), `tools/state_contract.py:CARD_STATUSES`, `validate_review_history` (\u22641 nonterminal, last-only), `RECOVERY.md:Review subject refresh`.\n\n### Immutable consumer chain (`elmakus/chatgpt-codex-project-workflow`)\n\n- `b65c8e2227c53d06c1948fd2070c67201ee53875`: fixed P3 B/C short \u2192 full key + M02-S10-T02/T03 literal-`\\n` board tables, preserved approval/statuses.\n- `778c371c7d37999bf0c4a6fa789e6cdb52b66318`: normalized existing S11 Card all parser fields (authority refs \u2192 comma-separated exact paths; dependencies \u2192 8\u00d7 full `path@commit:blob` equal to DONE board locators; review requirement \u2192 `required`; technical contract \u2192 `none`), preserving scope/annotations/prose; `parse_task_card` OK; board/result/R01 untouched; documents pending-reservation blocker with normalized Result as proposed-only.\n- `dbece127247bfb6b460a0d27d7cc11c5e4dc5bfa` (tip): Main reconciled S11 to canonical `in_progress`, `revision 69` (`review` \u2192 `in_progress`, 2-line diff, sole active Card). Verified via `git show dbece127`.\n\n### Current remaining gate (confirmed at `dbece127`)\n\n`implementation/workstreams/change-pwv22-program-brainstorming/results/M02-S11-T01.md` at `dbece127`:\n\n```\n- Evidence refs: `implementation/workstreams/change-pwv22-program-brainstorming/evidence/M02-S11-T01_EXECUTION.md`.\n```\n\nRaw-ref parser fails (verified in-memory against canonical `parse_card_result`):\n\n```\nFAIL: card_result.evidence[0]: invalid workstream evidence ref\n```\n\nNormalized form (same path, no backticks, no trailing period) passes:\n\n```\nimplementation/workstreams/change-pwv22-program-brainstorming/evidence/M02-S11-T01_EXECUTION.md \u2192 PASS\n```\n\nBut normalizing changes result blob `1c64f5bff052b3da6c3ab8c6cffcbfb0869ea676`. Pending `M02-S11-T01-R01` at `dbece127` covers the unchanged old subject (`commit 8a88b171377abc7890499f9343e14342a6c71add`, same blob, `verdict=pending`, `evidence_path=\"\"`); board `cards[15]` locator at `dbece127` is the same old commit/blob. Hence repair-first/refreeze has no safe path under current laws:\n\n- `REVIEW.md`: changed subject \u2192 new attempt; terminal history immutable; \u22641 pending/in-progress and it must be last.\n- `RECOVERY.md:Review subject refresh`: pending for different current result \u2192 Recovery (not auto-refresh); GREEN only on still-current result.\n- `router.py:565-571`: stale pending (`covered != current`) \u2192 hard `ValidationError(\"active review attempt is stale...\")` \u2192 `recovery_boundary`; `review_freeze` for a new attempt exists only after terminal history; `validate_review_history` forbids R02 alongside pending R01.\n- No cancel/supersede lifecycle for an unstarted pending reservation exists in contracts.\n\n### Reviewer posture (authority gap, not authorization)\n\n- Independent exact reviewer withheld verdict: `route`/`review` unreachable before the parse-result gate (`router.py:531` \u2192 `recovery_boundary` on `ExecutionContractError`); Recovery coverage recheck does not permit a terminal-verdict bypass. No RED/GREEN fabricated to unlock \u2014 R01 remains `pending` with empty evidence at `dbece127`.\n- Record as authority gap to assess, NOT authorization for worker/Main to invent lifecycle (no silent rebind, verdict manufacture, history drop, or R02-freeze alongside R01).\n- Fresh reviewer disagreement with the earlier tentative owner interpretation in `778c371c` evidence (hypothetical all-three-normalized \u2192 `route`/`review`) resolved fail-closed: current durable state routes Recovery, and even the hypothetical requires an authority-sanctioned pending-reservation refresh mechanism that does not exist.\n\n### Focused repro / guardrail requirement (for triage)\n\n1. Minimal repro (read-only, immutable): `git show dbece127:.../results/M02-S11-T01.md` \u2192 `parse_card_result(..., \"M02-S11-T01\", \"change-pwv22-program-brainstorming\")` FAILs on backticked+period ref; stripped raw ref PASSes; `R01.subject == board.result == 8a88b171:1c64f5bff` proves any normalization orphans pending R01 into stale-Recovery with no lawful R02 path.\n2. Require: canonical recovery path for an unstarted pending reservation when a normalized artifact envelope must change (representational-only Result fix), preserving history/independence/append-only guarantees; explicit fail-closed rule until such mechanism exists.\n3. Require: robust explicit raw-ref Card Result examples in `templates/CARD_RESULT.md` + `workflow/EXECUTION.md` (raw comma-separated `evidence/*.md` paths, no Markdown backticks, no trailing prose period on the field line), plus regression fixtures: backticked ref, trailed-period ref, multi-ref with one bad entry; assert `card_result.evidence[i]` diagnostic with index.\n\nNo re-litigation of satisfied gates; no implementation authorization.\n",
+        "author_association": "OWNER",
+        "pin": null,
+        "reactions": {
+          "url": "https://api.github.com/repos/elmakus/project_workflow_v2/issues/comments/5882937264/reactions",
+          "total_count": 0,
+          "+1": 0,
+          "-1": 0,
+          "laugh": 0,
+          "hooray": 0,
+          "confused": 0,
+          "heart": 0,
+          "rocket": 0,
+          "eyes": 0
+        },
+        "performed_via_github_app": null,
+        "minimized": null
+      }
+    ]
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "## Observed\n\nA canonical Premium B stop emitted a `NEW CHAT START PROMPT` for a fresh independent Plan Review:\n\n- repository: `elmakus/project_workflow_v2`\n- branch: `work/pwv2-paseo-child-delegation`\n- durable pointer: `implementation/workstreams/issue-paseo-child-delegation/PLANNING.toml`\n- entry obligation: `Premium B \u2014 independent Plan Review`\n\nThe prompt was pasted into a genuinely fresh ChatGPT context. The receiving context recovered the state and correctly observed that the frozen plan has `Premium A = satisfied` and `Premium B = due`, but then treated itself as the producer-side Premium B stop and emitted another fresh-context handoff instead of consuming the handoff and performing the independent Plan Review.\n\nThis creates a possible infinite loop:\n\n`Premium B stop -> fresh independent handoff -> fresh receiver -> Premium B stop -> fresh independent handoff -> ...`\n\n## Expected\n\nA fresh context that receives an explicit workflow-generated Premium B / independent Plan Review handoff must be able to establish that the current context is the intended independent receiver for the exact frozen subject and execute the Plan Review, provided all canonical independence/subject bindings are valid.\n\nThe receiving context must not blindly replay the producer-side fresh-context stop merely because durable state still says Premium B is due.\n\n## Relationship to recent issues\n\nThis appears adjacent to, but distinct from:\n\n- #11: deterministic rendering of a required handoff at a real fresh-context stop;\n- #17: receiving a NEW CHAT START PROMPT asks for redundant `continue` instead of executing the stated obligation;\n- #23: durable-state/schema drift can route a Premium B receiver into Recovery before review.\n\nThe current reproduction gets past the earlier schema/recovery symptom far enough to recognize `Premium B = due`, then re-emits the same handoff. Diagnosis must explicitly deduplicate/root-cause against #11, #17 and #23 rather than assuming independence.\n\n## Required diagnosis and research\n\nBefore repair authorization:\n\n1. Reproduce and localize the exact selector/owner contract that cannot distinguish producer-side Premium B stop from a valid fresh independent receiver.\n2. Trace current `ROUTER.md`, `USER_STOP.md`, Planning/Plan Review/Review/Continuation/Recovery contracts and production selector behavior.\n3. Audit recent fixes/issues (#11, #16, #17, #20, #22, #23) for overlapping semantics and regressions.\n4. Determine what durable/evidence-bound signal may establish handoff receipt without making runtime/model/session identity workflow authority.\n5. Preserve fail-closed independence, immutable subject binding, stale-handoff rejection, and genuine Premium B stop semantics.\n6. Cover negative cases: same context that produced/repaired the plan, stale/wrong subject, replayed handoff, malformed handoff, schema recovery, and a fresh receiver that is actually eligible.\n7. Run substantial formal Research using the repository-root `COORDINATOR_PROTOCOL.md` in `elmakus/project-research`: one whole-scope lane, one independent red-team lane, and at least eight targeted lanes, with a frozen common analysis subject and one integration pass.\n8. Return the integrated evidence to PWv2 Intake, then use Brainstorming for alternatives/tradeoffs before any Definition/implementation authorization.\n\n## Scope\n\nDiagnosis/research/brainstorming only at this stage. Do not treat this tracker as repair authorization.",
+    "createdAt": "2026-09-29T02:09:07Z",
+    "number": 25,
+    "state": "OPEN",
+    "title": "Fresh Premium B handoff loops instead of executing independent Plan Review",
+    "updatedAt": "2026-09-29T02:09:07Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/25",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "## Observed\n\nDuring issue #22 (CI pending deterministic continuation), an independent Review entry for `M01-T01-R01` failed closed into Recovery because the newly materialized workstream did not satisfy the current canonical PWv2 durable-state contract.\n\nObserved inconsistencies reported by the reviewer:\n\n- `WORKSTREAM.toml` lacked `plan_review` and `task_board` locators.\n- `DEFINITION.toml`, `PLANNING.toml`, `TRACKER.toml`, and `TASK_BOARD.toml` used noncanonical schema.\n- `M01-T01` had status `review_pending`, while the current Card contract allows only `planned | ready | in_progress | blocked | done`.\n- Because of the malformed durable state, the canonical router selected Recovery before the requested independent Review.\n\nThis state was produced by the normal PWv2 path for a fresh workstream, shortly before the independent reviewer attempted to enter `M01-T01-R01`.\n\n## Expected\n\nA workstream materialized by the canonical PWv2 Planning / Execution Prep / Execution path must itself satisfy the current canonical durable-state schema, so that a fresh independent reviewer can resume from the durable pointer without schema reconciliation.\n\nNo stage should emit a state that the canonical router immediately rejects as malformed.\n\n## Impact\n\nThis can block independent Review and force Recovery immediately after otherwise normal materialization. It also risks producer/consumer schema drift between workflow stages.\n\n## Separate defect discovered during reproduction\n\nWhile checking the exact review subject `32e7971f96e76a403de6bc5cd7b8d5979ac0dfe2`, the reviewer also found that the issue #22 implementation classified `completed` as `terminal_success`. A completed CI run can have a negative conclusion (failure, cancelled, etc.), so completion alone must not be treated as successful evidence.\n\nThat implementation defect belongs to the active #22 repair/review cycle and should not be conflated with this issue. This issue tracks the durable-state/schema inconsistency that prevented legal Review entry.\n\n## Required diagnosis\n\nDetermine which canonical producer emitted the incompatible state, why its schema/status vocabulary diverges from the current router/authority contract, and add coverage proving that a freshly materialized workstream can be consumed by a fresh independent Review invocation without Recovery caused by producer-generated schema drift.\n\n## Additional independent reproduction: existing active workstream after PWv2 contract evolution\n\nA second independent reproduction occurred on `implementation/workstreams/issue-paseo-child-delegation` while attempting Premium B / independent Plan Review.\n\nThe fresh canonical router again selected Recovery before the requested obligation because the durable state was written against an older PWv2 contract than the current validator expects.\n\nReported mismatches include:\n\n- `PLANNING.toml` has `revision = 1`, while the current contract expects a string revision.\n- It uses `plan_artifact` instead of the current `plan_path`.\n- It has `review_mode = \"normal\"` instead of the current `review_mode = \"independent\"`.\n- It lacks the required immutable `[subject]` table / exact Git-blob binding.\n- `WORKSTREAM.toml` lacks the current `plan_review` locator.\n\nThe plan content itself was reported as semantically consistent with the accepted Definition; the blocker is durable-state compatibility, not plan scope/content.\n\nThis demonstrates that the issue is not limited to the fresh workstream created during #22. It also affects already-active PWv2 workstreams when the canonical durable-state contract evolves.\n\n### Additional requirement\n\nDiagnosis/repair for this issue must therefore cover both directions:\n\n1. canonical producers must not emit state rejected by current canonical consumers; and\n2. an active durable PWv2 workstream created under an earlier supported V2 contract must have a deterministic, fail-closed Recovery/reconciliation path to the current contract without silently changing accepted scope, approvals, or immutable authority.\n\nRegression coverage should include resuming an older active workstream at a premium/review boundary after a contract evolution and proving that reconciliation preserves its accepted semantic scope before routing back to the intended obligation.",
+    "createdAt": "2026-09-29T01:45:24Z",
+    "number": 23,
+    "state": "OPEN",
+    "title": "Regression: newly materialized workstream violates canonical V2 durable-state schema",
+    "updatedAt": "2026-09-29T01:53:47Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/23",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "Regression of #16. After a required independent Review reaches GREEN and the Card is finalized, the same invocation can continue into the next Card and reach a required-test/CI boundary while GitHub Actions is still queued or in_progress. Current continuation semantics must be diagnosed for terminal vs queued vs in_progress CI so workflow behavior is independent of agent speed. This tracker is bookkeeping only; repair authority remains in durable Project Workflow state.",
+    "createdAt": "2026-09-29T01:25:25Z",
+    "number": 22,
+    "state": "CLOSED",
+    "title": "Regression: deterministic continuation races required CI completion",
+    "updatedAt": "2026-09-29T01:55:52Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/22",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "Observed in a Paseo PWv2 continuation: canonical routing required delegated Recovery before Review, but the session stopped because no native agent-scoped `create_agent` tool was exposed. Existing pi-unraid evidence demonstrates a temporary Paseo daemon -> Pi provider child mechanism (commit 24a45813094a22e2a189692204804a54a51c0a6a), so the current runtime/tool-name assumption can reject an actually available child execution path.\n\nDesired repair direction (not authorization): make delegation capability semantic/runtime-neutral and allow an evidence-bound temporary Paseo->Pi child mechanism where it preserves required independence, subject binding, lifecycle/readback and fail-closed guarantees. Do not pretend that `create_agent` exists; do not weaken Recovery/Review independence; retain a path to the later native helper.\n\nDedup key: pwv2:paseo-temporary-child-delegation-capability",
+    "createdAt": "2026-09-29T00:37:49Z",
+    "number": 20,
+    "state": "OPEN",
+    "title": "Paseo temporary child delegation is rejected when create_agent is absent",
+    "updatedAt": "2026-09-29T00:37:49Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/20",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "## Problem\n\nA consumer workstream exposed a durable Review-state contradiction: a terminal review attempt records `verdict = GREEN` while its canonical independence field records `materially_produced_or_repaired_subject = true`. Separate evidence text claims independence, so the durable review artifacts disagree.\n\nUnder current PWv2 semantics:\n- GREEN requires an independent reviewer;\n- terminal Review history is append-only and must not be rewritten;\n- downstream consumption must fail closed when required acceptance is not valid;\n- Recovery does not currently define how to supersede an internally invalid terminal GREEN without editing history.\n\n## Concrete observed case\n\nConsumer: `elmakus/chatgpt-codex-project-workflow`\nWorkstream: `change-pwv22-program-brainstorming`\nAttempt: `M02-S08-T01-R11`\n\nThe attempt TOML has `verdict = \"GREEN\"` and `materially_produced_or_repaired_subject = true`, while its evidence claims a fresh independent context.\n\n## Desired invariant\n\nDefine a canonical append-only Recovery path for an invalid terminal Review attempt. The invalid historical attempt should remain immutable; Recovery should durably record/surface its invalidity and authorize a fresh subsequent attempt (for example R12) against the exact still-current subject. Downstream gates must consume only a valid terminal attempt.\n\nAlso specify precedence when review-attempt metadata and prose evidence disagree, and tests for invalid GREEN, invalid RED if applicable, supersession, and downstream fail-closed behavior.\n\nDiscovered while preparing J-S11; intentionally deferred so the active PWv2.2 program can continue through the narrowest legal recovery path available.",
+    "createdAt": "2026-09-28T23:52:11Z",
+    "number": 18,
+    "state": "OPEN",
+    "title": "Recovery: invalid terminal GREEN review needs append-only supersession path",
+    "updatedAt": "2026-09-28T23:52:11Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/18",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "## Observed behavior\n\nAt a real Premium A \u2014 Strategic Planning stop, PWv2 correctly offers a locator-only `NEW CHAT START PROMPT` so the user can move the obligation to a fresh/better model context.\n\nExample handoff:\n\n```\nRepository: elmakus/project_workflow_v2\nBranch: work/pwv2-deterministic-continuation\nEntry obligation: Premium A \u2014 Strategic Planning\nDurable start pointer: implementation/workstreams/issue-deterministic-continuation/DEFINITION.toml\n```\n\nWhen that generated prompt is pasted into a fresh chat/context, the receiving agent can stop again and ask the user to type `continue` instead of immediately recovering state and executing the stated entry obligation.\n\n## Expected behavior\n\nPasting a workflow-generated `NEW CHAT START PROMPT` into a fresh context is itself the continuation instruction for the stated `Entry obligation`. After canonical router/state recovery, the receiving agent should immediately execute deterministic authorized transitions until it reaches a **new real workflow stop**.\n\nIt must not introduce an extra confirmation/authorization round-trip merely because the handoff entered a new context.\n\nThis matters especially for paid external model runtimes (for example Pi/Paseo with a metered model), where reading the handoff and asking \"continue?\" creates a needless paid invocation.\n\n## Research / diagnosis requirements\n\nTreat this as a separate issue initially. During Intake Research / Brainstorming:\n\n1. Search repository history/current policy for an earlier attempt to fix this same redundant-confirmation behavior; the symptom was observed before the newer deterministic-continuation issue.\n2. Compare root cause and affected contracts with the currently active `issue-deterministic-continuation` workstream.\n3. Determine whether that in-flight fix already resolves this case, partially overlaps it, or is independent.\n4. Determine whether implementation can safely proceed in parallel or should consume/rebase on the completed deterministic-continuation change.\n5. Add a regression/acceptance case covering a fresh context receiving a generated handoff and proceeding without a redundant user confirmation.\n6. Preserve genuine authorization gates: the fix must not reinterpret an actual workflow stop as implicitly authorized.\n\n## Reproduction evidence\n\nObserved 2026-09-29 in ChatGPT after a Premium A stop. The source context correctly produced the handoff; the fresh context consumed it but returned another user-action-required continuation prompt instead of starting Strategic Planning.\n\n## Scope intent\n\nFix in PWv2 now rather than deferring to a later major version. Research may run while the other deterministic-continuation workstream is still active; implementation dependency/order should be decided from evidence rather than assumed.",
+    "createdAt": "2026-09-28T23:11:05Z",
+    "number": 17,
+    "state": "CLOSED",
+    "title": "NEW CHAT START PROMPT causes redundant confirmation instead of immediate continuation",
+    "updatedAt": "2026-09-29T01:24:49Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/17",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "## Observed bug\n\nConfirmed after the #11 correction was already merged to `main`.\n\nFresh ChatGPT context:\n- consumer: `elmakus/chatgpt-codex-project-workflow`\n- branch: `work/pwv22-program-brainstorming`\n- entry obligation: independent review `M02-S08-T01-R02`\n- durable start pointer: `implementation/workstreams/change-pwv22-program-brainstorming/TASK_BOARD.toml`\n\nAt approximately **2026-09-29 00:26 Europe/Zurich**, the fresh context completed R02 as RED, persisted the review evidence and terminal RED attempt, and then ended its response. It did not continue the deterministic workflow into RED/corrective classification and the next authorized obligation.\n\nDurable evidence:\n- `reviews/M02-S08-T01-R02.toml` has `verdict = \"RED\"`\n- `evidence/M02-S08-T01-R02_REVIEW.md` contains the exact finding and required correction\n- Task Board revision 41 leaves `M02-S08-T01` at `review_pending` with R02 terminal RED.\n\nThe finding itself is bounded: admission acceptance is still an unauthenticated caller-provided mapping; a fabricated in-memory GREEN can authorize parallel legality/fan-in. The review evidence specifies the required correction.\n\n## Why this is a workflow-continuation defect\n\nCurrent canonical main explicitly says:\n- `workflow/ROUTER.md`: `RED -> corrective classification while failed-attempt evidence remains durable`;\n- `workflow/REVIEW.md`: RED routes to corrective classification and is not automatically a user stop;\n- `workflow/RECOVERY.md`: bounded correction inside accepted authority routes to Execution; a RED verdict alone is not a user stop; ordinary role changes and RED verdicts are not stops.\n\nThe observed response nevertheless terminated at the RED role/result boundary.\n\n## Relation to #11\n\nThis is **not** the pre-merge evidence that caused withdrawn #15.\n\nIssue #11 fixed observable handoff delivery for already-established real stops and intentionally prevents ordinary GREEN/RED completion from fabricating a stop/handoff. The new reproduction is after #11 and exposes a complementary gap: the workflow says RED is not a stop, but there is no enforced observable postcondition that deterministic routing actually continues after a non-stop RED boundary.\n\nSo #11 appears to be **too narrow for this failure mode**, not absent from the receiving chat.\n\n## Expected correction\n\nAdd a runtime-neutral deterministic-continuation postcondition for non-stop semantic boundaries:\n\n1. after terminal RED is durably persisted, immediately re-enter canonical routing/recovery;\n2. classify the RED according to current durable authority;\n3. continue the exact authorized correction/Research/Planning/Definition transition until the router reaches a real stop or another genuine blocker;\n4. do not emit a fresh-context handoff merely because RED occurred;\n5. preserve reviewer independence: the RED reviewer must not issue a later independent verdict for a subject it materially repairs, but role transition into bounded correction is not itself a stop when canonical authority permits it;\n6. add regression coverage for `fresh independent Review -> RED -> bounded correction -> repair/result -> next required independent review real stop/handoff`, proving the run cannot terminate merely at the first RED response.\n\nAlso cover GREEN/Card/role completion so deterministic non-stop continuation cannot silently end there either, while preserving true USER_STOP boundaries.",
+    "createdAt": "2026-09-28T22:38:28Z",
+    "number": 16,
+    "state": "CLOSED",
+    "title": "Deterministic workflow continuation can stop after RED even though RED is not a real stop",
+    "updatedAt": "2026-09-28T23:54:01Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/16",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "## Withdrawn\n\nThis report was created from evidence whose chronology was initially misunderstood.\n\nThe screenshot used as the reproduction was captured at **2026-09-28 23:41 Europe/Zurich**, while Issue #11 was closed/merged at **2026-09-28 21:50 UTC = 23:50 Europe/Zurich**. The observed chat therefore predates the #11 correction reaching main and cannot demonstrate post-fix behavior.\n\nNo confirmed post-#11 reproduction remains in this Issue. Closing as not planned. If the behavior is reproduced from a context started after the #11 merge, it should be diagnosed from that new evidence rather than treating this withdrawn report as proof of a regression.",
+    "createdAt": "2026-09-28T22:33:58Z",
+    "number": 15,
+    "state": "CLOSED",
+    "title": "[Withdrawn: pre-fix evidence] Fresh independent-review context can continue as Main after GREEN instead of returning control",
+    "updatedAt": "2026-09-28T22:37:56Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/15",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "## Bug\n\nA real PWv2.2 consumer run exposed an ordering cycle that passed both the P2 planner audit and independent Plan Review because acyclicity was checked on execution/seam-input dependencies without composing acceptance/composed-review gates into the same legality graph.\n\nObserved consumer: elmakus/chatgpt-codex-project-workflow, branch work/pwv22-program-brainstorming.\n\nRelevant evidence:\n- frozen P2 subject commit: 76c46d59566807a4d0f11832d0c30f3123c0c54e\n- P2 Plan Review: implementation/workstreams/change-pwv22-program-brainstorming/evidence/PLAN_REVIEW_P2_R01_2026-09-28.md\n- initial S07 Card materialization: 1afdcc1a18e41f6e90cb4c269aa8cecbee65798c\n\nThe problematic semantics became explicit as:\n1. S08 needs the exact accepted S07 Result/material-input representation to materialize/execute.\n2. R03 is the required composed S07/S08 acceptance surface.\n3. S07 was stated as not consumable by S08 until that composed R03 boundary was satisfied.\n4. But R03 cannot exist until S08 exists.\n\nSo the execution-only DAG can look acyclic (S05 -> S07 -> S08) while the legal execution+acceptance graph is cyclic (S07 -> R03(S07+S08) -> permission for S08 to consume S07 -> S08 -> R03).\n\nExecution Prep correctly failed closed and returned this to Strategic Planning. The defect is that planner audit / Plan Review did not detect the cross-gate cycle earlier.\n\n## Expected future correction\n\nPlanning audit / Plan Review should detect cycles that arise only after combining material-input/result-consumption dependencies with acceptance/composed-review gates. It must distinguish constituent acceptance sufficient for bounded implementation-input consumption from composed acceptance required before downstream consumption, without weakening composed acceptance.\n\n## Disposition\n\nDeferred for PWv2.2.1. Do not widen the active PWv2.2.0 correction scope solely to implement this canonical workflow fix.",
+    "createdAt": "2026-09-28T22:20:39Z",
+    "number": 14,
+    "state": "OPEN",
+    "title": "Plan Review can miss cycles spanning execution dependencies and acceptance gates",
+    "updatedAt": "2026-09-28T22:20:39Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/14",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "Superseded / created from an incorrect classification model.\n\nCorrection: observed defects are tracked as GitHub Issues when activated with #issue, whether fixed now or deferred to a later version. Future improvement ideas activated with #feature are parked as non-authoritative candidates in elmakus/project-research. Research produced while resolving an Issue may later be orchestrated from Brainstorming/Research, but the Issue itself is not first converted into a research candidate.\n\nThis Issue is intentionally closed without implementation.",
+    "createdAt": "2026-09-28T22:07:44Z",
+    "number": 13,
+    "state": "CLOSED",
+    "title": "[Superseded] Define parking and promotion convention for future workflow findings",
+    "updatedAt": "2026-09-28T22:20:38Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/13",
+    "comments": []
+  },
+  {
+    "author": {
+      "id": "MDQ6VXNlcjc2OTEwNjg3",
+      "is_bot": false,
+      "login": "elmakus",
+      "name": ""
+    },
+    "body": "Observed in multiple PWv2 consumers (including elmakus/pi-unraid and elmakus/chatgpt-codex-project-workflow): a context can correctly establish a real fresh-context/independent-review stop but intermittently omit the required USER ACTION REQUIRED + NEW CHAT START PROMPT. A subsequent equivalent boundary may render it correctly.\n\nAudit findings:\n- workflow/ROUTER.md requires every real stop to load workflow/USER_STOP.md.\n- workflow/USER_STOP.md requires a ready-to-copy locator prompt when a fresh ChatGPT context is required/recommended.\n- workflow/REVIEW.md requires fresh-context locator handoff when the current context produced/repaired the exact subject and no qualifying independent context is available.\n- M05-T01 tests currently prove mainly that these strings/contracts exist in Markdown; they do not behaviorally/structurally prove that a routed fresh-context stop cannot complete without the handoff artifact.\n\nRequired correction:\n1. Preserve the principle that PW specifies semantic obligations, not LLM implementation procedure.\n2. Treat fresh-context handoff fields as an output/postcondition contract, not reasoning instructions.\n3. A router-established fresh-context-required stop must not be complete unless the user-facing result includes the exact locator-only handoff required by USER_STOP.\n4. Do not let USER_STOP create stops. Only canonical routing/owner state may establish a stop.\n5. Add behavioral/structural regression coverage for:\n   - produced subject -> pending independent review -> fresh-context stop -> required handoff;\n   - repaired RED subject -> next independent review -> required handoff;\n   - ordinary GREEN/RED/Card completion that is not a stop -> no fabricated stop/handoff;\n   - end-of-scope and premium stop behavior remains unchanged.\n6. Do not mutate consumer Task Boards/workstreams as part of this fix.\n\nThis issue is intended as a bounded canonical PWv2 defect; active consumer executions should be able to continue from durable state while this is corrected.",
+    "createdAt": "2026-09-28T21:02:23Z",
+    "number": 11,
+    "state": "CLOSED",
+    "title": "Make fresh-context handoff delivery deterministic at real stops",
+    "updatedAt": "2026-09-28T21:50:53Z",
+    "url": "https://github.com/elmakus/project_workflow_v2/issues/11",
+    "comments": []
+  }
+]
