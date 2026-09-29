@@ -35,3 +35,7 @@ path = "implementation/workstreams/issue-orphan-preexecution-owners/BRAINSTORM.t
 [definition]
 class = "definition"
 path = "implementation/workstreams/issue-orphan-preexecution-owners/DEFINITION.toml"
+
+[planning]
+class = "planning"
+path = "implementation/workstreams/issue-orphan-preexecution-owners/PLANNING.toml"
