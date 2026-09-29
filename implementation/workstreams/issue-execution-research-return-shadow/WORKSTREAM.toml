@@ -39,3 +39,7 @@ path = "implementation/workstreams/issue-execution-research-return-shadow/DEFINI
 [planning]
 class = "planning"
 path = "implementation/workstreams/issue-execution-research-return-shadow/PLANNING.toml"
+
+[plan_review]
+class = "plan_review"
+path = "implementation/workstreams/issue-execution-research-return-shadow/PLAN_REVIEW.toml"

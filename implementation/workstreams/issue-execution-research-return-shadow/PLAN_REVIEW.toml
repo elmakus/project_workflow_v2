@@ -1,0 +1,21 @@
+workstream_id = "issue-execution-research-return-shadow"
+plan_revision = "P1"
+planning_cycle = 1
+attempt = "R01"
+verdict = "pending"
+evidence_path = ""
+
+[subject]
+class = "git_blob"
+repository = "elmakus/project_workflow_v2"
+commit = "c0e1a8bad8c6dae7b89b14385f70d6293f189395"
+path = "planning/ISSUE_28_EXECUTION_RESEARCH_RETURN_PRECEDENCE_PLAN.md"
+blob = "ac6f8c9ab6a9612a8bd6471537292f2bfdf6b023"
+
+[acceptance]
+class = "authority"
+path = "requirements/ISSUE_28_EXECUTION_RESEARCH_RETURN_PRECEDENCE.md"
+
+[independence]
+materially_produced_or_repaired_subject = false
+basis = "Fresh independent Premium B review context did not materially produce or repair this exact frozen plan subject."
