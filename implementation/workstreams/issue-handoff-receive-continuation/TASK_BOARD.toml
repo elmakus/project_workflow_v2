@@ -1,12 +1,12 @@
 workstream_id = "issue-handoff-receive-continuation"
-revision = 4
+revision = 5
 
 [execution_ref]
 branch = "work/pwv2-handoff-receive-continuation"
 
 [[cards]]
 id = "M06-T01"
-status = "implemented"
+status = "DONE"
 review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-handoff-receive-continuation/reviews/M06-T01-R01.toml" }]
 
 [cards.contract]
@@ -22,7 +22,7 @@ blob = "eda46340dae4a0e209728723fd5783ed20c2bfcd"
 [[jit_triggers]]
 id = "M06-T02-after-M06-T01"
 after_card = "M06-T01"
-state = "waiting"
+state = "satisfied"
 condition = "Materialize M06-T02 only after M06-T01 is DONE with a durable exact GREEN result that can be bound as its dependency."
 
 [[jit_triggers]]
