@@ -1,0 +1,30 @@
+workstream_id = "issue-durable-state-schema"
+state = "active"
+origin_role = "intake"
+origin_subject = "Ensure every canonical PWv2 durable-state producer emits state conforming to the same current executable schema used by the router/validators, and add deterministic fail-closed intra-V2 schema reconciliation for supported older or legacy-shaped active workstreams that preserves accepted scope, approvals and immutable authority, with fresh-materialization and resume regression coverage."
+return_target = "intake"
+return_reconciliation = "pending"
+return_result = ""
+finding = ""
+limitations = ""
+conflicts = ""
+
+[[sources]]
+class = "official_upstream"
+status = "checked"
+weight = "highest: canonical PWv2 workflow modules and executable contracts define the current schema and routing semantics"
+
+[[sources]]
+class = "project_runtime"
+status = "checked"
+weight = "highest: exact Git snapshots and Recovery commits for the two supplied reproductions"
+
+[[sources]]
+class = "tracker_discussion"
+status = "checked"
+weight = "context only: Issues #20, #22 and #23 establish observed symptoms but not workflow authority"
+
+[[sources]]
+class = "practitioner_community"
+status = "not_relevant"
+weight = "not relevant: this is an internal repository contract with authoritative local executable semantics"
