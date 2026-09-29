@@ -1,0 +1,13 @@
+workstream_id = "issue-premium-b-handoff-loop"
+scope_id = "premium-b-receive-admission"
+revision = 1
+state = "active"
+challenge_audit = "pending"
+explicit_user_stop = false
+promotion_state = "pending"
+promotion_subject = ""
+source_subject = "Define a canonical exact-subject-bound Premium B receive admission transition so a valid semantically independent receiver consumes the specific transferable Premium B boundary and establishes the exact pending Plan Review admission before ordinary rerouting, while preserving producer-side Premium B as a real stop, stale/replay/concurrency safety, Recovery precedence, and runtime-neutral independence."
+scope = "Explore and decide the canonical architecture for exact-subject-bound Premium B handoff receipt and Plan Review admission, including transition ownership, exact boundary identity, atomicity/crash semantics, concurrent receiver behavior, locator compatibility, semantic-independence evidence and composition with Recovery/schema reconciliation."
+non_goals = "No implementation, Definition promotion, router/schema mutation or weakening of producer-side Premium B, semantic independence, Recovery precedence or runtime-neutral authority during Brainstorming."
+future_direction = "After resolving genuine product/strategy choices and a GREEN final challenge, present the exact brainstorm revision for explicit Definition-promotion authorization."
+challenge = "Research identifies multiple viable families; Brainstorming must select the smallest architecture that closes the real producer-to-receiver transition without introducing stale/replay authorization, parallel workflow authority or runtime/session identity as durable truth."
