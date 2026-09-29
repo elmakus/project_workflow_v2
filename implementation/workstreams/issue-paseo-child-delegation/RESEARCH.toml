@@ -1,0 +1,34 @@
+workstream_id = "issue-paseo-child-delegation"
+state = "consumed"
+origin_role = "intake"
+origin_subject = "repair:runtime-neutral-verified-child-delegation-fallback:v1"
+return_target = "intake"
+return_reconciliation = "applied"
+return_result = "implementation/workstreams/issue-paseo-child-delegation/RESEARCH.toml#finding"
+finding = "PWv2 correctly requires semantic independence and runtime-neutral authority, but a receiving Paseo/Pi context can falsely classify delegation as unavailable when it tests only for an exposed native agent-scoped create_agent/MCP surface. Upstream Paseo v0.9.2 defines create_agent in its caller-scoped Paseo tool catalog and Pi receives that catalog through its MCP adapter path; project runtime evidence separately proves Paseo daemon -> Pi-provider child launch. The bounded repair is capability-based: permit an evidence-bound fallback child-launch/delegation path only when it can preserve exact subject, independent context, lifecycle/readback and fail-closed semantics. A mere spawned pi process is not by itself equivalent to create_agent."
+limitations = "The current pi-unraid evidence proves daemon-parented Pi agent launch, not that the exact production Paseo session exposes create_agent inside Pi. The fallback therefore must verify its usable delegation surface and child/result binding at runtime rather than infer capability from process presence. No claim is made that CLI launch and native create_agent are identical implementations."
+conflicts = "No authority conflict. Upstream supports both Pi process-backed agents and caller-scoped Paseo tools, while project evidence proves child launch but not in-agent tool exposure. The apparent conflict is resolved by distinguishing launch capability from agent-scoped delegation capability."
+
+[[sources]]
+class = "official_upstream"
+status = "checked"
+weight = "primary"
+reference = "getpaseo/paseo@v0.9.2 docs/providers.md"
+
+[[sources]]
+class = "project_runtime"
+status = "checked"
+weight = "primary"
+reference = "elmakus/pi-unraid@24a45813094a22e2a189692204804a54a51c0a6a M06-T01 Paseo/Pi spawn evidence"
+
+[[sources]]
+class = "tracker_discussion"
+status = "checked"
+weight = "direct"
+reference = "elmakus/project_workflow_v2#20"
+
+[[sources]]
+class = "practitioner_community"
+status = "not_relevant"
+weight = "none"
+reference = "Issue is an exact local runtime/contract mismatch; community opinion cannot establish the required capability or independence semantics."
