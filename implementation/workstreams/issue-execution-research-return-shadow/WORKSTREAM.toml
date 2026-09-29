@@ -25,3 +25,7 @@ path = "implementation/workstreams/issue-execution-research-return-shadow/TRACKE
 [research]
 class = "research"
 path = "implementation/workstreams/issue-execution-research-return-shadow/RESEARCH.toml"
+
+[brainstorm]
+class = "brainstorm"
+path = "implementation/workstreams/issue-execution-research-return-shadow/BRAINSTORM.toml"
