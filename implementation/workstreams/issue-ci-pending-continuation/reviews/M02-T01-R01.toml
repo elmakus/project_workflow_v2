@@ -1,0 +1,20 @@
+workstream_id = "issue-ci-pending-continuation"
+card_id = "M02-T01"
+attempt = "R01"
+verdict = "pending"
+evidence_path = ""
+
+[subject]
+class = "git_blob"
+repository = "elmakus/project_workflow_v2"
+commit = "f1bf2d4a2e490455b069ded1d614562db6628cdf"
+path = "implementation/workstreams/issue-ci-pending-continuation/results/M02-T01.md"
+blob = "a8ae2997550a18b116536bcb2572a08d24a8b1c4"
+
+[acceptance]
+class = "task_card"
+path = "implementation/workstreams/issue-ci-pending-continuation/cards/M02-T01.md"
+
+[independence]
+materially_produced_or_repaired_subject = true
+basis = "Current context materially implemented M02-T01 implementation subject 2deea07f7dd2c0192828f2e6d1822d9b2f584a6b and therefore cannot issue the independent verdict for its exact current result subject."
