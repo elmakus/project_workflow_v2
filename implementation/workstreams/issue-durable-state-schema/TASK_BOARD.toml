@@ -1,5 +1,5 @@
 workstream_id = "issue-durable-state-schema"
-revision = 5
+revision = 6
 
 [execution_ref]
 branch = "work/pwv2-durable-state-schema"
@@ -22,8 +22,16 @@ blob = "aedcd2262a1b0a01ebde710ea186e2d65498dd0b"
 class = "review_attempt"
 path = "implementation/workstreams/issue-durable-state-schema/reviews/M01-T01-R01.toml"
 
+[[cards]]
+id = "M02-T01"
+status = "ready"
+
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/issue-durable-state-schema/cards/M02-T01.md"
+
 [[jit_triggers]]
 id = "after-M01-T01-materialize-M02"
 after_card = "M01-T01"
-state = "satisfied"
+state = "consumed"
 condition = "When M01-T01 is DONE with a durable result, materialize the M02 reconciliation Card using that exact result path@commit:blob as its dependency."
