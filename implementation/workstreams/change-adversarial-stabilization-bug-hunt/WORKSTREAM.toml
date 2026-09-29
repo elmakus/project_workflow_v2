@@ -1,0 +1,20 @@
+kind = "change"
+workstream_id = "change-adversarial-stabilization-bug-hunt"
+branch = "research/pwv2-adversarial-stabilization-bug-hunt"
+created_from = "d3ab917f02e4de91b7dbb17915c2287c2387333e"
+integration_target = "main"
+authority = [
+  { class = "authority", path = "workflow/ROUTER.md" },
+  { class = "authority", path = "workflow/AUTHORITY.md" },
+  { class = "authority", path = "workflow/STATE.md" },
+  { class = "authority", path = "workflow/CONTINUATION.md" },
+  { class = "authority", path = "workflow/CLOSE.md" },
+]
+
+[intake]
+class = "intake"
+path = "implementation/workstreams/change-adversarial-stabilization-bug-hunt/INTAKE.toml"
+
+[research]
+class = "research"
+path = "implementation/workstreams/change-adversarial-stabilization-bug-hunt/RESEARCH.toml"
