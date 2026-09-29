@@ -1,12 +1,12 @@
 workstream_id = "issue-durable-state-schema"
 kind = "issue"
-state = "active"
+state = "complete"
 diagnosis_revision = 1
 repair_subject = "Ensure every canonical PWv2 durable-state producer emits state conforming to the same current executable schema used by the router/validators, and add deterministic fail-closed intra-V2 schema reconciliation for supported older or legacy-shaped active workstreams that preserves accepted scope, approvals and immutable authority, with fresh-materialization and resume regression coverage."
 diagnosis_prior_art_subject = "Ensure every canonical PWv2 durable-state producer emits state conforming to the same current executable schema used by the router/validators, and add deterministic fail-closed intra-V2 schema reconciliation for supported older or legacy-shaped active workstreams that preserves accepted scope, approvals and immutable authority, with fresh-materialization and resume regression coverage."
 diagnosis_prior_art_result = "implementation/workstreams/issue-durable-state-schema/evidence/INTAKE_PRIOR_ART.md@6763f786be3f26e1de699a40fe2e638b272f41a5:29c78d8ed154734ff57313208eaf2061557dc657"
-response_kind = "none"
-response_observed = false
-alignment_state = "pending"
-alignment_subject = ""
+response_kind = "authorization"
+response_observed = true
+alignment_state = "authorized"
+alignment_subject = "Ensure every canonical PWv2 durable-state producer emits state conforming to the same current executable schema used by the router/validators, and add deterministic fail-closed intra-V2 schema reconciliation for supported older or legacy-shaped active workstreams that preserves accepted scope, approvals and immutable authority, with fresh-materialization and resume regression coverage."
 micro_fix_candidate = false
