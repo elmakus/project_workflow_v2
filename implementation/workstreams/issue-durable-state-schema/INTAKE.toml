@@ -1,0 +1,12 @@
+workstream_id = "issue-durable-state-schema"
+kind = "issue"
+state = "active"
+diagnosis_revision = 0
+repair_subject = ""
+diagnosis_prior_art_subject = ""
+diagnosis_prior_art_result = ""
+response_kind = "none"
+response_observed = false
+alignment_state = "pending"
+alignment_subject = ""
+micro_fix_candidate = false
