@@ -33,18 +33,34 @@ def classify_route_completion(*, disposition: str, obligation: str) -> Continuat
     raise ContinuationContractError(f"unknown route disposition {disposition!r}")
 
 
-TERMINAL_SUCCESS = frozenset({"success", "passed", "completed"})
+TERMINAL_SUCCESS = frozenset({"success", "passed"})
 TERMINAL_FAILURE = frozenset({"failure", "failed", "cancelled", "timed_out", "action_required"})
 PENDING_EXTERNAL = frozenset({"queued", "requested", "waiting", "pending", "in_progress"})
 
 
-def classify_external_evidence(*, status: str, exact_subject_observed: bool = True) -> str:
+def classify_external_evidence(
+    *,
+    status: str,
+    conclusion: str | None = None,
+    exact_subject_observed: bool = True,
+) -> str:
     """Classify exact-subject external evidence without claiming semantic reconciliation."""
     if not isinstance(status, str) or not status.strip():
         raise ContinuationContractError("external evidence status must be non-empty")
     if not isinstance(exact_subject_observed, bool):
         raise ContinuationContractError("exact_subject_observed must be boolean")
     normalized = status.strip().lower()
+    normalized_conclusion = conclusion.strip().lower() if isinstance(conclusion, str) else None
+    if conclusion is not None and (not isinstance(conclusion, str) or not normalized_conclusion):
+        raise ContinuationContractError("external evidence conclusion must be non-empty when supplied")
+    if normalized == "completed":
+        if not exact_subject_observed:
+            raise ContinuationContractError("completed evidence is not bound to the exact subject")
+        if normalized_conclusion in TERMINAL_SUCCESS:
+            return "terminal_success"
+        if normalized_conclusion in TERMINAL_FAILURE:
+            return "terminal_failure"
+        raise ContinuationContractError("completed evidence requires a supported terminal conclusion")
     if normalized in TERMINAL_SUCCESS:
         if not exact_subject_observed:
             raise ContinuationContractError("terminal success is not bound to the exact subject")
