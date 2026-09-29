@@ -1,0 +1,14 @@
+workstream_id = "issue-durable-state-schema"
+source_scope_subject = "durable-state-schema-contract-parity@1"
+revision = "R1"
+state = "green"
+completeness_audit = "green"
+premium_a = "satisfied"
+
+[requirements]
+class = "authority"
+path = "requirements/ISSUE_23_DURABLE_STATE_SCHEMA.md"
+
+[[decisions]]
+class = "authority"
+path = "decisions/ISSUE_23_DURABLE_STATE_SCHEMA.md"

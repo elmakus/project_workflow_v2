@@ -1,0 +1,13 @@
+workstream_id = "issue-paseo-child-delegation"
+scope_id = "temporary-paseo-create-agent-readiness"
+revision = 1
+state = "promoted"
+challenge_audit = "green"
+explicit_user_stop = false
+promotion_state = "authorized"
+promotion_subject = "temporary-paseo-create-agent-readiness@1"
+source_subject = "repair:temporary-paseo-create-agent-readiness:v2"
+scope = "Temporary readiness/configuration repair for the current Paseo/Pi deployment: rely only on the official caller-scoped Paseo create_agent path, ensure or verify the supported agent-tool injection prerequisites, and fail closed with a specific diagnostic when the required capability is unavailable."
+non_goals = "No PWv2 child spawner; no daemon or shell spawn bypass; no alternate lifecycle/readback; no fallback delegation mechanism; no implementation of the final PWv2.2 helper in this workstream."
+future_direction = "The later PWv2.2 runtime-neutral helper/adapter remains separate and, for Paseo, should consume the official Paseo child-delegation capability rather than a spawn workaround."
+challenge = "The smallest repair is intentionally temporary and deployment/readiness-scoped. Live E2E already proves official create_agent works when injection is enabled, so adding an alternate delegation implementation would duplicate Paseo and create migration debt."

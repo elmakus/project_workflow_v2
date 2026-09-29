@@ -1,0 +1,19 @@
+kind = "issue"
+workstream_id = "issue-pwv2-stabilization-program"
+branch = "work/pwv2-stabilization-program"
+created_from = "d3ab917f02e4de91b7dbb17915c2287c2387333e"
+integration_target = "main"
+authority = [
+  { class = "authority", path = "workflow/ROUTER.md" },
+  { class = "authority", path = "workflow/INTAKE.md" },
+  { class = "authority", path = "workflow/RESEARCH.md" },
+  { class = "authority", path = "workflow/BRAINSTORMING.md" },
+  { class = "authority", path = "workflow/DEFINITION.md" },
+  { class = "authority", path = "workflow/STATE.md" },
+  { class = "authority", path = "workflow/AUTHORITY.md" },
+  { class = "authority", path = "workflow/CONTINUATION.md" },
+]
+
+[intake]
+class = "intake"
+path = "implementation/workstreams/issue-pwv2-stabilization-program/INTAKE.toml"

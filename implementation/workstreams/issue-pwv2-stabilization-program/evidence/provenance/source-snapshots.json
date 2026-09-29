@@ -1,0 +1,20 @@
+[
+  {
+    "branch": "research/pwv2-adversarial-stabilization-bug-hunt",
+    "head": "95d74bad11115419696a684c8eef11fda076f92f",
+    "workstream": "change-adversarial-stabilization-bug-hunt",
+    "role": "evidence and existing-scope boundary only; not canonical product policy or selected live continuation"
+  },
+  {
+    "branch": "work/pwv2-durable-state-schema",
+    "head": "b076e081fb91815ff570fb70566e71f8cc53154e",
+    "workstream": "issue-durable-state-schema",
+    "role": "evidence and existing-scope boundary only; not canonical product policy or selected live continuation"
+  },
+  {
+    "branch": "work/pwv2-paseo-child-delegation",
+    "head": "c5e9ba1d3da8d339e882b43b86b4e8a8dd2e9a28",
+    "workstream": "issue-paseo-child-delegation",
+    "role": "evidence and existing-scope boundary only; not canonical product policy or selected live continuation"
+  }
+]

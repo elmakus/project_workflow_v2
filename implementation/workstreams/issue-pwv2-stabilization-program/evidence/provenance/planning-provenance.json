@@ -1,0 +1,110 @@
+{
+  "kind": "noncanonical diagnosis/planning provenance; no workflow state or approval",
+  "proposal": "PWV2-STAB-P1",
+  "implementation_authorized": false,
+  "canonical_repository": "elmakus/project_workflow_v2",
+  "canonical_commit": "d3ab917f02e4de91b7dbb17915c2287c2387333e",
+  "pi_audit_evidence_commit": "6f1a047c912898281a645594b8518140172a8682",
+  "inputs": [
+    {
+      "path": "/tmp/pwv2-stabilization/STABILIZATION_PROGRAM_P1.md",
+      "sha256": "869f277e95ae8b15e969beb04d48d3b53d5ef095e4553359a4d356158e1ecce3"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/issue-readback.json",
+      "sha256": "4fc6581b525dc808e7eadde31cca2a3a5bdb271954ac174855c8538bbb48f8f4"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/source-snapshots.json",
+      "sha256": "0cc2494f28338d410e5d50210803082616afedb6cb4f8cf4894c2a152cebde2e"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/pr9-readback.json",
+      "sha256": "f47ded1b7796b89e1e7d32023b94d9bd23ceb8f7f0791cb9a9e83e1ea539fafb"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/pr24-readback.json",
+      "sha256": "4d8630f71a8b694872563fb12ddaa246a986e04743a03af6524ce8ea73533b0d"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/merged-pr-readback.json",
+      "sha256": "daa6a73e928a793ae70fb536c4b3f19a88277603dc90b10463664ba1d740be2d"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/issue23-existing-authority.md",
+      "sha256": "479c2436e51b4539fdf3949efd621f60497b6e673412d58e630e2fc6dbaa96bb"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/issue20-existing-authority.md",
+      "sha256": "ddf2f00c13b97b300db20c638cedb2456b30c7d343614cc6e73f33cae91c0680"
+    },
+    {
+      "path": "/tmp/pwv2-runtime-audit/evidence/REPORT.md",
+      "sha256": "ce88653db76d334009d322788a38c53021783ac51b902827efa44c7fd55caf90"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/source-evidence/change-adversarial-stabilization-bug-hunt/BRAINSTORM.toml",
+      "sha256": "739441a04683ae9e91259581705abbe21d1cf0d014b269ba92c2f88386abe394"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/source-evidence/change-adversarial-stabilization-bug-hunt/INTAKE.toml",
+      "sha256": "6724d7b65ff49741ab90c777c1090c9d5198c958a0da81c2afb0c0e77a94eacf"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/source-evidence/change-adversarial-stabilization-bug-hunt/RESEARCH.toml",
+      "sha256": "26bb5e04ba882cd211d3a3e95efaf07b4bf2288c369d2a82193535bbd73f319a"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/source-evidence/change-adversarial-stabilization-bug-hunt/WORKSTREAM.toml",
+      "sha256": "eaaff8b2064d8ebffb7d92780660c09b24966756da8fe12a8eb79da5b245b1fc"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/source-evidence/change-adversarial-stabilization-bug-hunt/evidence--ADVERSARIAL_STABILIZATION_AUDIT_2026-09-29.md",
+      "sha256": "b1b8bda83304c62c989abf8c347bee2ee0df01a1de4ebe6ee64fcce93f8b05c2"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/source-evidence/issue-durable-state-schema/BRAINSTORM.toml",
+      "sha256": "413a1eda0ce66971ed0baa4461685330f15dbef32a465a9458341af6b39778bd"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/source-evidence/issue-durable-state-schema/DEFINITION.toml",
+      "sha256": "1ffa480f88834b646cba5fa36caba0fc5294661dfc5918dd36ee5684300a30a2"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/source-evidence/issue-durable-state-schema/INTAKE.toml",
+      "sha256": "ff174acad653bcca61e51ec58e3d3ee985a4b4bdf1f2b5f86112dc0843e1a6ae"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/source-evidence/issue-durable-state-schema/PLANNING.toml",
+      "sha256": "6b4fa1ec180814cdb4ba0dc4db684fc88192b9572608762d36205b10339330df"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/source-evidence/issue-durable-state-schema/RESEARCH.toml",
+      "sha256": "ba707a3e91c595c25aae06728d5d752c1f8371d407f99986d6c214d0a7699811"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/source-evidence/issue-durable-state-schema/WORKSTREAM.toml",
+      "sha256": "072b71087380dcb5ff70db458f998ff15784688ba17596e0f586b5bfc0ee9483"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/source-evidence/issue-paseo-child-delegation/BRAINSTORM.toml",
+      "sha256": "03ef99c67e07540f83113e4aa005e7540c575c21707732cff67843d2b7fc7bee"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/source-evidence/issue-paseo-child-delegation/DEFINITION.toml",
+      "sha256": "372f554cd27a4978153b946f76b5684529971d7df211d0d3cdc0d6331bee64c7"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/source-evidence/issue-paseo-child-delegation/INTAKE.toml",
+      "sha256": "ad7af464680eca7d83d10765ac08de7815a1ae365b30172d0cb314fa52260dc3"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/source-evidence/issue-paseo-child-delegation/PLANNING.toml",
+      "sha256": "a7ab0df1e9686382880982198ce3b7b4b42c613b1ed205b4ee92412d50156f80"
+    },
+    {
+      "path": "/tmp/pwv2-stabilization/source-evidence/issue-paseo-child-delegation/WORKSTREAM.toml",
+      "sha256": "09f1805b0b991bf5e2e9ad6d2f095eb96a7f7bd08e869c6c29ffe34163033ccd"
+    }
+  ]
+}

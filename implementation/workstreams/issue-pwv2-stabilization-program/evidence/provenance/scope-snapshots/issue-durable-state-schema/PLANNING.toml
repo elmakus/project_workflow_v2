@@ -1,0 +1,22 @@
+workstream_id = "issue-durable-state-schema"
+cycle = 1
+entry_subject = "R1"
+revision = "P1"
+state = "approved"
+planner_audit = "green"
+plan_path = "planning/ISSUE_23_DURABLE_STATE_SCHEMA_PLAN.md"
+review_mode = "independent"
+review_exemption_basis = ""
+review_exemption_base_subject = ""
+premium_a = "satisfied"
+premium_a_subject = "R1"
+premium_b = "satisfied"
+premium_b_subject = "elmakus/project_workflow_v2@8c009500dc1cdc98baa88613a8d5b258cba5791a:planning/ISSUE_23_DURABLE_STATE_SCHEMA_PLAN.md@ea1f3a1a034e180a9b21df5588011c624aa6782f"
+premium_c = "satisfied"
+premium_c_subject = "elmakus/project_workflow_v2@8c009500dc1cdc98baa88613a8d5b258cba5791a:planning/ISSUE_23_DURABLE_STATE_SCHEMA_PLAN.md@ea1f3a1a034e180a9b21df5588011c624aa6782f"
+
+[subject]
+repository = "elmakus/project_workflow_v2"
+commit = "8c009500dc1cdc98baa88613a8d5b258cba5791a"
+path = "planning/ISSUE_23_DURABLE_STATE_SCHEMA_PLAN.md"
+blob = "ea1f3a1a034e180a9b21df5588011c624aa6782f"

@@ -1,0 +1,30 @@
+workstream_id = "change-adversarial-stabilization-bug-hunt"
+state = "consumed"
+origin_role = "intake"
+origin_subject = "adversarial-stabilization-bug-hunt@1"
+return_target = "intake"
+return_reconciliation = "applied"
+return_result = "implementation/workstreams/change-adversarial-stabilization-bug-hunt/evidence/ADVERSARIAL_STABILIZATION_AUDIT_2026-09-29.md@c9491d2039da0b302f8a8c85c1449b89b615ea73:c2d4e91f12dd35ab23e862db9b876e0ec5a41b71"
+finding = "Adversarial full-lifecycle audit found multiple independent invariant classes rather than one systemic root cause: existing #14/#16/#18/#22/#23/#25/#26 remain the correct trackers for their reproduced scopes, while seven current-schema-valid or structurally distinct defects were deduplicated and opened as #27 through #33."
+limitations = "Diagnosis is anchored to current canonical main d3ab917f02e4de91b7dbb17915c2287c2387333e and exact repository artifacts. No repair branch was treated as canonical authority and no implementation was performed."
+conflicts = "The audit rejects a single-root-cause explanation: producer/schema drift, handoff receipt, terminal semantic closure, selector precedence, durable Close identity, review acceptance identity, Plan Review history, and Intake relational closure are separable failure classes with independent reproducers."
+
+[[sources]]
+class = "official_upstream"
+status = "checked"
+weight = "primary: current workflow/ROUTER.md, owner modules, executable contracts, templates and tests"
+
+[[sources]]
+class = "project_runtime"
+status = "checked"
+weight = "direct: current main durable workstreams, exact terminal Close evidence and schema-valid reproductions"
+
+[[sources]]
+class = "tracker_discussion"
+status = "checked"
+weight = "supporting: existing Issues #11, #14, #16, #17, #18, #20, #22, #23, #25, #26 and deduplicated new Issues #27-#33"
+
+[[sources]]
+class = "practitioner_community"
+status = "not_relevant"
+weight = "not relevant: these invariants are internally defined by canonical PWv2 repository authority"
