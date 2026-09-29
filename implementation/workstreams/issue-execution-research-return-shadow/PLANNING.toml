@@ -1,0 +1,22 @@
+workstream_id = "issue-execution-research-return-shadow"
+cycle = 1
+entry_subject = "D1"
+revision = "P1"
+state = "frozen"
+planner_audit = "green"
+plan_path = "planning/ISSUE_28_EXECUTION_RESEARCH_RETURN_PRECEDENCE_PLAN.md"
+review_mode = "independent"
+review_exemption_basis = ""
+review_exemption_base_subject = ""
+premium_a = "satisfied"
+premium_a_subject = "D1"
+premium_b = "due"
+premium_b_subject = "elmakus/project_workflow_v2@c0e1a8bad8c6dae7b89b14385f70d6293f189395:planning/ISSUE_28_EXECUTION_RESEARCH_RETURN_PRECEDENCE_PLAN.md@ac6f8c9ab6a9612a8bd6471537292f2bfdf6b023"
+premium_c = "not_due"
+premium_c_subject = ""
+
+[subject]
+repository = "elmakus/project_workflow_v2"
+commit = "c0e1a8bad8c6dae7b89b14385f70d6293f189395"
+path = "planning/ISSUE_28_EXECUTION_RESEARCH_RETURN_PRECEDENCE_PLAN.md"
+blob = "ac6f8c9ab6a9612a8bd6471537292f2bfdf6b023"
