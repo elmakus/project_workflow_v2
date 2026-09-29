@@ -35,7 +35,7 @@ condition = "Materialize the downstream Execution/evidence-composition Card from
 
 [[cards]]
 id = "M02-T01"
-status = "in_progress"
+status = "done"
 
 [cards.contract]
 class = "task_card"
