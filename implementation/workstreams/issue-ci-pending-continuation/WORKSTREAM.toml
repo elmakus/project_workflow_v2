@@ -23,3 +23,7 @@ path = "implementation/workstreams/issue-ci-pending-continuation/RESEARCH.toml"
 [tracker]
 class = "tracker"
 path = "implementation/workstreams/issue-ci-pending-continuation/TRACKER.toml"
+
+[brainstorm]
+class = "brainstorm"
+path = "implementation/workstreams/issue-ci-pending-continuation/BRAINSTORM.toml"
