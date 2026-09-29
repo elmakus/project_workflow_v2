@@ -1,8 +1,8 @@
 workstream_id = "issue-orphan-preexecution-owners"
 card_id = "M01-T01"
 attempt = "R01"
-verdict = "pending"
-evidence_path = ""
+verdict = "green"
+evidence_path = "implementation/workstreams/issue-orphan-preexecution-owners/reviews/M01-T01-R01-evidence.md"
 
 [subject]
 class = "git_blob"
@@ -17,4 +17,4 @@ path = "implementation/workstreams/issue-orphan-preexecution-owners/cards/M01-T0
 
 [independence]
 materially_produced_or_repaired_subject = false
-basis = "R01 is reserved for a fresh independent review context that did not implement or repair the exact M01-T01 subject."
+basis = "Fresh independent review of exact result and Card acceptance; reviewing context did not implement or repair the subject."
