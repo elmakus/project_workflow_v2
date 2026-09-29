@@ -39,3 +39,7 @@ path = "implementation/workstreams/issue-orphan-preexecution-owners/DEFINITION.t
 [planning]
 class = "planning"
 path = "implementation/workstreams/issue-orphan-preexecution-owners/PLANNING.toml"
+
+[plan_review]
+class = "plan_review"
+path = "implementation/workstreams/issue-orphan-preexecution-owners/PLAN_REVIEW.toml"
