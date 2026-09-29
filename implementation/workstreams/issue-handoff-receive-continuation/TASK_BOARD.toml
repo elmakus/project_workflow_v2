@@ -1,17 +1,23 @@
 workstream_id = "issue-handoff-receive-continuation"
-revision = 2
+revision = 3
 
 [execution_ref]
 branch = "work/pwv2-handoff-receive-continuation"
 
 [[cards]]
 id = "M06-T01"
-status = "in_progress"
+status = "implemented"
 review_attempts = []
 
 [cards.contract]
 class = "task_card"
 path = "implementation/workstreams/issue-handoff-receive-continuation/cards/M06-T01.md"
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-handoff-receive-continuation/results/M06-T01.md"
+commit = "bf375a645359d338218e782e94856c8fa9f1ed02"
+blob = "eda46340dae4a0e209728723fd5783ed20c2bfcd"
 
 [[jit_triggers]]
 id = "M06-T02-after-M06-T01"
