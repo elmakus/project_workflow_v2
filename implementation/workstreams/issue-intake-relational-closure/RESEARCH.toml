@@ -1,0 +1,30 @@
+workstream_id = "issue-intake-relational-closure"
+state = "active"
+origin_role = "intake"
+origin_subject = "repair:intake-relational-closure:v1"
+return_target = "intake"
+return_reconciliation = "pending"
+return_result = ""
+finding = ""
+limitations = ""
+conflicts = ""
+
+[[sources]]
+class = "official_upstream"
+status = "pending"
+weight = "canonical workflow and state contracts control intended semantics"
+
+[[sources]]
+class = "project_runtime"
+status = "pending"
+weight = "current production validator/router behavior and exact reproducers control defect evidence"
+
+[[sources]]
+class = "tracker_discussion"
+status = "pending"
+weight = "current issue readback supports deduplication and diagnosis only"
+
+[[sources]]
+class = "practitioner_community"
+status = "pending"
+weight = "secondary evidence only; use only if material to this internal relational invariant"
