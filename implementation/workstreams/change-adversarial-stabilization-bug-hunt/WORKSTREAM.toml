@@ -18,3 +18,7 @@ path = "implementation/workstreams/change-adversarial-stabilization-bug-hunt/INT
 [research]
 class = "research"
 path = "implementation/workstreams/change-adversarial-stabilization-bug-hunt/RESEARCH.toml"
+
+[brainstorm]
+class = "brainstorm"
+path = "implementation/workstreams/change-adversarial-stabilization-bug-hunt/BRAINSTORM.toml"
