@@ -1,0 +1,12 @@
+workstream_id = "issue-premium-b-handoff-loop"
+kind = "issue"
+state = "complete"
+diagnosis_revision = 1
+repair_subject = "Define canonical exact-subject-bound Premium B handoff receipt so an eligible semantically independent receiver consumes the exact current transferable Premium B boundary, establishes one exact pending Plan Review admission, and canonically reroutes into Plan Review without replaying the producer stop, while preserving stale/replay/concurrency, Recovery, and Stage-6 independence safety."
+diagnosis_prior_art_subject = "Define canonical exact-subject-bound Premium B handoff receipt so an eligible semantically independent receiver consumes the exact current transferable Premium B boundary, establishes one exact pending Plan Review admission, and canonically reroutes into Plan Review without replaying the producer stop, while preserving stale/replay/concurrency, Recovery, and Stage-6 independence safety."
+diagnosis_prior_art_result = "project-research:projects/project_workflow_v2/issues/issue-25-premium-b-handoff-loop/FINAL_SYNTHESIS.md@research/issue25-premium-b-loop-integration"
+response_kind = "question_or_alternative"
+response_observed = true
+alignment_state = "brainstorming"
+alignment_subject = "Define canonical exact-subject-bound Premium B handoff receipt so an eligible semantically independent receiver consumes the exact current transferable Premium B boundary, establishes one exact pending Plan Review admission, and canonically reroutes into Plan Review without replaying the producer stop, while preserving stale/replay/concurrency, Recovery, and Stage-6 independence safety."
+micro_fix_candidate = false
