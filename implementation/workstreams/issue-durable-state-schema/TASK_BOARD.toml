@@ -1,5 +1,5 @@
 workstream_id = "issue-durable-state-schema"
-revision = 6
+revision = 7
 
 [execution_ref]
 branch = "work/pwv2-durable-state-schema"
@@ -24,7 +24,7 @@ path = "implementation/workstreams/issue-durable-state-schema/reviews/M01-T01-R0
 
 [[cards]]
 id = "M02-T01"
-status = "ready"
+status = "in_progress"
 
 [cards.contract]
 class = "task_card"
