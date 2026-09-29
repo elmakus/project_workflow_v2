@@ -12,6 +12,8 @@ authority = [
   { class = "authority", path = "workflow/STATE.md" },
   { class = "authority", path = "workflow/AUTHORITY.md" },
   { class = "authority", path = "workflow/CONTINUATION.md" },
+  { class = "authority", path = "requirements/ISSUE_32_INTAKE_RELATIONAL_CLOSURE.md" },
+  { class = "authority", path = "decisions/ISSUE_32_INTAKE_RELATIONAL_CLOSURE.md" },
 ]
 
 [intake]
@@ -29,3 +31,7 @@ path = "implementation/workstreams/issue-intake-relational-closure/TRACKER.toml"
 [brainstorm]
 class = "brainstorm"
 path = "implementation/workstreams/issue-intake-relational-closure/BRAINSTORM.toml"
+
+[definition]
+class = "definition"
+path = "implementation/workstreams/issue-intake-relational-closure/DEFINITION.toml"
