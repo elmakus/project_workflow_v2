@@ -1,5 +1,5 @@
 workstream_id = "issue-durable-state-schema"
 card_id = "M02-T01"
 class = "human_authority"
-summary = "The exact #20/#22 M02 profiles cannot satisfy accepted #23 fixture/authority requirements without an unauthorized subject or scope change; clarification of accepted #23 authority is required."
+summary = "Definition R2 corrects fixture authority; M02-T01 remains blocked until new Planning A/B/independent review/C and a revised lawful Card. No P1 Result or #22 pending-subject replacement is authorized."
 evidence_path = "implementation/workstreams/issue-durable-state-schema/evidence/M02_REAL_SOURCE_AUTHORITY_CONFLICT.md"

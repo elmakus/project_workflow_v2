@@ -1,5 +1,7 @@
 # Issue #23 — Durable-state producer/consumer parity requirements
 
+Definition R2: the historical #20 state is a negative Recovery fixture, not a positive migration target. This does not reopen closed #20 or authorize a different #22 review subject. The prior Definition R1 authority remains available at its historical Git revision.
+
 ## Authorized scope
 
 Repair only the durable-state/schema inconsistency covered by the exact authorized Intake repair subject. Do not change unrelated workflow semantics, premium-gate policy, review independence, execution orchestration, or accepted product scope.
@@ -19,8 +21,8 @@ Repair only the durable-state/schema inconsistency covered by the exact authoriz
 11. Reconciliation must be deterministic, idempotent and restart-safe. Reapplying it to already-current state must not create duplicate approvals, attempts, effects or semantic transitions.
 12. Regression coverage must include:
     - canonical fresh materialization followed by fresh independent resume/review;
-    - the pre-Recovery #22 malformed producer shape as a negative regression fixture;
-    - the pre-Recovery #20 legacy-shaped active state as a reconciliation fixture;
+    - the pre-Recovery #22 malformed producer shape as a negative regression fixture, retaining its pending review reservation unchanged until any separately authorized lawful replacement;
+    - the pre-Recovery #20 legacy-shaped active state as a negative fail-closed Recovery fixture, without inventing authority or claiming positive migration;
     - a supported older-V2 premium/review-boundary resume proving preserved semantic authority;
     - exact subject-preservation and subject-change reset behavior;
     - ambiguous/unsupported fail-closed behavior;

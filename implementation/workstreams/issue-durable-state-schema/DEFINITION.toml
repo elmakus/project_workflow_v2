@@ -1,9 +1,9 @@
 workstream_id = "issue-durable-state-schema"
 source_scope_subject = "durable-state-schema-contract-parity@1"
-revision = "R1"
+revision = "R2"
 state = "green"
 completeness_audit = "green"
-premium_a = "satisfied"
+premium_a = "due"
 
 [requirements]
 class = "authority"
