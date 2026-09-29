@@ -1,12 +1,12 @@
 workstream_id = "issue-intake-relational-closure"
 kind = "issue"
-state = "active"
+state = "complete"
 diagnosis_revision = 1
 repair_subject = "repair:intake-relational-closure:v1"
 diagnosis_prior_art_subject = "repair:intake-relational-closure:v1"
 diagnosis_prior_art_result = "implementation/workstreams/issue-intake-relational-closure/evidence/INTAKE_PRIOR_ART.md@b4f35aa8351c81130ee5b523df28d1709d53b898:639c0e85639a4422e760a8696da5a2c31238e4e1"
-response_kind = "none"
-response_observed = false
-alignment_state = "pending"
-alignment_subject = ""
+response_kind = "authorization"
+response_observed = true
+alignment_state = "authorized"
+alignment_subject = "repair:intake-relational-closure:v1"
 micro_fix_candidate = false
