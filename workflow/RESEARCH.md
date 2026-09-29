@@ -30,3 +30,7 @@ A completed record with reconciliation pending routes to its exact return owner.
 For a concrete `#issue` diagnosis, Intake uses this same contract: `origin_role = intake`, `origin_subject` is the exact current repair subject and `return_target = intake`. Alignment cannot proceed until that exact proportional prior-art result has been applied and consumed **and** Intake has persisted the exact subject/result binding described in `workflow/INTAKE.md`. After that reconciliation, the single current Research slot may be reused for a later legitimate Brainstorming/Definition obligation without erasing proof that diagnosis prior art was checked. If the repair subject changes, the Intake-owned binding and old Research result are stale for alignment.
 
 Research never selects a different target by itself.
+
+## Validated durable-state write boundary
+
+Canonical TOML state creation or mutation owned by this module (research) is successfully reconciled only from `tools.state_contract.render_validated_state_record` or `write_validated_state_record`. The shared boundary dispatches to the production validator, generically renders the already-validated data, parses it back, and validates it again before persistence; hand-written or guessed TOML must not be treated as a successful canonical transition. An external repository writer may persist only the validated rendered bytes and must retain its normal exact readback/uncertainty handling.

@@ -27,3 +27,7 @@ The manifest locates records only. Each pointed record owns only its semantic do
 Before final integration, all unique knowable workstream-owned recovery artifacts must be present in the exact merge subject. After integration, closure may recover from that target-side package plus immutable PR/merge evidence even when the source ref has already disappeared; source-ref recreation for bookkeeping is forbidden.
 
 A surviving source branch is cleanup input only. `safe_to_delete` is an optional fallback after terminal truth is independently durable, and deletion requires exact-head revalidation plus absence readback. Automatic deletion of a merged head needs no fallback record. Terminal-unmerged closure preserves only recovery/history metadata on the durable target-side package and never imports rejected implementation content.
+
+## Validated durable-state write boundary
+
+Canonical TOML state creation or mutation owned by this module (workstream) is successfully reconciled only from `tools.state_contract.render_validated_state_record` or `write_validated_state_record`. The shared boundary dispatches to the production validator, generically renders the already-validated data, parses it back, and validates it again before persistence; hand-written or guessed TOML must not be treated as a successful canonical transition. An external repository writer may persist only the validated rendered bytes and must retain its normal exact readback/uncertainty handling.
