@@ -70,8 +70,20 @@ class ContinuationContractTests(unittest.TestCase):
                     )
 
     def test_exact_subject_external_evidence_classification(self):
-        for status in ("success", "passed", "completed"):
+        for status in ("success", "passed"):
             self.assertEqual(classify_external_evidence(status=status), "terminal_success")
+        self.assertEqual(
+            classify_external_evidence(status="completed", conclusion="success"),
+            "terminal_success",
+        )
+        for conclusion in ("failure", "failed", "cancelled", "timed_out", "action_required"):
+            with self.subTest(completed_conclusion=conclusion):
+                self.assertEqual(
+                    classify_external_evidence(status="completed", conclusion=conclusion),
+                    "terminal_failure",
+                )
+        with self.assertRaises(ContinuationContractError):
+            classify_external_evidence(status="completed")
         for status in ("failure", "failed", "cancelled", "timed_out", "action_required"):
             self.assertEqual(classify_external_evidence(status=status), "terminal_failure")
         for status in ("queued", "requested", "waiting", "pending", "in_progress"):
@@ -79,7 +91,7 @@ class ContinuationContractTests(unittest.TestCase):
         self.assertEqual(classify_external_evidence(status="missing"), "readback_exact_subject")
 
     def test_external_evidence_malformed_or_wrong_subject_fails_closed(self):
-        for status in ("success", "failure", "queued", "in_progress"):
+        for status in ("success", "failure", "queued", "in_progress", "completed"):
             with self.assertRaises(ContinuationContractError):
                 classify_external_evidence(status=status, exact_subject_observed=False)
         for status in ("", "unknown"):
