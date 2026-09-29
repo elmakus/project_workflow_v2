@@ -1,28 +1,28 @@
 workstream_id = "issue-execution-research-return-shadow"
-state = "active"
+state = "complete"
 origin_role = "intake"
 origin_subject = "repair:execution-research-return-owner-precedence:v1"
 return_target = "intake"
 return_reconciliation = "pending"
 return_result = ""
-finding = ""
-limitations = ""
-conflicts = ""
+finding = "Issue #28 is confirmed: a lawful completed execution-owned Research record can be reachable through both manifest and Task-Board locators, and the earlier manifest path shadows the correct execution return handling by indexing a non-execution-only owner map."
+limitations = "Diagnosis used current main-equivalent selector code, a fresh executable fixture reproducer, and an existing positive control; no repair has been implemented or authorized."
+conflicts = "None material; canonical Research semantics, executable state validation, the tracker diagnosis, the fresh negative reproducer, and the positive control agree."
 
 [[sources]]
 class = "official_upstream"
-status = "pending"
-weight = "canonical workflow/router contracts"
+status = "checked"
+weight = "canonical Research/Router/State contracts define exact-owner once-only return semantics"
 
 [[sources]]
 class = "project_runtime"
-status = "pending"
-weight = "current main selector and executable regression behavior"
+status = "checked"
+weight = "current selector source plus fresh executable reproducer and positive control establish actual behavior"
 
 [[sources]]
 class = "tracker_discussion"
-status = "pending"
-weight = "Issue #28 diagnosis and deduplication evidence"
+status = "checked"
+weight = "Issue #28 provides the exact dedup marker and diagnosis context only"
 
 [[sources]]
 class = "practitioner_community"
