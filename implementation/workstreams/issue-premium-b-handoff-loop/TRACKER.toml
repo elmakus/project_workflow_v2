@@ -1,0 +1,9 @@
+workstream_id = "issue-premium-b-handoff-loop"
+provider = "github"
+repository = "elmakus/project_workflow_v2"
+dedup_key = "issue-25-premium-b-handoff-loop"
+state = "linked"
+issue_number = 25
+candidate_issue_numbers = []
+readback_state = "verified"
+final_pr = 0
