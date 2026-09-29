@@ -1,30 +1,30 @@
 workstream_id = "issue-explicit-stop-precedence"
-state = "active"
+state = "complete"
 origin_role = "intake"
 origin_subject = "repair:brainstorm-explicit-stop-precedence:v1"
 return_target = "intake"
 return_reconciliation = "pending"
 return_result = ""
-finding = ""
-limitations = ""
-conflicts = ""
+finding = "Canonical explicit user stop must precede matching Definition/Planning dispatch; current router bypasses it because Definition handling returns before Brainstorm stop evaluation."
+limitations = "Read-only diagnosis used durable tracker provenance and disposable current-schema reproducers; no repair was implemented or authorized."
+conflicts = "None material; independent audit variants differ only in the downstream phase reached by the same stop-precedence bypass."
 
 [[sources]]
 class = "official_upstream"
-status = "pending"
+status = "checked"
 weight = "canonical Brainstorming, routing, state, authority, and stop contracts control intended semantics"
 
 [[sources]]
 class = "project_runtime"
-status = "pending"
+status = "checked"
 weight = "current production selector behavior, exact reproducers, tests, and history control defect evidence"
 
 [[sources]]
 class = "tracker_discussion"
-status = "pending"
+status = "checked"
 weight = "Issue #33 readback supports deduplication and diagnosis only"
 
 [[sources]]
 class = "practitioner_community"
-status = "pending"
-weight = "secondary only; use only if material to this internal precedence invariant"
+status = "not_relevant"
+weight = "secondary only; internal deterministic precedence has direct canonical and executable evidence"
