@@ -9,6 +9,7 @@ authority = [
   { class = "authority", path = "workflow/RESEARCH.md" },
   { class = "authority", path = "workflow/BRAINSTORMING.md" },
   { class = "authority", path = "workflow/DEFINITION.md" },
+  { class = "authority", path = "workflow/PLANNING.md" },
   { class = "authority", path = "workflow/STATE.md" },
   { class = "authority", path = "workflow/AUTHORITY.md" },
   { class = "authority", path = "workflow/CONTINUATION.md" },
@@ -35,3 +36,7 @@ path = "implementation/workstreams/issue-pwv2-stabilization-program/BRAINSTORM.t
 [definition]
 class = "definition"
 path = "implementation/workstreams/issue-pwv2-stabilization-program/DEFINITION.toml"
+
+[planning]
+class = "planning"
+path = "implementation/workstreams/issue-pwv2-stabilization-program/PLANNING.toml"
