@@ -3,7 +3,7 @@ source_scope_subject = "durable-state-schema-contract-parity@1"
 revision = "R2"
 state = "green"
 completeness_audit = "green"
-premium_a = "due"
+premium_a = "satisfied"
 
 [requirements]
 class = "authority"
