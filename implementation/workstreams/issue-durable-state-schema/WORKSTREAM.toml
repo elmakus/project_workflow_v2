@@ -38,3 +38,7 @@ path = "implementation/workstreams/issue-durable-state-schema/RESEARCH.toml"
 [tracker]
 class = "tracker"
 path = "implementation/workstreams/issue-durable-state-schema/TRACKER.toml"
+
+[task_board]
+class = "task_board"
+path = "implementation/workstreams/issue-durable-state-schema/TASK_BOARD.toml"
