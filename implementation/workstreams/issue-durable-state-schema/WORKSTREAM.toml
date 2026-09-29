@@ -7,6 +7,8 @@ authority = [
   { class = "authority", path = "workflow/ROUTER.md" },
   { class = "authority", path = "workflow/INTAKE.md" },
   { class = "authority", path = "workflow/STATE.md" },
+  { class = "authority", path = "requirements/ISSUE_23_DURABLE_STATE_SCHEMA.md" },
+  { class = "authority", path = "decisions/ISSUE_23_DURABLE_STATE_SCHEMA.md" },
 ]
 
 [intake]
@@ -16,6 +18,10 @@ path = "implementation/workstreams/issue-durable-state-schema/INTAKE.toml"
 [brainstorm]
 class = "brainstorm"
 path = "implementation/workstreams/issue-durable-state-schema/BRAINSTORM.toml"
+
+[definition]
+class = "definition"
+path = "implementation/workstreams/issue-durable-state-schema/DEFINITION.toml"
 
 [research]
 class = "research"
