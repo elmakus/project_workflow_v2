@@ -1,5 +1,5 @@
 workstream_id = "issue-execution-research-return-shadow"
-revision = 1
+revision = 2
 
 [execution_ref]
 branch = "work/issue-28-execution-research-return-shadow"
@@ -11,3 +11,9 @@ status = "in_progress"
 [cards.contract]
 class = "task_card"
 path = "implementation/workstreams/issue-execution-research-return-shadow/cards/M01-T01.md"
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-execution-research-return-shadow/results/M01-T01.md"
+commit = "0397d2f52730a23a90d21eb910672e98817d4f40"
+blob = "b072dce4e368a9bcb02a3f481f5e8b18c87652cf"
