@@ -1,18 +1,8 @@
+workstream_id = "issue-handoff-receive-continuation"
 scope_id = "handoff-receive-continuation"
 revision = 1
-lifecycle = "promoted"
-final_challenge_audit = "GREEN"
+state = "promoted"
+challenge_audit = "green"
 explicit_user_stop = false
-promotion_authorization_subject = "handoff-receive-continuation@1"
-
-[accepted_scope]
-receive_contract = "A valid inbound four-field PWv2 locator is untrusted input that starts canonical receive processing. After canonical bootstrap and exact durable validation, receipt may consume only the exact current transferable handoff/context-selection boundary defined by its owner semantics and must immediately enter the resulting authorized obligation without a generic second confirmation."
-authority = "Canonical router and durable owner state always outrank locator prose; locator never grants repair/scope/product authority."
-safety = "Stale, malformed, contradictory, wrong-workstream or non-independent handoffs fail closed under existing Recovery/Review/owner semantics. Genuine human/product authorization, blocker, explicit-stop, external-effect and end-of-scope boundaries remain real stops."
-composition = "Build on accepted terminal Issue #16 continuation/restart semantics now present on main; do not create a second router, session ledger or runtime-specific authority."
-regression = "Qualify producer-to-locator-to-fresh-receiver end-to-end plus Premium A/B/C, independent Review, stale/forged locator, replay/readback, Recovery and subsequent non-stop continuation."
-
-[challenge]
-unresolved_user_product_choices = "none"
-research_conflicts = "none"
-scope_widening = "none"
+promotion_state = "authorized"
+promotion_subject = "handoff-receive-continuation@1"
