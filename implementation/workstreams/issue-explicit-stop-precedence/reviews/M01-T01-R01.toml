@@ -1,8 +1,8 @@
 workstream_id = "issue-explicit-stop-precedence"
 card_id = "M01-T01"
 attempt = "R01"
-verdict = "pending"
-evidence_path = ""
+verdict = "green"
+evidence_path = "implementation/workstreams/issue-explicit-stop-precedence/evidence/M01-T01_REVIEW_R01.md"
 
 [subject]
 class = "git_blob"
@@ -17,4 +17,4 @@ path = "implementation/workstreams/issue-explicit-stop-precedence/cards/M01-T01.
 
 [independence]
 materially_produced_or_repaired_subject = false
-basis = "Reserved for a fresh independent reviewer that did not implement or repair the exact M01-T01 subject."
+basis = "Fresh independent exact-subject reviewer did not implement or repair M01-T01; verified frozen result and implementation blobs and ran independent production-selector probes."
