@@ -143,8 +143,11 @@ def consume_handoff_and_classify(
         disposition=freshly_routed_disposition,
         obligation=freshly_routed_obligation,
     )
-    restart = resume_action(
-        durable_semantic_result=durable_semantic_result,
-        external_effect_uncertain=external_effect_uncertain,
-    )
+    if completion.action == "return":
+        restart = "no_replay"
+    else:
+        restart = resume_action(
+            durable_semantic_result=durable_semantic_result,
+            external_effect_uncertain=external_effect_uncertain,
+        )
     return ReceiveContinuationDecision(received.action, completion.action, restart)
