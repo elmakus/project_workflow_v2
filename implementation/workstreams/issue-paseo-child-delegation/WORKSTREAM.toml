@@ -28,6 +28,10 @@ path = "implementation/workstreams/issue-paseo-child-delegation/BRAINSTORM.toml"
 class = "definition"
 path = "implementation/workstreams/issue-paseo-child-delegation/DEFINITION.toml"
 
+[planning]
+class = "planning"
+path = "implementation/workstreams/issue-paseo-child-delegation/PLANNING.toml"
+
 [tracker]
 class = "tracker"
 path = "implementation/workstreams/issue-paseo-child-delegation/TRACKER.toml"
