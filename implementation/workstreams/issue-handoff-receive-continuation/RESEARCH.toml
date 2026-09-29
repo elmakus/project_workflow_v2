@@ -1,0 +1,30 @@
+workstream_id = "issue-handoff-receive-continuation"
+origin_role = "intake"
+origin_subject = "Define canonical receive-side handoff consumption so an exact current transferable NEW CHAT START PROMPT is validated against durable authority, consumes only its exact handoff/context-selection boundary, and immediately enters the resulting authorized obligation without a generic second confirmation, while preserving genuine authority/independence/recovery/blocker stops."
+state = "consumed"
+return_target = "intake"
+return_reconciliation = "applied"
+return_result = "project-research:projects/project_workflow_v2/issues/issue-17-handoff-receive-continuation/FINAL_SYNTHESIS.md@research/pwv2-issue17-integration"
+finding = "Issue #17 is a receive/bootstrap contract gap. Issue #11 fixed sender delivery; completed Issue #16 supplies continuation/restart safety but not exact inbound handoff consumption. Implement the residual receive seam on the accepted terminal Issue #16 baseline."
+limitations = "Formal research analyzed frozen Issue #16 plus one live-drift reconciliation; implementation must bind to the accepted terminal Issue #16 baseline now on main."
+conflicts = "none material after evidence-weighted integration"
+
+[[sources]]
+class = "official_upstream"
+status = "checked"
+weight = "high"
+
+[[sources]]
+class = "project_runtime"
+status = "checked"
+weight = "high"
+
+[[sources]]
+class = "tracker_discussion"
+status = "checked"
+weight = "medium"
+
+[[sources]]
+class = "practitioner_community"
+status = "not_relevant"
+weight = "none"

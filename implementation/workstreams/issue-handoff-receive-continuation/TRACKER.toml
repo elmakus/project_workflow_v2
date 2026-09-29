@@ -1,0 +1,9 @@
+workstream_id = "issue-handoff-receive-continuation"
+provider = "github"
+repository = "elmakus/project_workflow_v2"
+dedup_key = "NEW CHAT START PROMPT causes redundant confirmation instead of immediate continuation"
+state = "linked"
+issue_number = 17
+candidate_issue_numbers = []
+readback_state = "verified"
+final_pr = 21

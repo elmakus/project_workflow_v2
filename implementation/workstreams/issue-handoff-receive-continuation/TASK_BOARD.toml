@@ -1,0 +1,83 @@
+workstream_id = "issue-handoff-receive-continuation"
+revision = 15
+
+[execution_ref]
+branch = "work/pwv2-handoff-receive-continuation"
+
+[[cards]]
+id = "M06-T01"
+status = "DONE"
+review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-handoff-receive-continuation/reviews/M06-T01-R01.toml" }]
+
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/issue-handoff-receive-continuation/cards/M06-T01.md"
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-handoff-receive-continuation/results/M06-T01.md"
+commit = "bf375a645359d338218e782e94856c8fa9f1ed02"
+blob = "eda46340dae4a0e209728723fd5783ed20c2bfcd"
+
+[[cards]]
+id = "M06-T02"
+status = "DONE"
+review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-handoff-receive-continuation/reviews/M06-T02-R01.toml" }, { class = "review_attempt", path = "implementation/workstreams/issue-handoff-receive-continuation/reviews/M06-T02-R02.toml" }]
+
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/issue-handoff-receive-continuation/cards/M06-T02.md"
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-handoff-receive-continuation/results/M06-T02.md"
+commit = "07567cb9fc3c2d2237e69ec61fd8df237ff56ab9"
+blob = "48ba09f33975fcc9e21e30153bfbe1d70d3a1cf7"
+
+[[cards]]
+id = "M06-T03"
+status = "DONE"
+review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-handoff-receive-continuation/reviews/M06-T03-R01.toml" }]
+
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/issue-handoff-receive-continuation/cards/M06-T03.md"
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-handoff-receive-continuation/results/M06-T03.md"
+commit = "e618009afd07be9e7f933a3d92e8313271c877b5"
+blob = "1952ada2fe6f71c58869d9b5236b83b35827582b"
+
+[[cards]]
+id = "M06-T04"
+status = "DONE"
+review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-handoff-receive-continuation/reviews/M06-T04-R01.toml" }, { class = "review_attempt", path = "implementation/workstreams/issue-handoff-receive-continuation/reviews/M06-T04-R02.toml" }]
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-handoff-receive-continuation/results/M06-T04.md"
+commit = "4d70e7b49e661a46a0394e18a07da47d42c35145"
+blob = "ef461be3994140f42c45e56b923ad740e18a9161"
+
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/issue-handoff-receive-continuation/cards/M06-T04.md"
+
+[[jit_triggers]]
+id = "M06-T02-after-M06-T01"
+after_card = "M06-T01"
+state = "consumed"
+condition = "Materialize M06-T02 only after M06-T01 is DONE with a durable exact GREEN result that can be bound as its dependency."
+
+[[jit_triggers]]
+id = "M06-T03-after-M06-T02"
+after_card = "M06-T02"
+state = "consumed"
+condition = "Materialize M06-T03 only after M06-T02 is DONE with a durable exact GREEN result that can be bound as its dependency."
+
+[[jit_triggers]]
+id = "M06-T04-after-M06-T03"
+after_card = "M06-T03"
+state = "consumed"
+condition = "Materialize M06-T04 only after M06-T03 is DONE with a durable exact GREEN result that can be bound as its dependency."

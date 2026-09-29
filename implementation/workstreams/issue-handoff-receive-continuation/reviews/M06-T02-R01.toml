@@ -1,0 +1,20 @@
+workstream_id = "issue-handoff-receive-continuation"
+card_id = "M06-T02"
+attempt = "R01"
+verdict = "RED"
+evidence_path = "implementation/workstreams/issue-handoff-receive-continuation/evidence/M06-T02-R01-review.md"
+
+[subject]
+class = "git_blob"
+repository = "elmakus/project_workflow_v2"
+commit = "4e7225084d295609d88e2abf223746846d91067a"
+path = "tools/receive_contract.py"
+blob = "da515e3a669f5cedc341ab3ad9e33337253fc10e"
+
+[acceptance]
+class = "task_card"
+path = "implementation/workstreams/issue-handoff-receive-continuation/cards/M06-T02.md"
+
+[independence]
+materially_produced_or_repaired_subject = false
+basis = "Fresh review context independently inspected the exact immutable subject and acceptance surface; it did not materially produce or repair the reviewed subject."

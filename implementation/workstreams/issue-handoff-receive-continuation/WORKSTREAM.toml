@@ -1,0 +1,36 @@
+kind = "issue"
+workstream_id = "issue-handoff-receive-continuation"
+branch = "work/pwv2-handoff-receive-continuation"
+created_from = "dde078d7b2d340cd100b33c9e03c9add6d959eb1"
+integration_target = "main"
+authority = [
+  { class = "authority", path = "requirements/ISSUE_17_HANDOFF_RECEIVE_CONTINUATION.md" },
+  { class = "authority", path = "decisions/ISSUE_17_HANDOFF_RECEIVE_CONTINUATION.md" },
+  { class = "authority", path = "workflow/ROUTER.md" },
+  { class = "authority", path = "workflow/CONTINUATION.md" },
+  { class = "authority", path = "workflow/USER_STOP.md" },
+]
+
+[intake]
+class = "intake"
+path = "implementation/workstreams/issue-handoff-receive-continuation/INTAKE.toml"
+
+[research]
+class = "research"
+path = "implementation/workstreams/issue-handoff-receive-continuation/RESEARCH.toml"
+
+[brainstorm]
+class = "brainstorm"
+path = "implementation/workstreams/issue-handoff-receive-continuation/BRAINSTORM.toml"
+
+[definition]
+class = "definition"
+path = "implementation/workstreams/issue-handoff-receive-continuation/DEFINITION.toml"
+
+[planning]
+class = "planning"
+path = "implementation/workstreams/issue-handoff-receive-continuation/PLANNING.toml"
+
+[tracker]
+class = "tracker"
+path = "implementation/workstreams/issue-handoff-receive-continuation/TRACKER.toml"

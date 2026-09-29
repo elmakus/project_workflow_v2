@@ -1,0 +1,20 @@
+workstream_id = "issue-handoff-receive-continuation"
+card_id = "M06-T04"
+attempt = "R02"
+verdict = "GREEN"
+evidence_path = "implementation/workstreams/issue-handoff-receive-continuation/evidence/M06-T04-R02-review.md"
+
+[subject]
+class = "git_blob"
+repository = "elmakus/project_workflow_v2"
+commit = "096e80811d0766c747c76427942a0d86fe1ac03d"
+path = "tests/test_issue17_qualification.py"
+blob = "213b052d6bc36a5eb7c2fdebac272d5b9f61de42"
+
+[acceptance]
+class = "task_card"
+path = "implementation/workstreams/issue-handoff-receive-continuation/cards/M06-T04.md"
+
+[independence]
+materially_produced_or_repaired_subject = false
+basis = "This fresh review context did not materially produce or repair the exact M06-T04 subject and independently reviewed the frozen blob against the stable Task Card and named authority."

@@ -1,0 +1,8 @@
+workstream_id = "issue-handoff-receive-continuation"
+scope_id = "handoff-receive-continuation"
+revision = 1
+state = "promoted"
+challenge_audit = "green"
+explicit_user_stop = false
+promotion_state = "authorized"
+promotion_subject = "handoff-receive-continuation@1"

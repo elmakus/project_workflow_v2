@@ -1,0 +1,20 @@
+workstream_id = "issue-handoff-receive-continuation"
+card_id = "M06-T02"
+attempt = "R02"
+verdict = "GREEN"
+evidence_path = "implementation/workstreams/issue-handoff-receive-continuation/evidence/M06-T02-R02-review.md"
+
+[subject]
+class = "git_blob"
+repository = "elmakus/project_workflow_v2"
+commit = "e26266ba047bd1eb42ed955a6d56e6517d796d2f"
+path = "tools/receive_contract.py"
+blob = "f9bdb4fa10957ca7f64becc6920bc9bf929c9961"
+
+[acceptance]
+class = "task_card"
+path = "implementation/workstreams/issue-handoff-receive-continuation/cards/M06-T02.md"
+
+[independence]
+materially_produced_or_repaired_subject = true
+basis = "Current context materially repaired the corrected M06-T02 subject after R01 RED and therefore cannot independently review the corrected subject."
