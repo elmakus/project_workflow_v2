@@ -22,6 +22,7 @@ from tools.state_contract import (
     validate_research,
     validate_review,
     validate_review_history,
+    validate_selected_intake_relation,
     validate_tracker,
     validate_workstream,
 )
@@ -278,6 +279,52 @@ class StateEnvelopeTests(unittest.TestCase):
         workstream["intake"]["path"] = "implementation/workstreams/other/INTAKE.toml"
         with self.assertRaises(ValidationError):
             validate_workstream(workstream)
+
+    def test_issue32_selected_intake_relation_requires_exact_kind_equality(self) -> None:
+        for kind in ("issue", "feature", "change"):
+            with self.subTest(kind=kind):
+                workstream = {"workstream_id": "sample-workstream", "kind": kind}
+                intake = {"workstream_id": "sample-workstream", "kind": kind}
+                validate_selected_intake_relation(workstream, intake)
+                self.assertEqual(workstream, {"workstream_id": "sample-workstream", "kind": kind})
+                self.assertEqual(intake, {"workstream_id": "sample-workstream", "kind": kind})
+
+    def test_issue32_selected_intake_relation_rejects_every_unequal_pairing(self) -> None:
+        pairings = (
+            ("issue", "feature"),
+            ("issue", "change"),
+            ("feature", "issue"),
+            ("feature", "change"),
+            ("change", "issue"),
+            ("change", "feature"),
+        )
+        for manifest_kind, intake_kind in pairings:
+            with self.subTest(manifest_kind=manifest_kind, intake_kind=intake_kind):
+                workstream = {"workstream_id": "sample-workstream", "kind": manifest_kind}
+                intake = {"workstream_id": "sample-workstream", "kind": intake_kind}
+                before_workstream = copy.deepcopy(workstream)
+                before_intake = copy.deepcopy(intake)
+                with self.assertRaisesRegex(ValidationError, "contradicts"):
+                    validate_selected_intake_relation(workstream, intake)
+                self.assertEqual(workstream, before_workstream)
+                self.assertEqual(intake, before_intake)
+
+    def test_issue32_selected_intake_relation_rejects_wrong_identity_and_kind(self) -> None:
+        with self.assertRaisesRegex(ValidationError, "workstream_id"):
+            validate_selected_intake_relation(
+                {"workstream_id": "sample-workstream", "kind": "issue"},
+                {"workstream_id": "other", "kind": "issue"},
+            )
+        with self.assertRaisesRegex(ValidationError, "invalid manifest kind"):
+            validate_selected_intake_relation(
+                {"workstream_id": "sample-workstream", "kind": "epic"},
+                {"workstream_id": "sample-workstream", "kind": "issue"},
+            )
+        with self.assertRaisesRegex(ValidationError, "invalid intake kind"):
+            validate_selected_intake_relation(
+                {"workstream_id": "sample-workstream", "kind": "issue"},
+                {"workstream_id": "sample-workstream", "kind": "epic"},
+            )
 
 
     def test_brainstorm_promotion_binds_exact_revision(self) -> None:

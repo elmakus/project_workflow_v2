@@ -264,6 +264,20 @@ def validate_intake(data: dict[str, Any], workstream_id: str) -> None:
         _require(alignment_state == "authorized", "intake: completed issue requires exact authorization")
 
 
+def validate_selected_intake_relation(workstream: dict[str, Any], intake: dict[str, Any]) -> None:
+    """Require exact WORKSTREAM.kind / INTAKE.kind equality for selected state."""
+    _require(workstream.get("workstream_id") == intake.get("workstream_id"),
+             "selected intake relation: wrong workstream_id")
+    manifest_kind = workstream.get("kind")
+    intake_kind = intake.get("kind")
+    _require(manifest_kind in INTAKE_KINDS,
+             f"selected intake relation: invalid manifest kind {manifest_kind!r}")
+    _require(intake_kind in INTAKE_KINDS,
+             f"selected intake relation: invalid intake kind {intake_kind!r}")
+    _require(manifest_kind == intake_kind,
+             f"selected intake relation: manifest kind {manifest_kind!r} contradicts intake kind {intake_kind!r}")
+
+
 def validate_brainstorm(data: dict[str, Any], workstream_id: str) -> None:
     reject_prohibited_keys(data, "brainstorm")
     _require(data.get("workstream_id") == workstream_id, "brainstorm: wrong workstream_id")

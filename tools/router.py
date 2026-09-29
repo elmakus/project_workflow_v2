@@ -26,6 +26,7 @@ from tools.state_contract import (
     validate_research,
     validate_review_history,
     validate_blocker,
+    validate_selected_intake_relation,
     validate_tracker,
     validate_workstream,
 )
@@ -205,6 +206,11 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
         if manifest_rel != expected_manifest:
             raise ValidationError(f"selected manifest must be exact path {expected_manifest!r}")
         research = None
+        intake = None
+        if "intake" in workstream:
+            intake = read_toml(reads.project(workstream["intake"]["path"]))
+            validate_intake(intake, workstream["workstream_id"])
+            validate_selected_intake_relation(workstream, intake)
         if "research" in workstream:
             research = read_toml(reads.project(workstream["research"]["path"]))
             validate_research(research, workstream["workstream_id"])
@@ -231,11 +237,15 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     owner_module=owner_modules[research["return_target"]],
                 )
 
-        intake = None
-        if "intake" in workstream:
-            intake = read_toml(reads.project(workstream["intake"]["path"]))
-            validate_intake(intake, workstream["workstream_id"])
-            if intake["kind"] == "issue" and intake["repair_subject"]:
+        if intake is not None:
+            if intake["kind"] == "issue" and not intake["repair_subject"].strip():
+                return result(
+                    reads, "route", "intake",
+                    "Issue diagnosis has no concrete repair subject yet; Intake must propose "
+                    "one and consume proportional prior-art Research before repair alignment can proceed",
+                    subject=intake["kind"], owner_module="workflow/INTAKE.md",
+                )
+            if intake["kind"] == "issue" and intake["repair_subject"].strip():
                 stable_diagnosis_prior_art = (
                     intake["diagnosis_prior_art_subject"] == intake["repair_subject"]
                     and bool(intake["diagnosis_prior_art_result"].strip())

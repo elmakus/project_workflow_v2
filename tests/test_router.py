@@ -191,11 +191,22 @@ class RouterTests(unittest.TestCase):
 
 
     def install_intake(self, project: Path, content: str) -> None:
+        import re
         workstream = project / MANIFEST
         original = workstream.read_text()
+        match = re.search(r'^kind\s*=\s*"([^"]+)"', content, re.MULTILINE)
+        if match:
+            original = re.sub(r'^kind\s*=\s*"[^"]+"', f'kind = "{match.group(1)}"', original, count=1, flags=re.MULTILINE)
         workstream.write_text(original + '\n[intake]\nclass = "intake"\npath = "implementation/workstreams/sample-workstream/INTAKE.toml"\n')
         intake = project / "implementation/workstreams/sample-workstream/INTAKE.toml"
         intake.write_text(content)
+
+    def set_manifest_kind(self, project: Path, kind: str) -> None:
+        import re
+        workstream = project / MANIFEST
+        text = workstream.read_text()
+        text = re.sub(r'^kind\s*=\s*"[^"]+"', f'kind = "{kind}"', text, count=1, flags=re.MULTILINE)
+        workstream.write_text(text)
 
 
     def install_state_record(self, project: Path, key: str, klass: str, filename: str, content: str) -> None:
@@ -591,6 +602,225 @@ class RouterTests(unittest.TestCase):
         finally:
             temp.cleanup()
 
+    def test_issue32_blank_subject_matrix_stays_in_intake_diagnosis(self) -> None:
+        for subject in ("", "   "):
+            for response_kind, observed in (
+                ("none", False),
+                ("question", True),
+                ("concern", True),
+                ("alternative", True),
+                ("authorization", True),
+            ):
+                with self.subTest(subject=repr(subject), response_kind=response_kind):
+                    temp, project = self.copy_fixture()
+                    try:
+                        self.install_intake(project, (
+                            'workstream_id = "sample-workstream"\n'
+                            'kind = "issue"\n'
+                            'state = "active"\n'
+                            'diagnosis_revision = 1\n'
+                            f'repair_subject = "{subject}"\n'
+                            'diagnosis_prior_art_subject = ""\n'
+                            'diagnosis_prior_art_result = ""\n'
+                            f'response_kind = "{response_kind}"\n'
+                            f"response_observed = {'true' if observed else 'false'}\n"
+                            'alignment_state = "pending"\n'
+                            'alignment_subject = ""\n'
+                            'micro_fix_candidate = false\n'
+                        ))
+                        routed = select_route(project, [MANIFEST], package_root=ROOT)
+                        self.assertEqual((routed.disposition, routed.obligation), ("route", "intake"))
+                        self.assertEqual(routed.subject, "issue")
+                        self.assertEqual(routed.owner_module, "workflow/INTAKE.md")
+                        self.assertIn("no concrete repair subject", routed.reason)
+                        self.assertNotIn(f"project:{BOARD}", routed.read_set)
+                        self.assertIn(
+                            "project:implementation/workstreams/sample-workstream/INTAKE.toml",
+                            routed.read_set,
+                        )
+                    finally:
+                        temp.cleanup()
+
+    def test_issue32_unequal_kind_matrix_recovers_before_dispatch(self) -> None:
+        pairings = (
+            ("issue", "feature"),
+            ("issue", "change"),
+            ("feature", "issue"),
+            ("feature", "change"),
+            ("change", "issue"),
+            ("change", "feature"),
+        )
+        for manifest_kind, intake_kind in pairings:
+            with self.subTest(manifest_kind=manifest_kind, intake_kind=intake_kind):
+                temp, project = self.copy_fixture()
+                try:
+                    if intake_kind == "issue":
+                        intake_content = (
+                            'workstream_id = "sample-workstream"\n'
+                            'kind = "issue"\n'
+                            'state = "active"\n'
+                            'diagnosis_revision = 1\n'
+                            'repair_subject = "repair:v1"\n'
+                            'diagnosis_prior_art_subject = "repair:v1"\n'
+                            'diagnosis_prior_art_result = "evidence/intake-prior-art.md"\n'
+                            'response_kind = "none"\n'
+                            'response_observed = false\n'
+                            'alignment_state = "pending"\n'
+                            'alignment_subject = ""\n'
+                            'micro_fix_candidate = false\n'
+                        )
+                    else:
+                        intake_content = (
+                            'workstream_id = "sample-workstream"\n'
+                            f'kind = "{intake_kind}"\n'
+                            'state = "active"\n'
+                            'diagnosis_revision = 0\n'
+                            'repair_subject = ""\n'
+                            'diagnosis_prior_art_subject = ""\n'
+                            'diagnosis_prior_art_result = ""\n'
+                            'response_kind = "none"\n'
+                            'response_observed = false\n'
+                            'alignment_state = "not_required"\n'
+                            'alignment_subject = ""\n'
+                            'micro_fix_candidate = false\n'
+                        )
+                    self.install_intake(project, intake_content)
+                    self.set_manifest_kind(project, manifest_kind)
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+                    self.assertIn("contradicts", routed.reason)
+                finally:
+                    temp.cleanup()
+
+    def test_issue32_mismatch_wins_over_active_research(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_intake(project, (
+                'workstream_id = "sample-workstream"\n'
+                'kind = "issue"\n'
+                'state = "active"\n'
+                'diagnosis_revision = 1\n'
+                'repair_subject = "repair:v1"\n'
+                'diagnosis_prior_art_subject = "repair:v1"\n'
+                'diagnosis_prior_art_result = "evidence/intake-prior-art.md"\n'
+                'response_kind = "none"\n'
+                'response_observed = false\n'
+                'alignment_state = "pending"\n'
+                'alignment_subject = ""\n'
+                'micro_fix_candidate = false\n'
+            ))
+            self.set_manifest_kind(project, "change")
+            self.install_state_record(
+                project, "research", "research", "RESEARCH.toml",
+                'state = "active"\n'
+                'workstream_id = "sample-workstream"\n'
+                'origin_role = "brainstorming"\n'
+                'origin_subject = "scope-a@1"\n'
+                'return_target = "brainstorming"\n'
+                'return_reconciliation = "pending"\n'
+                'return_result = ""\n'
+                'finding = ""\n'
+                'limitations = ""\n'
+                'conflicts = ""\n'
+                '[[sources]]\nclass = "official_upstream"\nstatus = "pending"\nweight = "primary"\n'
+                '[[sources]]\nclass = "project_runtime"\nstatus = "pending"\nweight = "direct"\n'
+                '[[sources]]\nclass = "tracker_discussion"\nstatus = "pending"\nweight = "supporting"\n'
+                '[[sources]]\nclass = "practitioner_community"\nstatus = "pending"\nweight = "supporting"\n',
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("contradicts", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_issue32_same_kind_positive_controls_preserve_lawful_routes(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_intake(project, (
+                'workstream_id = "sample-workstream"\n'
+                'kind = "issue"\n'
+                'state = "active"\n'
+                'diagnosis_revision = 1\n'
+                'repair_subject = "repair:v1"\n'
+                'diagnosis_prior_art_subject = "repair:v1"\n'
+                'diagnosis_prior_art_result = "evidence/intake-prior-art.md"\n'
+                'response_kind = "none"\n'
+                'response_observed = false\n'
+                'alignment_state = "pending"\n'
+                'alignment_subject = ""\n'
+                'micro_fix_candidate = false\n'
+            ))
+            self.install_state_record(
+                project, "research", "research", "RESEARCH.toml",
+                self.issue_research_content("repair:v1"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("stop", "issue_alignment"))
+            self.assertEqual(routed.owner_module, "workflow/INTAKE.md")
+        finally:
+            temp.cleanup()
+
+        for kind in ("feature", "change"):
+            temp, project = self.copy_fixture()
+            try:
+                with self.subTest(kind=kind):
+                    self.install_intake(project, (
+                        'workstream_id = "sample-workstream"\n'
+                        f'kind = "{kind}"\n'
+                        'state = "active"\n'
+                        'diagnosis_revision = 0\n'
+                        'repair_subject = ""\n'
+                        'diagnosis_prior_art_subject = ""\n'
+                        'diagnosis_prior_art_result = ""\n'
+                        'response_kind = "none"\n'
+                        'response_observed = false\n'
+                        'alignment_state = "not_required"\n'
+                        'alignment_subject = ""\n'
+                        'micro_fix_candidate = false\n'
+                    ))
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertEqual((routed.disposition, routed.obligation), ("route", "intake"))
+                    self.assertEqual(routed.subject, kind)
+            finally:
+                temp.cleanup()
+
+        temp, project = self.copy_fixture()
+        try:
+            self.install_intake(project, (
+                'workstream_id = "sample-workstream"\n'
+                'kind = "issue"\n'
+                'state = "active"\n'
+                'diagnosis_revision = 1\n'
+                'repair_subject = "repair:v1"\n'
+                'diagnosis_prior_art_subject = "repair:v1"\n'
+                'diagnosis_prior_art_result = "evidence/intake-prior-art.md"\n'
+                'response_kind = "none"\n'
+                'response_observed = false\n'
+                'alignment_state = "pending"\n'
+                'alignment_subject = ""\n'
+                'micro_fix_candidate = false\n'
+            ))
+            self.install_state_record(
+                project, "research", "research", "RESEARCH.toml",
+                'state = "active"\n'
+                'workstream_id = "sample-workstream"\n'
+                'origin_role = "brainstorming"\n'
+                'origin_subject = "scope-a@1"\n'
+                'return_target = "brainstorming"\n'
+                'return_reconciliation = "pending"\n'
+                'return_result = ""\n'
+                'finding = ""\n'
+                'limitations = ""\n'
+                'conflicts = ""\n'
+                '[[sources]]\nclass = "official_upstream"\nstatus = "pending"\nweight = "primary"\n'
+                '[[sources]]\nclass = "project_runtime"\nstatus = "pending"\nweight = "direct"\n'
+                '[[sources]]\nclass = "tracker_discussion"\nstatus = "pending"\nweight = "supporting"\n'
+                '[[sources]]\nclass = "practitioner_community"\nstatus = "pending"\nweight = "supporting"\n',
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "research"))
+        finally:
+            temp.cleanup()
 
     def test_active_and_completed_research_route_to_exact_owner(self) -> None:
         base = (
