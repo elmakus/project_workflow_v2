@@ -1,0 +1,32 @@
+workstream_id = "issue-handoff-receive-continuation"
+revision = 1
+
+[execution_ref]
+branch = "work/pwv2-handoff-receive-continuation"
+
+[[cards]]
+id = "M06-T01"
+status = "ready"
+review_attempts = []
+
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/issue-handoff-receive-continuation/cards/M06-T01.md"
+
+[[jit_triggers]]
+id = "M06-T02-after-M06-T01"
+after_card = "M06-T01"
+state = "waiting"
+condition = "Materialize M06-T02 only after M06-T01 is DONE with a durable exact GREEN result that can be bound as its dependency."
+
+[[jit_triggers]]
+id = "M06-T03-after-M06-T02"
+after_card = "M06-T02"
+state = "waiting"
+condition = "Materialize M06-T03 only after M06-T02 is DONE with a durable exact GREEN result that can be bound as its dependency."
+
+[[jit_triggers]]
+id = "M06-T04-after-M06-T03"
+after_card = "M06-T03"
+state = "waiting"
+condition = "Materialize M06-T04 only after M06-T03 is DONE with a durable exact GREEN result that can be bound as its dependency."
