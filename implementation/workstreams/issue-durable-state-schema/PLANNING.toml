@@ -12,7 +12,7 @@ premium_a = "satisfied"
 premium_a_subject = "R1"
 premium_b = "satisfied"
 premium_b_subject = "elmakus/project_workflow_v2@8c009500dc1cdc98baa88613a8d5b258cba5791a:planning/ISSUE_23_DURABLE_STATE_SCHEMA_PLAN.md@ea1f3a1a034e180a9b21df5588011c624aa6782f"
-premium_c = "due"
+premium_c = "satisfied"
 premium_c_subject = "elmakus/project_workflow_v2@8c009500dc1cdc98baa88613a8d5b258cba5791a:planning/ISSUE_23_DURABLE_STATE_SCHEMA_PLAN.md@ea1f3a1a034e180a9b21df5588011c624aa6782f"
 
 [subject]
