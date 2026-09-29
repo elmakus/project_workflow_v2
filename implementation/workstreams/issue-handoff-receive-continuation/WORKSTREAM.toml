@@ -26,3 +26,7 @@ path = "implementation/workstreams/issue-handoff-receive-continuation/BRAINSTORM
 [definition]
 class = "definition"
 path = "implementation/workstreams/issue-handoff-receive-continuation/DEFINITION.toml"
+
+[planning]
+class = "planning"
+path = "implementation/workstreams/issue-handoff-receive-continuation/PLANNING.toml"
