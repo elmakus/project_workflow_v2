@@ -1,0 +1,14 @@
+workstream_id = "issue-explicit-stop-precedence"
+source_scope_subject = "brainstorm-explicit-stop-precedence@1"
+revision = "D1"
+state = "green"
+completeness_audit = "green"
+premium_a = "due"
+
+[requirements]
+class = "authority"
+path = "requirements/ISSUE_33_EXPLICIT_STOP_PRECEDENCE.md"
+
+[[decisions]]
+class = "authority"
+path = "decisions/ISSUE_33_EXPLICIT_STOP_PRECEDENCE.md"
