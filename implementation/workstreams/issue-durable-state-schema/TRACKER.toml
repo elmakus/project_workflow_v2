@@ -1,0 +1,9 @@
+workstream_id = "issue-durable-state-schema"
+provider = "github"
+repository = "elmakus/project_workflow_v2"
+dedup_key = "issue-23-durable-state-schema-regression"
+state = "linked"
+issue_number = 23
+candidate_issue_numbers = []
+readback_state = "verified"
+final_pr = 0
