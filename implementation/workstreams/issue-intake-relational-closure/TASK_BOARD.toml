@@ -1,5 +1,5 @@
 workstream_id = "issue-intake-relational-closure"
-revision = 2
+revision = 3
 
 [execution_ref]
 branch = "work/issue-32-intake-relational-closure"
@@ -11,3 +11,9 @@ status = "in_progress"
 [cards.contract]
 class = "task_card"
 path = "implementation/workstreams/issue-intake-relational-closure/cards/M01-T01.md"
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-intake-relational-closure/results/M01-T01.md"
+commit = "90a92c8df970647d9ab374becffd90247ad9346a"
+blob = "747c9c993efae5ea91c36fcfa70c901f6d8b868b"
