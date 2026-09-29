@@ -1,0 +1,7 @@
+workstream_id = "issue-ci-pending-continuation"
+provider = "github"
+repository = "elmakus/project_workflow_v2"
+number = 22
+state = "linked"
+url = "https://github.com/elmakus/project_workflow_v2/issues/22"
+authority = false
