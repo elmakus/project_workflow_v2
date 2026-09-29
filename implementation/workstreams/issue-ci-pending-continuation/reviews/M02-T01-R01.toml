@@ -1,8 +1,8 @@
 workstream_id = "issue-ci-pending-continuation"
 card_id = "M02-T01"
 attempt = "R01"
-verdict = "pending"
-evidence_path = ""
+verdict = "green"
+evidence_path = "implementation/workstreams/issue-ci-pending-continuation/evidence/M02-T01-R01.md"
 
 [subject]
 class = "git_blob"
