@@ -1,5 +1,5 @@
 workstream_id = "issue-execution-research-return-shadow"
-revision = 2
+revision = 3
 
 [execution_ref]
 branch = "work/issue-28-execution-research-return-shadow"
@@ -7,6 +7,7 @@ branch = "work/issue-28-execution-research-return-shadow"
 [[cards]]
 id = "M01-T01"
 status = "in_progress"
+review_attempts = [{ class = "review_attempt", path = "implementation/workstreams/issue-execution-research-return-shadow/reviews/M01-T01-R01.toml" }]
 
 [cards.contract]
 class = "task_card"
