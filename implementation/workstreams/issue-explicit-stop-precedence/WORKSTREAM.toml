@@ -26,3 +26,7 @@ path = "implementation/workstreams/issue-explicit-stop-precedence/RESEARCH.toml"
 [tracker]
 class = "tracker"
 path = "implementation/workstreams/issue-explicit-stop-precedence/TRACKER.toml"
+
+[brainstorm]
+class = "brainstorm"
+path = "implementation/workstreams/issue-explicit-stop-precedence/BRAINSTORM.toml"

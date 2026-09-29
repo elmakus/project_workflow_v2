@@ -1,0 +1,8 @@
+workstream_id = "issue-explicit-stop-precedence"
+scope_id = "brainstorm-explicit-stop-precedence"
+revision = 1
+state = "ready_for_definition"
+challenge_audit = "green"
+explicit_user_stop = false
+promotion_state = "pending"
+promotion_subject = ""
