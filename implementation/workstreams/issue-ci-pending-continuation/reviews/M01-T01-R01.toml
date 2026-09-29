@@ -1,0 +1,20 @@
+workstream_id = "issue-ci-pending-continuation"
+card_id = "M01-T01"
+attempt = "R01"
+verdict = "pending"
+evidence_path = ""
+
+[subject]
+class = "git_commit"
+repository = "elmakus/project_workflow_v2"
+commit = "32e7971f96e76a403de6bc5cd7b8d5979ac0dfe2"
+path = "tools/continuation_contract.py"
+blob = "a68e7211cbbebe07b4d6cf04e18eaa000b76c3ad"
+
+[acceptance]
+class = "task_card"
+path = "implementation/workstreams/issue-ci-pending-continuation/cards/M01-T01.md"
+
+[independence]
+materially_produced_or_repaired_subject = false
+basis = "Pending independent review obligation; verdict must be issued by a context that did not materially produce or repair the exact implementation subject."
