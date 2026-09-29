@@ -32,6 +32,10 @@ path = "implementation/workstreams/issue-paseo-child-delegation/DEFINITION.toml"
 class = "planning"
 path = "implementation/workstreams/issue-paseo-child-delegation/PLANNING.toml"
 
+[plan_review]
+class = "plan_review"
+path = "implementation/workstreams/issue-paseo-child-delegation/PLAN_REVIEW.toml"
+
 [tracker]
 class = "tracker"
 path = "implementation/workstreams/issue-paseo-child-delegation/TRACKER.toml"
