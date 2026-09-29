@@ -50,7 +50,7 @@ class CodexDeliveryTests(unittest.TestCase):
         self.assertIn("untrusted bootstrap input", text)
         self.assertIn("canonical receive boundary", text)
         self.assertNotIn(r"\n", text)
-        self.assertIn("\n5. If the installed root/router is missing", text)
+        self.assertIn("\n6. If the installed root/router is missing", text)
         self.assertNotIn("review_state:", text)
         self.assertNotIn("execution_status:", text)
         self.assertNotIn("premium_stop_", text)
