@@ -1,0 +1,21 @@
+workstream_id = "issue-pwv2-stabilization-program"
+plan_revision = "P1"
+planning_cycle = 1
+attempt = "R01"
+verdict = "pending"
+evidence_path = ""
+
+[subject]
+class = "git_blob"
+repository = "elmakus/project_workflow_v2"
+commit = "9eda96a7ee31956b8b8675c4883f5d4587c02501"
+path = "planning/PWV2_STABILIZATION_PROGRAM_PLAN.md"
+blob = "2f2ebf55fc7ed307a98edaec3db9463f20d3a308"
+
+[acceptance]
+class = "authority"
+path = "requirements/PWV2_STABILIZATION_PROGRAM_FORMALIZATION.md"
+
+[independence]
+materially_produced_or_repaired_subject = false
+basis = "Fresh independent receiving review context did not materially author or repair this exact frozen plan. It performs read-only receipt/review; only the coordinator reconciles canonical state."
