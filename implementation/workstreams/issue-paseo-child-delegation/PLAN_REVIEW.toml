@@ -1,14 +1,21 @@
+attempt = "P1-R01"
 workstream_id = "issue-paseo-child-delegation"
-cycle = 1
+planning_cycle = 1
 plan_revision = "P1"
-subject = "elmakus/project_workflow_v2@46d0ef9c6e7998401d57b05cf866b33681b472a2:planning/ISSUE_20_TEMPORARY_PASEO_CREATE_AGENT_READINESS.md@2cc782afe295be4d1737c4240ff9f3744796bc16"
-acceptance_authority = [
-  "implementation/workstreams/issue-paseo-child-delegation/DEFINITION.toml",
-  "implementation/workstreams/issue-paseo-child-delegation/BRAINSTORM.toml",
-  "implementation/workstreams/issue-paseo-child-delegation/INTAKE.toml",
-  "implementation/workstreams/issue-paseo-child-delegation/RESEARCH.toml"
-]
-independence_proof = "fresh independent Premium B context; this context did not materially author or repair the exact frozen plan subject"
-state = "red"
-verdict = "RED"
-evidence_locator = "implementation/workstreams/issue-paseo-child-delegation/PLAN_REVIEW.md"
+verdict = "red"
+evidence_path = "implementation/workstreams/issue-paseo-child-delegation/PLAN_REVIEW.md"
+
+[subject]
+class = "git_blob"
+repository = "elmakus/project_workflow_v2"
+commit = "46d0ef9c6e7998401d57b05cf866b33681b472a2"
+path = "planning/ISSUE_20_TEMPORARY_PASEO_CREATE_AGENT_READINESS.md"
+blob = "2cc782afe295be4d1737c4240ff9f3744796bc16"
+
+[acceptance]
+class = "authority"
+path = "implementation/workstreams/issue-paseo-child-delegation/DEFINITION.toml"
+
+[independence]
+materially_produced_or_repaired_subject = false
+basis = "Fresh independent Premium B context; this context did not materially author or repair the exact frozen plan subject."
