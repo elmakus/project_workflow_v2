@@ -1,5 +1,5 @@
 workstream_id = "issue-ci-pending-continuation"
-revision = 4
+revision = 5
 
 [execution_ref]
 branch = "work/pwv2-ci-pending-continuation"
@@ -29,5 +29,14 @@ path = "implementation/workstreams/issue-ci-pending-continuation/reviews/M01-T01
 [[jit_triggers]]
 id = "after-M01-T01"
 after_card = "M01-T01"
-state = "waiting"
+state = "consumed"
 condition = "Materialize the downstream Execution/evidence-composition Card from the accepted M01 result, then retain bounded integration qualification."
+
+
+[[cards]]
+id = "M02-T01"
+status = "ready"
+
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/issue-ci-pending-continuation/cards/M02-T01.md"
