@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import shutil
+import subprocess
 import tempfile
 import tomllib
 import unittest
@@ -30,6 +31,7 @@ CREATED_FROM = "1" * 40
 
 
 def legacy_definition() -> dict:
+    """SYNTHETIC unit-logic fixture only; does NOT match real #20/#22 bytes."""
     return {
         "workstream_id": WORKSTREAM_ID,
         "source_scope": "scope-a",
@@ -43,6 +45,7 @@ def legacy_definition() -> dict:
 
 
 def legacy_planning() -> dict:
+    """SYNTHETIC unit-logic fixture only; does NOT match real #20/#22 bytes."""
     return {
         "workstream_id": WORKSTREAM_ID,
         "cycle": 1,
@@ -421,6 +424,147 @@ class PlanApplyTests(unittest.TestCase):
         second = fingerprint_sources({"A.toml": b"one\n", "B.toml": b"two\n"})
         self.assertEqual(first, second)
         self.assertRegex(first, r"^[0-9a-f]{64}$")
+
+
+class RealByteBlockerTests(unittest.TestCase):
+    """Exact durable source verification at af76106 (#20) and 51c5ebc (#22).
+
+    These tests read the real pre-Recovery bytes via git and prove M02 P1
+    remains fail-closed Recovery instead of synthetic GREEN. They never mutate
+    Board/Result/Review state and never rebind or drop the pending reservation.
+    """
+
+    COMMIT20 = "af76106415504c746668113d1df46a411fdcebd7"
+    COMMIT22 = "51c5ebccca4ea1b4e1fd60b3f36dddc5fb2e72d2"
+    WS20 = "implementation/workstreams/issue-paseo-child-delegation"
+    WS22 = "implementation/workstreams/issue-ci-pending-continuation"
+
+    def git_show(self, commit: str, path: str) -> bytes:
+        completed = subprocess.run(
+            ["git", "show", f"{commit}:{path}"],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+        return completed.stdout
+
+    def git_blob(self, commit: str, path: str) -> str:
+        completed = subprocess.run(
+            ["git", "ls-tree", commit, "--", path],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+            text=True,
+        )
+        parts = completed.stdout.strip().split()
+        self.assertEqual(len(parts), 4, f"ls-tree unexpected: {completed.stdout!r}")
+        return parts[2]
+
+    def test_real_blob_identities_are_exact(self) -> None:
+        self.assertEqual(
+            self.git_blob(self.COMMIT20, f"{self.WS20}/DEFINITION.toml"),
+            "5aed776d21580db46f3b1408209eb2e8be4593bd",
+        )
+        self.assertEqual(
+            self.git_blob(self.COMMIT20, f"{self.WS20}/PLANNING.toml"),
+            "32d92a06ff61d7dc6fd0a4dda18d5d9eeed12256",
+        )
+        self.assertEqual(
+            self.git_blob(self.COMMIT22, f"{self.WS22}/DEFINITION.toml"),
+            "4e33647bdd71570124bc0ba1447143e612cf4eda",
+        )
+        self.assertEqual(
+            self.git_blob(self.COMMIT22, f"{self.WS22}/PLANNING.toml"),
+            "eebec0b303fa4d90cf886d7d9472edebc6481f8d",
+        )
+        self.assertEqual(
+            self.git_blob(self.COMMIT22, f"{self.WS22}/reviews/M01-T01-R01.toml"),
+            "87db02e2fe07c557418e9fb21e22802e7f78c319",
+        )
+
+    def test_real_20_authority_and_plan_path_fail_closed(self) -> None:
+        definition_raw = self.git_show(self.COMMIT20, f"{self.WS20}/DEFINITION.toml")
+        planning_raw = self.git_show(self.COMMIT20, f"{self.WS20}/PLANNING.toml")
+        definition = tomllib.loads(definition_raw.decode("utf-8"))
+        planning = tomllib.loads(planning_raw.decode("utf-8"))
+        # Exact real markers that synthetic fixtures do not carry.
+        self.assertEqual(definition["source_scope"], "temporary-paseo-create-agent-readiness@1")
+        self.assertIn("requirements_locator", definition)
+        self.assertIn("accepted_decision_locators", definition)
+        self.assertIn("premium_a_state", definition)
+        self.assertEqual(planning["plan_artifact"], f"{self.WS20}/PLAN.md")
+        self.assertIn("frozen_plan_subject", planning)
+        self.assertEqual(planning["premium_c"], "pending")
+        # Synthetic shape differs; real must not be claimed as supported.
+        self.assertNotEqual(definition["source_scope"], "scope-a")
+        self.assertNotEqual(planning["plan_artifact"], "planning/MASTER_PLAN.md")
+        # M02 fails closed with explicit authority/plan-path blockers.
+        with self.assertRaisesRegex(V2ReconciliationError, "authority|double-suffix|fragment|D4"):
+            from tools.v2_reconciliation import canonicalize_definition
+
+            canonicalize_definition(definition, "issue-paseo-child-delegation")
+        with self.assertRaisesRegex(V2ReconciliationError, "planning|PLAN.md|frozen_plan_subject|pending"):
+            from tools.v2_reconciliation import canonicalize_planning
+
+            canonicalize_planning(planning, "issue-paseo-child-delegation", "R1", None)
+
+    def test_real_20_source_set_is_not_either_synthetic_profile(self) -> None:
+        completed = subprocess.run(
+            ["git", "ls-tree", "-r", "--name-only", self.COMMIT20, "--", f"{self.WS20}/"],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            check=True,
+            text=True,
+        )
+        names = [line for line in completed.stdout.splitlines() if line]
+        # 8 workstream files at af76106, not the synthetic 2-file profile.
+        self.assertEqual(len(names), 8)
+        with self.assertRaisesRegex(V2ReconciliationError, "not an explicitly supported profile"):
+            detect_profile({"DEFINITION.toml": {}, "PLANNING.toml": {}, "WORKSTREAM.toml": {}})
+
+    def test_real_22_pending_reservation_is_preserved_not_rebound(self) -> None:
+        review_raw = self.git_show(self.COMMIT22, f"{self.WS22}/reviews/M01-T01-R01.toml")
+        review = tomllib.loads(review_raw.decode("utf-8"))
+        self.assertEqual(review["verdict"], "pending")
+        self.assertEqual(review["subject"]["class"], "git_commit")
+        self.assertEqual(review["subject"]["commit"], "32e7971f96e76a403de6bc5cd7b8d5979ac0dfe2")
+        self.assertEqual(review["subject"]["path"], "tools/continuation_contract.py")
+        # Any source set containing the pending file must fail with the explicit
+        # #26 blocker, never silently drop or rebind git_commit to git_blob.
+        with self.assertRaisesRegex(V2ReconciliationError, "#26|pending.*reservation"):
+            detect_profile(
+                {
+                    "WORKSTREAM.toml": {},
+                    "DEFINITION.toml": {},
+                    "PLANNING.toml": {},
+                    "TRACKER.toml": {},
+                    "TASK_BOARD.toml": {},
+                    "reviews/M01-T01-R01.toml": review,
+                }
+            )
+
+    def test_real_22_definition_planning_fail_closed(self) -> None:
+        definition = tomllib.loads(
+            self.git_show(self.COMMIT22, f"{self.WS22}/DEFINITION.toml").decode("utf-8")
+        )
+        planning = tomllib.loads(
+            self.git_show(self.COMMIT22, f"{self.WS22}/PLANNING.toml").decode("utf-8")
+        )
+        self.assertEqual(definition["source_scope"], "ci-pending-deterministic-continuation@1")
+        self.assertIn("requirements_locator", definition)
+        self.assertEqual(planning["plan_artifact"], f"{self.WS22}/PLAN.md")
+        self.assertIsInstance(planning["frozen_subject"], str)
+        self.assertTrue(planning["frozen_subject"].startswith("git-blob:"))
+        with self.assertRaisesRegex(V2ReconciliationError, "authority|double-suffix|fragment|D4"):
+            from tools.v2_reconciliation import canonicalize_definition
+
+            canonicalize_definition(definition, "issue-ci-pending-continuation")
+        with self.assertRaisesRegex(V2ReconciliationError, "planning|PLAN.md|git-blob|table"):
+            from tools.v2_reconciliation import canonicalize_planning
+
+            canonicalize_planning(planning, "issue-ci-pending-continuation", "R1", None)
 
 
 class ValidatorRouterIntegrationTests(unittest.TestCase):

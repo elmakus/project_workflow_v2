@@ -9,19 +9,61 @@ mapping.
 
 Supported profiles (exact structural checks, no guessing):
 
-- ``issue20-definition-planning-drift``: pre-Recovery #20
-  ``DEFINITION.toml`` + ``PLANNING.toml`` shape with integer revisions,
-  ``plan_artifact``, ``review_mode = "normal"``, no immutable ``[subject]``
-  table and no plan-review locator.
-- ``issue22-workstream-bundle-drift``: pre-Recovery #22
+- ``issue20-definition-planning-drift``: SYNTHETIC unit-logic profile for
+  ``DEFINITION.toml`` + ``PLANNING.toml`` with integer revisions,
+  ``plan_artifact`` under ``planning/``, ``review_mode = "normal"``, no
+  immutable ``[subject]`` table and no plan-review locator. This synthetic
+  shape does NOT match the real pre-Recovery #20 bytes at
+  af76106415504c746668113d1df46a411fdcebd7 (see blocker note below).
+- ``issue22-workstream-bundle-drift``: SYNTHETIC unit-logic profile for
   ``WORKSTREAM.toml`` + ``DEFINITION.toml`` + ``PLANNING.toml`` +
-  ``TRACKER.toml`` + ``TASK_BOARD.toml`` shape with missing
+  ``TRACKER.toml`` + ``TASK_BOARD.toml`` with missing
   ``created_from``/``task_board`` locator, legacy Definition string locators
-  and uppercase enums, legacy Planning integer revision/``plan_artifact``/
-  ``frozen_subject``/``normal`` mode, legacy Tracker ``number``/``url``/
-  ``authority`` fields, and legacy Task Board ``review_pending`` /
-  top-level ``result_path`` / ``review_requirement`` without exact
-  result/review-attempt locators.
+  under accepted authority roots and uppercase enums, legacy Planning integer
+  revision/``planning/``-rooted ``plan_artifact``/table ``frozen_subject``/
+  ``normal`` mode, legacy Tracker ``number``/exact ``url`` shape, and legacy
+  Task Board ``review_pending`` / top-level ``result_path`` /
+  ``review_requirement`` without exact result/review-attempt locators. This
+  synthetic shape does NOT match the real pre-Recovery #22 bytes at
+  51c5ebccca4ea1b4e1fd60b3f36dddc5fb2e72d2 (see blocker note below).
+
+Real-byte blocker (verified against exact durable commits, not synthetic):
+
+- Real #20 DEFINITION.toml@af76106 (blob 5aed776d...) uses
+  ``source_scope = "temporary-paseo-create-agent-readiness@1"`` (already
+  scoped) with integer ``revision = 1``, ``requirements_locator`` and
+  ``accepted_decision_locators`` with workstream-local ``#fragment`` paths,
+  prose ``requirements``/``non_goals``/``future_compatibility`` and
+  ``premium_a_state`` (not ``premium_a``). Mapping this to current authority
+  tables would synthesize authority from prose/fragments (forbidden by D4/R10)
+  or double-suffix the subject to ``...@1@1`` (ambiguous identity). Fail closed.
+- Real #20 PLANNING.toml@af76106 (blob 32d92a06...) uses
+  ``plan_artifact = "implementation/.../PLAN.md"`` (not ``planning/``),
+  ``frozen_plan_subject`` (not ``frozen_subject``) as a bare path string,
+  ``premium_b_subject`` as a bare path string (no exact
+  repository+commit+path+blob), and ``premium_c = "pending"`` (unsupported
+  enum). Preserving the path verbatim fails the production validator;
+  changing the path changes the immutable subject without proof. Fail closed.
+- Real #20 source set at af76106 is 8 workstream files (not 2) and its
+  WORKSTREAM.toml already carries ``created_from``. It is not either synthetic
+  profile. Fail closed.
+- Real #22 DEFINITION.toml@51c5ebc (blob 4e33647b...) uses already-scoped
+  ``source_scope`` plus ``requirements_locator``/``decision_locators`` with
+  workstream-local paths (not accepted authority roots). Fail closed.
+- Real #22 PLANNING.toml@51c5ebc (blob eebec0b3...) uses
+  ``plan_artifact = "implementation/.../PLAN.md"`` and
+  ``frozen_subject = "git-blob:9d6e..."`` STRING plus ``premium_b/c_subject``
+  as ``git-blob:``-prefixed strings (not exact
+  repository+commit+path+blob tables). No exact Git table identity is provable.
+  Fail closed.
+- Real #22 pending reviews/M01-T01-R01.toml@51c5ebc (blob 87db02e2...) carries
+  ``verdict = "pending"`` with ``subject.class = "git_commit"`` (not
+  ``git_blob``) for ``tools/continuation_contract.py@32e7971...``. Rebinding
+  ``git_commit`` to ``git_blob``, changing commit/blob, or dropping the file
+  to reconcile the board/plan would be identity-changing replacement without
+  a lawful successor. That is #26 pending-attempt replacement, explicitly
+  excluded from M02. The reservation must be preserved verbatim; M02 remains
+  fail-closed Recovery.
 
 Authority rules (requirements R6-R11, decisions D3-D6):
 
@@ -215,6 +257,17 @@ def detect_profile(records: dict[str, dict[str, Any]]) -> str:
     """Return the single supported profile for an exact source set or fail closed."""
     _require(isinstance(records, dict) and records, "reconciliation: empty source set remains Recovery")
     names = set(records)
+    # Pending-review reservation guard (#26 excluded from M02): any review-like
+    # source, including the real #22 reviews/M01-T01-R01.toml pending file,
+    # must never be rebound or dropped by M02. Fail closed with an explicit
+    # #26 blocker instead of generic unsupported-set handling.
+    for name in names:
+        lowered = name.lower()
+        if lowered.startswith("reviews/") or lowered.endswith("-r01.toml") or "/reviews/" in lowered:
+            raise V2ReconciliationError(
+                "reconciliation: pending review reservation present; rebinding or dropping "
+                "it requires #26 pending-attempt replacement which is excluded from M02; remains Recovery"
+            )
     unknown = names - set(_FILENAME_TO_KIND)
     _require(not unknown, f"reconciliation: unsupported source file(s) {sorted(unknown)} remain Recovery")
 
@@ -293,8 +346,25 @@ def canonicalize_definition(legacy: dict[str, Any], workstream_id: str) -> tuple
     _require(isinstance(legacy, dict), "definition: legacy record must be a table")
     _is_prohibited_shape(legacy, "definition")
     _require(legacy.get("workstream_id") == workstream_id, "definition: wrong workstream_id; remains Recovery")
+    # Real #20/#22 blocker: workstream-local fragment locators cannot become
+    # current authority tables. Synthesizing authority from prose/fragments
+    # violates D4/R10; dropping scope violates preservation. Fail closed.
+    for real_key in ("requirements_locator", "accepted_decision_locators", "decision_locators"):
+        _require(
+            real_key not in legacy,
+            f"definition: real pre-Recovery {real_key!r} uses workstream-local paths, not accepted "
+            "authority roots; synthesizing authority is forbidden (D4/R10); remains Recovery",
+        )
     scope = legacy.get("source_scope")
     _require(isinstance(scope, str) and scope.strip(), "definition: legacy source_scope must be non-empty")
+    # Real #20/#22 blocker: source_scope already carries @revision (e.g.
+    # "...readiness@1") with integer revision. Mapping to f"{scope}@{N}"
+    # would double-suffix to "...@1@1" (ambiguous identity). Fail closed.
+    _require(
+        "@" not in scope.strip(),
+        "definition: legacy source_scope already carries @revision with integer revision; "
+        "canonical subject would double-suffix and is ambiguous; remains Recovery",
+    )
     revision_int = legacy.get("revision")
     _require(isinstance(revision_int, int) and revision_int >= 1, "definition: legacy revision must be positive integer")
     canonical_revision = f"R{revision_int}"
@@ -306,6 +376,15 @@ def canonicalize_definition(legacy: dict[str, Any], workstream_id: str) -> tuple
 
     requirements_raw = legacy.get("requirements")
     if isinstance(requirements_raw, str):
+        # Real #20 blocker: prose requirements (e.g. "Implement only a temporary
+        # readiness ...") are not authority paths. _authority_table already fails
+        # them as outside accepted roots; keep the failure explicit here so the
+        # blocker names synthesis rather than a generic path error.
+        _require(
+            "/" in requirements_raw.strip(),
+            "definition: legacy requirements is prose, not an authority path; synthesizing "
+            "authority from prose is forbidden (D4/R10); remains Recovery",
+        )
         requirements = _authority_table(requirements_raw.strip(), "definition.requirements")
     elif isinstance(requirements_raw, dict):
         _require(requirements_raw.get("class") == "authority", "definition: invalid requirements locator")
@@ -360,6 +439,22 @@ def canonicalize_planning(
     _require(isinstance(legacy, dict), "planning: legacy record must be a table")
     _is_prohibited_shape(legacy, "planning")
     _require(legacy.get("workstream_id") == workstream_id, "planning: wrong workstream_id; remains Recovery")
+    # Real #20 blocker: frozen_plan_subject (not frozen_subject) as a bare path.
+    _require(
+        "frozen_plan_subject" not in legacy,
+        "planning: real pre-Recovery frozen_plan_subject is a bare path string without exact "
+        "repository+commit+path+blob identity; cannot prove subject; remains Recovery",
+    )
+    # Real #20 blocker: premium_c pending is outside the current gate enum.
+    # Silently mapping pending to not_due would guess gate semantics. Fail closed.
+    for gate in ("premium_b", "premium_c"):
+        if gate in legacy:
+            raw_gate = legacy[gate]
+            _require(
+                isinstance(raw_gate, str) and raw_gate.strip().lower() in {"not_due", "due", "satisfied"},
+                f"planning: legacy {gate} {raw_gate!r} is outside the current gate enum; "
+                "mapping it would guess approval semantics; remains Recovery",
+            )
 
     cycle = legacy.get("cycle")
     _require(isinstance(cycle, int) and cycle >= 1, "planning: legacy cycle must be positive integer")
@@ -378,9 +473,14 @@ def canonicalize_planning(
     plan_artifact = legacy.get("plan_artifact")
     _require(isinstance(plan_artifact, str) and plan_artifact.strip(), "planning: legacy plan_artifact must be non-empty")
     plan_path = plan_artifact.strip()
+    # Real #20/#22 blocker: plan_artifact is implementation/.../PLAN.md, not
+    # planning/*.md. Preserving verbatim fails the production validator;
+    # changing the path changes the immutable subject without proof. Fail closed.
     _require(
         plan_path.startswith("planning/") and plan_path.endswith(".md") and ".." not in plan_path.split("/"),
-        "planning: legacy plan_artifact is not a planning Markdown artifact; remains Recovery",
+        "planning: legacy plan_artifact is not a planning Markdown artifact (real pre-Recovery uses "
+        "implementation/.../PLAN.md); preserving it fails validation and changing the path changes "
+        "the immutable subject without proof; remains Recovery",
     )
 
     _require(legacy.get("review_mode") == "normal", "planning: supported drift requires review_mode normal")
@@ -394,7 +494,14 @@ def canonicalize_planning(
     )
 
     frozen = legacy.get("frozen_subject")
-    _require(isinstance(frozen, dict), "planning: legacy frozen_subject table is required for subject proof")
+    # Real #22 blocker: frozen_subject is the STRING "git-blob:9d6e...", not an
+    # exact repository+commit+path+blob table. No Git table identity is provable.
+    _require(
+        isinstance(frozen, dict),
+        "planning: legacy frozen_subject table is required for subject proof (real pre-Recovery uses "
+        "a git-blob: prefixed string without exact repository+commit+path+blob); cannot prove subject; "
+        "remains Recovery",
+    )
     proven_subject: dict[str, str] | None = None
     if plan_subject_evidence is not None:
         _require(
