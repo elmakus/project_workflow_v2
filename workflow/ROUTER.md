@@ -29,6 +29,7 @@ The router is one small runtime-neutral obligation selector. Product/model/sessi
 - active Brainstorming -> Brainstorming;
 - ready Brainstorming without exact promotion -> Definition-promotion stop;
 - exact promoted revision -> Definition;
+- manifest-declared Planning without Definition locator, or Plan Review without Planning locator -> Recovery before unrelated pre-execution/Board dispatch; only locator membership is checked, orphan content is not read/accepted and downstream content is not eagerly validated;
 - active Definition -> Definition;
 - Definition GREEN with A due -> premium A stop with a human-facing recommendation to use the best available model/context for Strategic Planning;
 - A satisfied and no plan -> Planning;

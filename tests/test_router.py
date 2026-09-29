@@ -1449,6 +1449,266 @@ class RouterTests(unittest.TestCase):
         for forbidden in ("chatgpt", "codex", "model_id", "session_id", "worker_id"):
             self.assertNotIn(forbidden, combined)
 
+    def test_orphan_planning_without_definition_fails_closed_before_board(self) -> None:
+        import hashlib
+        for planning_kwargs, name in (
+            ({"state": "draft", "premium_a": "due"}, "draft_a_due"),
+            ({"state": "draft", "premium_a": "satisfied"}, "draft_a_satisfied"),
+        ):
+            temp, project = self.copy_fixture()
+            try:
+                with self.subTest(case=name):
+                    self.install_state_record(
+                        project, "planning", "planning", "PLANNING.toml",
+                        self.planning_content(**planning_kwargs),
+                    )
+                    planning_rel = "implementation/workstreams/sample-workstream/PLANNING.toml"
+                    board_path = project / BOARD
+                    before = {
+                        "planning": hashlib.sha256((project / planning_rel).read_bytes()).hexdigest(),
+                        "board": hashlib.sha256(board_path.read_bytes()).hexdigest(),
+                    }
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertEqual(
+                        (routed.disposition, routed.obligation),
+                        ("recovery", "recovery_boundary"),
+                    )
+                    self.assertEqual(routed.owner_module, "workflow/RECOVERY.md")
+                    self.assertIn("manifest declares [planning] without current [definition]", routed.reason)
+                    self.assertIn(f"project:{MANIFEST}", routed.read_set)
+                    self.assertNotIn(f"project:{planning_rel}", routed.read_set)
+                    self.assertNotIn(f"project:{BOARD}", routed.read_set)
+                    self.assertIn("package:workflow/RECOVERY.md", routed.read_set)
+                    self.assertEqual(
+                        hashlib.sha256((project / planning_rel).read_bytes()).hexdigest(),
+                        before["planning"],
+                    )
+                    self.assertEqual(
+                        hashlib.sha256(board_path.read_bytes()).hexdigest(),
+                        before["board"],
+                    )
+            finally:
+                temp.cleanup()
+
+        temp, project = self.copy_fixture()
+        try:
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(state="draft", premium_a="due"),
+            )
+            self.remove_board_locator(project)
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("manifest declares [planning] without current [definition]", routed.reason)
+            self.assertNotIn(f"project:{BOARD}", routed.read_set)
+        finally:
+            temp.cleanup()
+
+    def test_orphan_plan_review_without_planning_fails_closed_before_board(self) -> None:
+        import hashlib
+        temp, project = self.copy_fixture()
+        try:
+            self.install_state_record(
+                project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                self.plan_review_content("pending"),
+            )
+            review_rel = "implementation/workstreams/sample-workstream/PLAN_REVIEW.toml"
+            board_path = project / BOARD
+            before_review = hashlib.sha256((project / review_rel).read_bytes()).hexdigest()
+            before_board = hashlib.sha256(board_path.read_bytes()).hexdigest()
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertEqual(routed.owner_module, "workflow/RECOVERY.md")
+            self.assertIn("manifest declares [plan_review] without current [planning]", routed.reason)
+            self.assertIn(f"project:{MANIFEST}", routed.read_set)
+            self.assertNotIn(f"project:{review_rel}", routed.read_set)
+            self.assertNotIn(f"project:{BOARD}", routed.read_set)
+            self.assertEqual(hashlib.sha256((project / review_rel).read_bytes()).hexdigest(), before_review)
+            self.assertEqual(hashlib.sha256(board_path.read_bytes()).hexdigest(), before_board)
+        finally:
+            temp.cleanup()
+
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            self.install_state_record(
+                project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                self.plan_review_content("pending"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("manifest declares [plan_review] without current [planning]", routed.reason)
+            self.assertNotEqual(routed.obligation, "planning")
+            self.assertNotIn(f"project:{BOARD}", routed.read_set)
+        finally:
+            temp.cleanup()
+
+        temp, project = self.copy_fixture()
+        try:
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(state="draft"),
+            )
+            self.install_state_record(
+                project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                self.plan_review_content("pending"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("manifest declares [planning] without current [definition]", routed.reason)
+        finally:
+            temp.cleanup()
+
+    def test_orphan_missing_takes_precedence_over_malformed_orphan_bytes(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                "not valid toml [[[\n",
+            )
+            planning_rel = "implementation/workstreams/sample-workstream/PLANNING.toml"
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("manifest declares [planning] without current [definition]", routed.reason)
+            self.assertNotIn(f"project:{planning_rel}", routed.read_set)
+        finally:
+            temp.cleanup()
+
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            bad_planning = self.planning_content(state="draft").replace(
+                'workstream_id = "sample-workstream"', 'workstream_id = "other-workstream"'
+            )
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                bad_planning,
+            )
+            planning_rel = "implementation/workstreams/sample-workstream/PLANNING.toml"
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertNotIn("without current [definition]", routed.reason)
+            self.assertIn(f"project:{planning_rel}", routed.read_set)
+        finally:
+            temp.cleanup()
+
+    def test_orphan_valid_owner_controls_remain_lawful(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "planning"))
+        finally:
+            temp.cleanup()
+
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(state="draft"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "planning"))
+        finally:
+            temp.cleanup()
+
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(state="frozen", premium_b="due"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("stop", "premium_B"))
+        finally:
+            temp.cleanup()
+
+        temp, project = self.copy_fixture()
+        try:
+            self.install_green_definition(project)
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(state="frozen", premium_b="satisfied"),
+            )
+            self.install_state_record(
+                project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                self.plan_review_content("pending"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "plan_review"))
+            self.assertEqual(routed.owner_module, "workflow/PLAN_REVIEW.md")
+        finally:
+            temp.cleanup()
+
+        temp, project = self.copy_fixture()
+        try:
+            self.install_approved_plan(project)
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "execution"))
+            self.assertIn(f"project:{BOARD}", routed.read_set)
+        finally:
+            temp.cleanup()
+
+    def test_orphan_preserves_earlier_research_intake_tracker_ownership(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(state="draft"),
+            )
+            self.install_state_record(project, "research", "research", "RESEARCH.toml", (
+                'state = "active"\n'
+                'workstream_id = "sample-workstream"\n'
+                'origin_role = "brainstorming"\n'
+                'origin_subject = "scope-a@1"\n'
+                'return_target = "brainstorming"\n'
+                'return_reconciliation = "pending"\n'
+                'return_result = ""\n'
+                'finding = ""\n'
+                'limitations = ""\n'
+                'conflicts = ""\n'
+                '[[sources]]\nclass = "official_upstream"\nstatus = "pending"\nweight = "primary"\n'
+                '[[sources]]\nclass = "project_runtime"\nstatus = "pending"\nweight = "direct"\n'
+                '[[sources]]\nclass = "tracker_discussion"\nstatus = "pending"\nweight = "supporting"\n'
+                '[[sources]]\nclass = "practitioner_community"\nstatus = "pending"\nweight = "supporting"\n'
+            ))
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "research"))
+        finally:
+            temp.cleanup()
+
+        temp, project = self.copy_fixture()
+        try:
+            self.install_state_record(
+                project, "planning", "planning", "PLANNING.toml",
+                self.planning_content(state="draft"),
+            )
+            self.install_state_record(
+                project, "tracker", "tracker", "TRACKER.toml",
+                self.tracker_content("discovery"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "github_issues"))
+        finally:
+            temp.cleanup()
+
+        temp, project = self.copy_fixture()
+        try:
+            self.install_state_record(
+                project, "plan_review", "plan_review", "PLAN_REVIEW.toml",
+                self.plan_review_content("pending"),
+            )
+            self.install_state_record(
+                project, "tracker", "tracker", "TRACKER.toml",
+                self.tracker_content("create_pending_readback"),
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("route", "github_issues"))
+        finally:
+            temp.cleanup()
+
 
 if __name__ == "__main__":
     unittest.main()

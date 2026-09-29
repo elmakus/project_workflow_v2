@@ -316,6 +316,19 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
             brainstorm = read_toml(reads.project(workstream["brainstorm"]["path"]))
             validate_brainstorm(brainstorm, workstream["workstream_id"])
 
+        if "planning" in workstream and "definition" not in workstream:
+            raise ValidationError(
+                "manifest declares [planning] without current [definition] locator; "
+                "Planning prerequisite is missing and must fail closed before unrelated "
+                "pre-execution/Board dispatch"
+            )
+        if "plan_review" in workstream and "planning" not in workstream:
+            raise ValidationError(
+                "manifest declares [plan_review] without current [planning] locator; "
+                "Plan Review prerequisite is missing and must fail closed before unrelated "
+                "pre-execution/Board dispatch"
+            )
+
         definition = None
         if "definition" in workstream:
             definition = read_toml(reads.project(workstream["definition"]["path"]))
