@@ -130,6 +130,33 @@ def classify_jit_refinement(change_class: str) -> tuple[str, str]:
     return routes[change_class]
 
 
+def resolve_research_return(
+    return_target: str,
+    origin_subject: str,
+) -> tuple[str, str, str]:
+    pre_execution = {
+        "intake": ("intake", origin_subject, "workflow/INTAKE.md"),
+        "brainstorming": ("brainstorming", origin_subject, "workflow/BRAINSTORMING.md"),
+        "definition": ("definition", origin_subject, "workflow/DEFINITION.md"),
+    }
+    if return_target in pre_execution:
+        return pre_execution[return_target]
+
+    execution = (
+        ("execution_resolution:", "execution_resolution", "workflow/RECOVERY.md"),
+        ("execution_prep:", "execution_prep", "workflow/EXECUTION_PREP.md"),
+        ("execution:", "execution", "workflow/EXECUTION.md"),
+    )
+    for prefix, obligation, owner_module in execution:
+        if return_target.startswith(prefix):
+            subject = return_target[len(prefix):]
+            if not subject:
+                raise ValidationError("Research execution return target requires an exact subject")
+            return obligation, subject, owner_module
+
+    raise ValidationError(f"Research has unsupported return target {return_target!r}")
+
+
 def refresh_ready_card(
     reads: Reads,
     board: dict,
@@ -215,20 +242,19 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     subject=research["origin_subject"], owner_module="workflow/RESEARCH.md",
                 )
             if research["state"] == "complete":
-                owner_modules = {
-                    "intake": "workflow/INTAKE.md",
-                    "brainstorming": "workflow/BRAINSTORMING.md",
-                    "definition": "workflow/DEFINITION.md",
-                }
+                obligation, subject, owner_module = resolve_research_return(
+                    research["return_target"],
+                    research["origin_subject"],
+                )
                 reason = (
                     "Completed Research must be reconciled by its exact return owner"
                     if research["return_reconciliation"] == "pending"
                     else "Research result is already applied; return owner may only consume/clear it"
                 )
                 return result(
-                    reads, "route", research["return_target"], reason,
-                    subject=research["origin_subject"],
-                    owner_module=owner_modules[research["return_target"]],
+                    reads, "route", obligation, reason,
+                    subject=subject,
+                    owner_module=owner_module,
                 )
 
         intake = None
@@ -494,22 +520,17 @@ def select_route(project_root: Path, selected_workstreams: list[str], *,
                     subject=board_research["origin_subject"], owner_module="workflow/RESEARCH.md",
                 )
             if board_research["state"] == "complete":
-                return_target = board_research["return_target"]
-                if return_target.startswith("execution_resolution:"):
-                    obligation = "execution_resolution"
-                elif return_target.startswith("execution_prep:"):
-                    obligation = "execution_prep"
-                elif return_target.startswith("execution:"):
-                    obligation = "execution"
-                else:
+                obligation, subject, owner_module = resolve_research_return(
+                    board_research["return_target"],
+                    board_research["origin_subject"],
+                )
+                if obligation not in {"execution_resolution", "execution_prep", "execution"}:
                     raise ValidationError("Task Board Research has non-execution return target")
                 return result(
                     reads, "route", obligation,
                     "Completed implementation Research returns once to its exact durable owner before pointer cleanup",
-                    subject=return_target.split(":", 1)[1],
-                    owner_module="workflow/RECOVERY.md" if obligation == "execution_resolution" else (
-                        "workflow/EXECUTION_PREP.md" if obligation == "execution_prep" else "workflow/EXECUTION.md"
-                    ),
+                    subject=subject,
+                    owner_module=owner_module,
                 )
             return result(
                 reads, "route", "research_cleanup",

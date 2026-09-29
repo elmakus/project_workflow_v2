@@ -1337,21 +1337,32 @@ class RouterTests(unittest.TestCase):
         finally:
             temp.cleanup()
 
-    def install_board_research(self, project: Path, *, state: str, reconciliation: str = "pending") -> None:
+    def install_board_research(
+        self, project: Path, *, state: str, reconciliation: str = "pending",
+        return_target: str = "execution_resolution:M01-T04",
+        origin_role: str = "execution_resolution", bind_manifest: bool = False,
+    ) -> None:
         board = project / BOARD
         board.write_text(
             board.read_text()
             + '\n[research_obligation]\nclass = "research"\n'
             + 'path = "implementation/workstreams/sample-workstream/RESEARCH.toml"\n'
         )
+        if bind_manifest:
+            workstream = project / MANIFEST
+            workstream.write_text(
+                workstream.read_text()
+                + '\n[research]\nclass = "research"\n'
+                + 'path = "implementation/workstreams/sample-workstream/RESEARCH.toml"\n'
+            )
         result = "" if reconciliation == "pending" else "implementation/workstreams/sample-workstream/evidence/research-return.md"
         research = project / "implementation/workstreams/sample-workstream/RESEARCH.toml"
         research.write_text(
             f'state = "{state}"\n'
             'workstream_id = "sample-workstream"\n'
-            'origin_role = "execution_resolution"\n'
+            f'origin_role = "{origin_role}"\n'
             'origin_subject = "M01-T04"\n'
-            'return_target = "execution_resolution:M01-T04"\n'
+            f'return_target = "{return_target}"\n'
             f'return_reconciliation = "{reconciliation}"\n'
             f'return_result = "{result}"\n'
             'finding = "Recovered exact evidence."\n'
@@ -1377,6 +1388,111 @@ class RouterTests(unittest.TestCase):
                 self.assertEqual((routed.disposition, routed.obligation), ("route", expected))
             finally:
                 temp.cleanup()
+
+    def test_dual_locator_execution_research_returns_to_exact_owner(self) -> None:
+        cases = (
+            ("execution_resolution", "workflow/RECOVERY.md"),
+            ("execution_prep", "workflow/EXECUTION_PREP.md"),
+            ("execution", "workflow/EXECUTION.md"),
+        )
+        for prefix, owner_module in cases:
+            for reconciliation in ("pending", "applied"):
+                temp, project = self.copy_fixture()
+                try:
+                    with self.subTest(prefix=prefix, reconciliation=reconciliation):
+                        self.install_board_research(
+                            project,
+                            state="complete",
+                            reconciliation=reconciliation,
+                            return_target=f"{prefix}:M01-T04",
+                            origin_role=prefix,
+                            bind_manifest=True,
+                        )
+                        routed = select_route(project, [MANIFEST], package_root=ROOT)
+                        self.assertEqual(
+                            (routed.disposition, routed.obligation, routed.subject, routed.owner_module),
+                            ("route", prefix, "M01-T04", owner_module),
+                        )
+                        self.assertNotIn(f"project:{BOARD}", routed.read_set)
+                finally:
+                    temp.cleanup()
+
+    def test_dual_locator_consumed_execution_research_is_cleanup_only(self) -> None:
+        for prefix in ("execution_resolution", "execution_prep", "execution"):
+            temp, project = self.copy_fixture()
+            try:
+                with self.subTest(prefix=prefix):
+                    self.install_board_research(
+                        project,
+                        state="consumed",
+                        reconciliation="applied",
+                        return_target=f"{prefix}:M01-T04",
+                        origin_role=prefix,
+                        bind_manifest=True,
+                    )
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertEqual(
+                        (routed.disposition, routed.obligation, routed.subject, routed.owner_module),
+                        ("route", "research_cleanup", "M01-T04", "workflow/RECOVERY.md"),
+                    )
+            finally:
+                temp.cleanup()
+
+    def test_manifest_pre_execution_research_returns_are_unchanged(self) -> None:
+        for target, owner_module in (
+            ("intake", "workflow/INTAKE.md"),
+            ("brainstorming", "workflow/BRAINSTORMING.md"),
+            ("definition", "workflow/DEFINITION.md"),
+        ):
+            temp, project = self.copy_fixture()
+            try:
+                with self.subTest(target=target):
+                    workstream = project / MANIFEST
+                    workstream.write_text(
+                        workstream.read_text()
+                        + '\n[research]\nclass = "research"\n'
+                        + 'path = "implementation/workstreams/sample-workstream/RESEARCH.toml"\n'
+                    )
+                    research = project / "implementation/workstreams/sample-workstream/RESEARCH.toml"
+                    research.write_text(
+                        'state = "complete"\n'
+                        'workstream_id = "sample-workstream"\n'
+                        f'origin_role = "{target}"\n'
+                        'origin_subject = "scope:exact"\n'
+                        f'return_target = "{target}"\n'
+                        'return_reconciliation = "pending"\n'
+                        'return_result = ""\n'
+                        'finding = "Exact finding."\n'
+                        'limitations = "none"\n'
+                        'conflicts = "none"\n'
+                        '[[sources]]\nclass = "official_upstream"\nstatus = "not_relevant"\nweight = "primary"\n'
+                        '[[sources]]\nclass = "project_runtime"\nstatus = "checked"\nweight = "direct"\n'
+                        '[[sources]]\nclass = "tracker_discussion"\nstatus = "not_relevant"\nweight = "supporting"\n'
+                        '[[sources]]\nclass = "practitioner_community"\nstatus = "not_relevant"\nweight = "supporting"\n'
+                    )
+                    routed = select_route(project, [MANIFEST], package_root=ROOT)
+                    self.assertEqual(
+                        (routed.disposition, routed.obligation, routed.subject, routed.owner_module),
+                        ("route", target, "scope:exact", owner_module),
+                    )
+            finally:
+                temp.cleanup()
+
+    def test_execution_research_return_without_subject_fails_closed(self) -> None:
+        temp, project = self.copy_fixture()
+        try:
+            self.install_board_research(
+                project,
+                state="complete",
+                return_target="execution:",
+                origin_role="execution",
+                bind_manifest=True,
+            )
+            routed = select_route(project, [MANIFEST], package_root=ROOT)
+            self.assertEqual((routed.disposition, routed.obligation), ("recovery", "recovery_boundary"))
+            self.assertIn("requires an exact subject", routed.reason)
+        finally:
+            temp.cleanup()
 
     def install_blocker(self, project: Path, blocker_class: str) -> None:
         blocker_path = "implementation/workstreams/sample-workstream/blockers/M01-T04.toml"
