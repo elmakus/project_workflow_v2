@@ -1,5 +1,5 @@
 workstream_id = "issue-orphan-preexecution-owners"
-revision = 1
+revision = 2
 
 [execution_ref]
 branch = "work/issue-36-orphan-preexecution-owners"
@@ -11,3 +11,9 @@ status = "in_progress"
 [cards.contract]
 class = "task_card"
 path = "implementation/workstreams/issue-orphan-preexecution-owners/cards/M01-T01.md"
+
+[cards.result]
+class = "result"
+path = "implementation/workstreams/issue-orphan-preexecution-owners/results/M01-T01.md"
+commit = "45815d215572e200ea849b8caafbbc221e9860ea"
+blob = "0581fc236d31810f13dc64f300f1ba2d25e79a18"
