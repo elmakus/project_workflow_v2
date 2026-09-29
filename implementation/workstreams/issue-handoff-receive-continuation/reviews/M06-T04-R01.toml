@@ -1,0 +1,20 @@
+workstream_id = "issue-handoff-receive-continuation"
+card_id = "M06-T04"
+attempt = "R01"
+verdict = "pending"
+evidence_path = ""
+
+[subject]
+class = "git_blob"
+repository = "elmakus/project_workflow_v2"
+commit = "2a35843e2b8fc4bfe33d7db053f5314acecf6547"
+path = "tests/test_issue17_qualification.py"
+blob = "f96fa3b6d2ab82360a4e3dc8ac7c8f0df21636b9"
+
+[acceptance]
+class = "task_card"
+path = "implementation/workstreams/issue-handoff-receive-continuation/cards/M06-T04.md"
+
+[independence]
+materially_produced_or_repaired_subject = true
+basis = "Current context materially produced the exact M06-T04 qualification subject and therefore cannot independently review it."
