@@ -1,5 +1,5 @@
 workstream_id = "issue-ci-pending-continuation"
-revision = 2
+revision = 3
 
 [execution_ref]
 branch = "work/pwv2-ci-pending-continuation"
@@ -15,12 +15,16 @@ path = "implementation/workstreams/issue-ci-pending-continuation/cards/M01-T01.m
 [cards.result]
 class = "result"
 path = "implementation/workstreams/issue-ci-pending-continuation/results/M01-T01.md"
-commit = "51c5ebccca4ea1b4e1fd60b3f36dddc5fb2e72d2"
-blob = "162769647a94e10ed72bd46b1577a1145dad8b9d"
+commit = "a4ad1db53dddfa31f8024f2e13e4a182cc710474"
+blob = "fd4c35e544bfb7a237389f156c7d6fdbeaa4cfb4"
 
 [[cards.review_attempts]]
 class = "review_attempt"
 path = "implementation/workstreams/issue-ci-pending-continuation/reviews/M01-T01-R01.toml"
+
+[[cards.review_attempts]]
+class = "review_attempt"
+path = "implementation/workstreams/issue-ci-pending-continuation/reviews/M01-T01-R02.toml"
 
 [[jit_triggers]]
 id = "after-M01-T01"
