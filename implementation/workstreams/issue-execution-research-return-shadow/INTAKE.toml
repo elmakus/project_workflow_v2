@@ -1,0 +1,12 @@
+workstream_id = "issue-execution-research-return-shadow"
+kind = "issue"
+state = "active"
+diagnosis_revision = 1
+repair_subject = "repair:execution-research-return-owner-precedence:v1"
+diagnosis_prior_art_subject = ""
+diagnosis_prior_art_result = ""
+response_kind = "none"
+response_observed = false
+alignment_state = "pending"
+alignment_subject = ""
+micro_fix_candidate = false
