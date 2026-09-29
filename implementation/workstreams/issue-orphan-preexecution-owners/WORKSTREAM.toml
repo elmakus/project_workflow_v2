@@ -43,3 +43,7 @@ path = "implementation/workstreams/issue-orphan-preexecution-owners/PLANNING.tom
 [plan_review]
 class = "plan_review"
 path = "implementation/workstreams/issue-orphan-preexecution-owners/PLAN_REVIEW.toml"
+
+[task_board]
+class = "task_board"
+path = "implementation/workstreams/issue-orphan-preexecution-owners/TASK_BOARD.toml"
