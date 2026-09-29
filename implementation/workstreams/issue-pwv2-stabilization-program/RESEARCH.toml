@@ -1,0 +1,30 @@
+workstream_id = "issue-pwv2-stabilization-program"
+state = "active"
+origin_role = "intake"
+origin_subject = "PWV2-STAB-P1"
+return_target = "intake"
+return_reconciliation = "pending"
+return_result = ""
+finding = ""
+limitations = ""
+conflicts = ""
+
+[[sources]]
+class = "official_upstream"
+status = "pending"
+weight = "canonical policy and official contract evidence dominate scope and legality"
+
+[[sources]]
+class = "project_runtime"
+status = "pending"
+weight = "exact independent audit observations and committed subjects dominate defect evidence"
+
+[[sources]]
+class = "tracker_discussion"
+status = "pending"
+weight = "dedup and issue-specific invariants; never authorization"
+
+[[sources]]
+class = "practitioner_community"
+status = "pending"
+weight = "proportional secondary evidence only; never scope or approval authority"

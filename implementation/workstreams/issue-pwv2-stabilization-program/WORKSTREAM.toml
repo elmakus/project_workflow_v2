@@ -17,3 +17,7 @@ authority = [
 [intake]
 class = "intake"
 path = "implementation/workstreams/issue-pwv2-stabilization-program/INTAKE.toml"
+
+[research]
+class = "research"
+path = "implementation/workstreams/issue-pwv2-stabilization-program/RESEARCH.toml"
