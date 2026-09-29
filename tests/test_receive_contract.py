@@ -8,6 +8,7 @@ from tools.receive_contract import (
     ReceiveExpectation,
     parse_fresh_context_locator,
     validate_receive,
+    consume_handoff_and_classify,
 )
 
 
@@ -98,6 +99,65 @@ Durable start pointer: implementation/workstreams/issue-handoff-receive-continua
             with self.subTest(value=value):
                 with self.assertRaises(ReceiveContractError):
                     parse_fresh_context_locator(value)
+
+
+    def test_receipt_enters_non_stop_continuation_without_second_confirmation(self):
+        locator = parse_fresh_context_locator(self.LOCATOR)
+        decision = consume_handoff_and_classify(
+            locator,
+            self.expected(),
+            receiver_semantically_independent=True,
+            freshly_routed_disposition="route",
+            freshly_routed_obligation="planning",
+        )
+        self.assertEqual(decision.receive_action, "consume_handoff")
+        self.assertEqual(decision.continuation_action, "continue")
+        self.assertEqual(decision.restart_action, "execute_selected_obligation")
+
+    def test_duplicate_receipt_after_durable_advancement_fails_closed(self):
+        locator = parse_fresh_context_locator(self.LOCATOR)
+        with self.assertRaises(ReceiveContractError):
+            consume_handoff_and_classify(
+                locator,
+                self.expected(disposition="route", transferable=False),
+                receiver_semantically_independent=True,
+                freshly_routed_disposition="route",
+                freshly_routed_obligation="execution_prep",
+            )
+
+    def test_durable_result_and_uncertain_external_effect_preserve_restart_safety(self):
+        locator = parse_fresh_context_locator(self.LOCATOR)
+        reconciled = consume_handoff_and_classify(
+            locator,
+            self.expected(),
+            receiver_semantically_independent=True,
+            freshly_routed_disposition="route",
+            freshly_routed_obligation="result_reconciliation",
+            durable_semantic_result=True,
+        )
+        self.assertEqual(reconciled.restart_action, "reconcile_without_replay")
+        uncertain = consume_handoff_and_classify(
+            locator,
+            self.expected(),
+            receiver_semantically_independent=True,
+            freshly_routed_disposition="recovery",
+            freshly_routed_obligation="recovery_boundary",
+            external_effect_uncertain=True,
+        )
+        self.assertEqual(uncertain.continuation_action, "recover")
+        self.assertEqual(uncertain.restart_action, "readback_external_effect_before_retry")
+
+    def test_genuine_nontransferable_stop_is_not_consumed(self):
+        locator = parse_fresh_context_locator(self.LOCATOR)
+        decision = consume_handoff_and_classify(
+            locator,
+            self.expected(transferable=False, independence_required=False),
+            receiver_semantically_independent=True,
+            freshly_routed_disposition="stop",
+            freshly_routed_obligation="end_of_scope",
+        )
+        self.assertEqual(decision.receive_action, "remain_stopped")
+        self.assertEqual(decision.continuation_action, "return")
 
 
 if __name__ == "__main__":
