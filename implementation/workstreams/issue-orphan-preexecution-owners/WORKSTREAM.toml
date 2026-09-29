@@ -21,3 +21,7 @@ path = "implementation/workstreams/issue-orphan-preexecution-owners/INTAKE.toml"
 [tracker]
 class = "tracker"
 path = "implementation/workstreams/issue-orphan-preexecution-owners/TRACKER.toml"
+
+[research]
+class = "research"
+path = "implementation/workstreams/issue-orphan-preexecution-owners/RESEARCH.toml"

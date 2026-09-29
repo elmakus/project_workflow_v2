@@ -1,8 +1,8 @@
 workstream_id = "issue-orphan-preexecution-owners"
 kind = "issue"
 state = "active"
-diagnosis_revision = 0
-repair_subject = ""
+diagnosis_revision = 1
+repair_subject = "repair:orphan-preexecution-owner-prerequisites:v1"
 diagnosis_prior_art_subject = ""
 diagnosis_prior_art_result = ""
 response_kind = "none"
