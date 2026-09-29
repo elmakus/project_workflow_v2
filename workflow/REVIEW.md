@@ -43,3 +43,7 @@ At most one pending/in-progress attempt may exist and it must be the last attemp
 ## Runtime boundary
 
 Capability detection and reviewer context launch remain runtime behavior. Project Workflow stores only the semantic attempt, exact subject/acceptance, independence basis and verdict/evidence.
+
+## Validated durable-state write boundary
+
+Canonical TOML state creation or mutation owned by this module (review_attempt and task_board) is successfully reconciled only from `tools.state_contract.render_validated_state_record` or `write_validated_state_record`. The shared boundary dispatches to the production validator, generically renders the already-validated data, parses it back, and validates it again before persistence; hand-written or guessed TOML must not be treated as a successful canonical transition. An external repository writer may persist only the validated rendered bytes and must retain its normal exact readback/uncertainty handling.

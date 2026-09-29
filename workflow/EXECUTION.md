@@ -70,3 +70,7 @@ Runtime-internal concurrency does not relax the one-Card invariant and does not 
 ## Runtime portability
 
 The same semantic result contract applies to delegated and direct execution. Pi/Codex-specific adapters, worker launch schemas and model selection remain outside this module.
+
+## Validated durable-state write boundary
+
+Canonical TOML state creation or mutation owned by this module (task_board/result locator mutations) is successfully reconciled only from `tools.state_contract.render_validated_state_record` or `write_validated_state_record`. The shared boundary dispatches to the production validator, generically renders the already-validated data, parses it back, and validates it again before persistence; hand-written or guessed TOML must not be treated as a successful canonical transition. An external repository writer may persist only the validated rendered bytes and must retain its normal exact readback/uncertainty handling.

@@ -51,3 +51,7 @@ Keep the pointer through Research `complete`. Final return-owner mutation and `r
 A blocked Card has one proportional workstream-local blocker record. It contains only Card identity, semantic class, concise summary and evidence reference when material. It does not store runtime identity.
 
 Ordinary role changes, GREEN/RED verdicts and deterministic correction/Research return are not stops.
+
+## Validated durable-state write boundary
+
+Canonical TOML state creation or mutation owned by this module (blocker/research/task_board records it mutates) is successfully reconciled only from `tools.state_contract.render_validated_state_record` or `write_validated_state_record`. The shared boundary dispatches to the production validator, generically renders the already-validated data, parses it back, and validates it again before persistence; hand-written or guessed TOML must not be treated as a successful canonical transition. An external repository writer may persist only the validated rendered bytes and must retain its normal exact readback/uncertainty handling.
