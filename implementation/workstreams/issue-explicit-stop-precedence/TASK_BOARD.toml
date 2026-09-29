@@ -1,0 +1,14 @@
+workstream_id = "issue-explicit-stop-precedence"
+revision = 1
+
+[execution_ref]
+branch = "work/issue-33-explicit-stop-precedence"
+
+[[cards]]
+id = "M01-T01"
+status = "ready"
+review_attempts = []
+
+[cards.contract]
+class = "task_card"
+path = "implementation/workstreams/issue-explicit-stop-precedence/cards/M01-T01.md"

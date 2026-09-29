@@ -44,3 +44,7 @@ path = "implementation/workstreams/issue-explicit-stop-precedence/PLANNING.toml"
 [plan_review]
 class = "plan_review"
 path = "implementation/workstreams/issue-explicit-stop-precedence/PLAN_REVIEW.toml"
+
+[task_board]
+class = "task_board"
+path = "implementation/workstreams/issue-explicit-stop-precedence/TASK_BOARD.toml"
