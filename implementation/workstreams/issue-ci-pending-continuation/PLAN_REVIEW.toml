@@ -1,0 +1,21 @@
+workstream_id = "issue-ci-pending-continuation"
+plan_revision = "1"
+planning_cycle = 1
+attempt = "R01"
+verdict = "green"
+evidence_path = "implementation/workstreams/issue-ci-pending-continuation/evidence/PLAN_REVIEW_R01.md"
+
+[subject]
+class = "git_blob"
+repository = "elmakus/project_workflow_v2"
+commit = "9340bbb2386ceeb662650881a9a172220fa1c39d"
+path = "implementation/workstreams/issue-ci-pending-continuation/PLAN.md"
+blob = "9d6e15a7e8c57c4a4a10d7c25b66f2404784509c"
+
+[acceptance]
+class = "authority"
+path = "implementation/workstreams/issue-ci-pending-continuation/DEFINITION.md"
+
+[independence]
+materially_produced_or_repaired_subject = false
+basis = "Fresh independent Premium B review context did not materially produce or repair this exact frozen plan subject."
