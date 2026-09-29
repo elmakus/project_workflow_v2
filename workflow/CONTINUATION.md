@@ -47,6 +47,6 @@ Exact-subject independence is evaluated for every review subject. A context that
 
 ## Pending exact-subject external evidence
 
-Required external CI/check evidence is observed against the exact immutable implementation subject before consumption. Terminal success is positive evidence; terminal failure remains correction evidence. Queued, requested, waiting, pending and in-progress observations are pending external evidence and do not claim semantic reconciliation. Temporary absence immediately after a known trigger requires bounded exact-subject readback rather than success.
+Required external CI/check evidence is observed against the exact immutable implementation subject before consumption. Terminal success requires a positive terminal conclusion; a completed/terminal status by itself is not success. Negative terminal conclusions such as failure, cancelled, timed_out or action_required remain correction evidence. Queued, requested, waiting, pending and in-progress observations are pending external evidence and do not claim semantic reconciliation. Temporary absence immediately after a known trigger requires bounded exact-subject readback rather than success.
 
 Pending observation therefore does not invoke the successful-reconciliation no-progress fuse merely because durable workflow state is unchanged. A claimed reconciliation with unchanged authoritative fingerprint and accepted evidence epoch still fails closed. Pending observation is ephemeral and creates no durable polling/session state or new authority.
