@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 
+from tools.continuation_contract import classify_route_completion, resume_action
+
 
 class ReceiveContractError(ValueError):
     """Raised when a locator cannot be safely received."""
@@ -103,3 +105,46 @@ def validate_receive(
         expected.entry_obligation,
         "exact canonical transferable boundary validated; consume only the handoff/context-selection boundary",
     )
+
+
+@dataclass(frozen=True)
+class ReceiveContinuationDecision:
+    receive_action: str
+    continuation_action: str
+    restart_action: str
+
+
+def consume_handoff_and_classify(
+    locator: FreshContextLocator,
+    expected: ReceiveExpectation,
+    *,
+    receiver_semantically_independent: bool,
+    freshly_routed_disposition: str,
+    freshly_routed_obligation: str,
+    durable_semantic_result: bool = False,
+    external_effect_uncertain: bool = False,
+) -> ReceiveContinuationDecision:
+    """Consume an exact transferable handoff and enter canonical continuation.
+
+    The caller must derive expected and the fresh route from canonical durable
+    state. This helper deliberately cannot manufacture either. Receipt is checked
+    first, so a duplicate/stale locator after durable advancement fails closed
+    before any continuation or replay decision is returned.
+    """
+    received = validate_receive(
+        locator,
+        expected,
+        receiver_semantically_independent=receiver_semantically_independent,
+    )
+    if received.action != "consume_handoff":
+        return ReceiveContinuationDecision(received.action, "return", "no_replay")
+
+    completion = classify_route_completion(
+        disposition=freshly_routed_disposition,
+        obligation=freshly_routed_obligation,
+    )
+    restart = resume_action(
+        durable_semantic_result=durable_semantic_result,
+        external_effect_uncertain=external_effect_uncertain,
+    )
+    return ReceiveContinuationDecision(received.action, completion.action, restart)
