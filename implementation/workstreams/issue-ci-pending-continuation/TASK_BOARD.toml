@@ -6,7 +6,7 @@ branch = "work/pwv2-ci-pending-continuation"
 
 [[cards]]
 id = "M01-T01"
-status = "ready"
+status = "in_progress"
 
 [cards.contract]
 class = "task_card"
