@@ -1,5 +1,5 @@
 workstream_id = "issue-ci-pending-continuation"
-revision = 5
+revision = 6
 
 [execution_ref]
 branch = "work/pwv2-ci-pending-continuation"
@@ -35,7 +35,7 @@ condition = "Materialize the downstream Execution/evidence-composition Card from
 
 [[cards]]
 id = "M02-T01"
-status = "ready"
+status = "in_progress"
 
 [cards.contract]
 class = "task_card"
