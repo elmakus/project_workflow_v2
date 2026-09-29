@@ -147,6 +147,19 @@ Durable start pointer: implementation/workstreams/issue-handoff-receive-continua
         self.assertEqual(uncertain.continuation_action, "recover")
         self.assertEqual(uncertain.restart_action, "readback_external_effect_before_retry")
 
+    def test_transferable_receipt_followed_by_real_stop_carries_no_execution_instruction(self):
+        locator = parse_fresh_context_locator(self.LOCATOR)
+        decision = consume_handoff_and_classify(
+            locator,
+            self.expected(),
+            receiver_semantically_independent=True,
+            freshly_routed_disposition="stop",
+            freshly_routed_obligation="authorization_boundary",
+        )
+        self.assertEqual(decision.receive_action, "consume_handoff")
+        self.assertEqual(decision.continuation_action, "return")
+        self.assertEqual(decision.restart_action, "no_replay")
+
     def test_genuine_nontransferable_stop_is_not_consumed(self):
         locator = parse_fresh_context_locator(self.LOCATOR)
         decision = consume_handoff_and_classify(
