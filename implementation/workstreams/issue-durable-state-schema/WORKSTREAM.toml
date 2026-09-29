@@ -13,6 +13,10 @@ authority = [
 class = "intake"
 path = "implementation/workstreams/issue-durable-state-schema/INTAKE.toml"
 
+[research]
+class = "research"
+path = "implementation/workstreams/issue-durable-state-schema/RESEARCH.toml"
+
 [tracker]
 class = "tracker"
 path = "implementation/workstreams/issue-durable-state-schema/TRACKER.toml"
