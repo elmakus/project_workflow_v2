@@ -29,3 +29,7 @@ GREEN returns to Planning for deterministic approval consumption. Planning then 
 ## RED
 
 RED returns to Planning for correction classification. Material strategy/milestone/coverage/gate correction creates a new planning cycle and repeats A/B/C. Accepted Definition contradictions route back to Definition; missing facts route to Research. The review role does not silently repair its own subject.
+
+## Validated durable-state write boundary
+
+Canonical TOML state creation or mutation owned by this module (plan_review) is successfully reconciled only from `tools.state_contract.render_validated_state_record` or `write_validated_state_record`. The shared boundary dispatches to the production validator, generically renders the already-validated data, parses it back, and validates it again before persistence; hand-written or guessed TOML must not be treated as a successful canonical transition. An external repository writer may persist only the validated rendered bytes and must retain its normal exact readback/uncertainty handling.

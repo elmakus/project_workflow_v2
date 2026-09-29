@@ -46,3 +46,7 @@ The premium stops carry recommendation semantics without storing runtime identit
 - C recommends switching to a lighter/cheaper model/context before Execution Prep; continuing is allowed, but the stop also renders an optional ready-to-copy locator-only handoff for moving downstream execution preparation to another context/harness.
 
 The handoff rendering contract is owned by `workflow/USER_STOP.md`. These recommendations are user-facing guidance only. Canonical state stores semantic gates/subjects, never current model/session identity or a hard-coded product model name.
+
+## Validated durable-state write boundary
+
+Canonical TOML state creation or mutation owned by this module (planning) is successfully reconciled only from `tools.state_contract.render_validated_state_record` or `write_validated_state_record`. The shared boundary dispatches to the production validator, generically renders the already-validated data, parses it back, and validates it again before persistence; hand-written or guessed TOML must not be treated as a successful canonical transition. An external repository writer may persist only the validated rendered bytes and must retain its normal exact readback/uncertainty handling.
