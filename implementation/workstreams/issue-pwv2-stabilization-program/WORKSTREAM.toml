@@ -21,3 +21,11 @@ path = "implementation/workstreams/issue-pwv2-stabilization-program/INTAKE.toml"
 [research]
 class = "research"
 path = "implementation/workstreams/issue-pwv2-stabilization-program/RESEARCH.toml"
+
+[tracker]
+class = "tracker"
+path = "implementation/workstreams/issue-pwv2-stabilization-program/TRACKER.toml"
+
+[brainstorm]
+class = "brainstorm"
+path = "implementation/workstreams/issue-pwv2-stabilization-program/BRAINSTORM.toml"
