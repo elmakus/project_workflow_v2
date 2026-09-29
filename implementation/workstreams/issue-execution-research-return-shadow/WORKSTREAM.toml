@@ -43,3 +43,7 @@ path = "implementation/workstreams/issue-execution-research-return-shadow/PLANNI
 [plan_review]
 class = "plan_review"
 path = "implementation/workstreams/issue-execution-research-return-shadow/PLAN_REVIEW.toml"
+
+[task_board]
+class = "task_board"
+path = "implementation/workstreams/issue-execution-research-return-shadow/TASK_BOARD.toml"
