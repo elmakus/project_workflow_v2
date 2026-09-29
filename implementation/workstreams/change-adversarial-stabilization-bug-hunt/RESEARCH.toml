@@ -1,0 +1,30 @@
+workstream_id = "change-adversarial-stabilization-bug-hunt"
+state = "active"
+origin_role = "intake"
+origin_subject = "adversarial-stabilization-bug-hunt@1"
+return_target = "intake"
+return_reconciliation = "pending"
+return_result = ""
+finding = ""
+limitations = ""
+conflicts = ""
+
+[[sources]]
+class = "official_upstream"
+status = "pending"
+weight = "primary: canonical workflow modules, executable contracts, templates and tests"
+
+[[sources]]
+class = "project_runtime"
+status = "pending"
+weight = "direct: immutable repository snapshots, active workstreams and concrete reproductions"
+
+[[sources]]
+class = "tracker_discussion"
+status = "pending"
+weight = "supporting: existing issues and their documented reproductions"
+
+[[sources]]
+class = "practitioner_community"
+status = "not_relevant"
+weight = "not relevant: internal PWv2 invariants are defined by repository authority"
