@@ -1,0 +1,12 @@
+workstream_id = "change-adversarial-stabilization-bug-hunt"
+kind = "change"
+state = "active"
+diagnosis_revision = 1
+repair_subject = ""
+diagnosis_prior_art_subject = ""
+diagnosis_prior_art_result = ""
+response_kind = "none"
+response_observed = false
+alignment_state = "not_required"
+alignment_subject = ""
+micro_fix_candidate = false
