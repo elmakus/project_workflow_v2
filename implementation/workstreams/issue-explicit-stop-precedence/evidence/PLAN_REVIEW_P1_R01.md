@@ -1,0 +1,12 @@
+# Independent Stage-6 Plan Review — issue #33 P1 / R01
+
+Verdict: **GREEN** for the immutable frozen plan subject `elmakus/project_workflow_v2@bfb9b9158877256e6342d3c157b092dd3e05fb1b:planning/ISSUE_33_EXPLICIT_STOP_PRECEDENCE_PLAN.md@de15400f6c8cb70d00fc41cc4516bad055658afa`.
+
+This fresh Premium B receiving context did not materially author or repair P1. The review compares P1 against Definition D1, accepted `requirements/ISSUE_33_EXPLICIT_STOP_PRECEDENCE.md` (I33-R1–R9), `decisions/ISSUE_33_EXPLICIT_STOP_PRECEDENCE.md` (I33-D1–D7), the current production selector and state/stop contracts. The blob was independently read back from the frozen commit and matches the durable gate and attempt.
+
+- **Ordering and ownership:** §3.1 places the stop immediately after successful local Brainstorm validation and before Definition consumption; preserves earlier Intake/Research/tracker ownership, the existing exact scope subject, reason, Brainstorm owner and USER_STOP composition. This meets R1–R3, R6–R7 and D1–D5 without reclassifying the stop as Recovery.
+- **Bounded implementation:** removal of the late duplicate branch and one Router clarification are proportionate to the demonstrated defect in `tools/router.py`. No downstream mutation, schema expansion, generic policy engine or unrelated issue repair is authorized (R4, R9; D3, D6).
+- **Acceptance and reversibility:** the one-Card boundary binds code, wording and discriminating production-selector tests. The matrix includes active/GREEN Definition, A-due/satisfied variants, later-record read deferral, malformed Brainstorm recovery, stop-cleared lawful resume and malformed downstream recovery (R5, R8; D7). It distinguishes precedence from mere stop delivery and requires exact-commit detached readback plus independent implementation review.
+- **Strategy and dependencies:** accepted D1 authority and the current selector baseline suffice; no unrelated workstream Result or live mutation is assumed. The explicit excluded work and Premium C/Execution Prep/Review/Close boundaries prevent premature implementation or integration. Requirement/decision coverage in §7 has no unmapped accepted item.
+
+No blocking contradiction, missing user decision, untestable acceptance condition or material strategy correction was found. GREEN is a review verdict only: Planning must consume it into approval and set Premium C due for this same subject before Execution Prep.
