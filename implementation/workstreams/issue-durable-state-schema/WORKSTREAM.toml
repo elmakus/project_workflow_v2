@@ -13,6 +13,10 @@ authority = [
 class = "intake"
 path = "implementation/workstreams/issue-durable-state-schema/INTAKE.toml"
 
+[brainstorm]
+class = "brainstorm"
+path = "implementation/workstreams/issue-durable-state-schema/BRAINSTORM.toml"
+
 [research]
 class = "research"
 path = "implementation/workstreams/issue-durable-state-schema/RESEARCH.toml"
