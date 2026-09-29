@@ -1,0 +1,22 @@
+source_scope_subject = "handoff-receive-continuation@1"
+revision = 1
+state = "GREEN"
+requirements_locator = "implementation/workstreams/issue-handoff-receive-continuation/DEFINITION.md"
+completeness_audit = "GREEN"
+premium_a = "due"
+
+[[decisions]]
+id = "receive-consumption"
+locator = "DEFINITION.md#receive-consumption"
+
+[[decisions]]
+id = "canonical-authority"
+locator = "DEFINITION.md#canonical-authority-and-fail-closed-safety"
+
+[[decisions]]
+id = "issue16-composition"
+locator = "DEFINITION.md#composition-with-issue-16"
+
+[[decisions]]
+id = "qualification"
+locator = "DEFINITION.md#qualification"
