@@ -1,12 +1,12 @@
 workstream_id = "issue-handoff-receive-continuation"
-revision = 1
+revision = 2
 
 [execution_ref]
 branch = "work/pwv2-handoff-receive-continuation"
 
 [[cards]]
 id = "M06-T01"
-status = "ready"
+status = "in_progress"
 review_attempts = []
 
 [cards.contract]
