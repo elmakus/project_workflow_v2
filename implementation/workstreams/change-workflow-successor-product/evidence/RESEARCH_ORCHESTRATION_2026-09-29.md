@@ -42,3 +42,27 @@ Current package:
 Generation 2 treats the owner decisions and the 1–60 disposition as fixed product constraints. Research is asked to falsify feasibility, find simpler prior art, expose contradictions, and determine implementation architecture; it must not casually reopen settled owner choices.
 
 No generation-2 lane branch has been launched or claimed as part of this preparation step. The consumer `RESEARCH.toml` remains active/pending and no Research finding has been reconciled back into Brainstorming yet.
+
+
+## Rich-wave expansion — 2026-09-30
+
+Status: **prepared / not launched**
+
+After owner clarification that the formal Research should use the full orchestration protocol with many independent lanes, the earlier 12-lane generation-2 package was superseded before any lane was claimed.
+
+Current Research wave:
+- protocol: repository-root `/COORDINATOR_PROTOCOL.md`
+- allocator: `finite_branch_claim`
+- claim generation: `3`
+- package root: `projects/project_workflow_v2/successor-product/architecture-v1`
+- research base: `1c1516ebdb675f0bfce61a52980d0ca91a50d8d8`
+- manifest publication: `6ac4fc3e3831042bab93130b1b06b123a06da25a`
+- analysis subject: `workflow-successor-product-architecture-v1@3`
+- lane shape: 1 whole-scope + 1 independent red-team + 30 targeted lanes = 32 independent workers before integration
+- integration branch: `research/workflow-successor-v1-integration-g3`
+
+The 30 targeted lanes are grouped across lifecycle/planning, durable state/evidence/recovery, runtime/GitHub/helpers/workers, qualification/self-maintenance/anomalies, and donor/prior-art/cutover. Owner-marked “research needed” questions from Brainstorming are assigned explicitly rather than hidden inside broad generalist lanes.
+
+Generation 2 was never launched; no generation-2 evidence is accepted into generation 3. Generation 3 is the only current launch package.
+
+No generation-3 lane is launched by this preparation update. Consumer `RESEARCH.toml` remains active with pending return reconciliation and no finding.
