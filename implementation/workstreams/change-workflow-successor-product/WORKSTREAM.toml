@@ -12,6 +12,8 @@ authority = [
   { class = "authority", path = "workflow/STATE.md" },
   { class = "authority", path = "workflow/AUTHORITY.md" },
   { class = "authority", path = "workflow/CONTINUATION.md" },
+  { class = "authority", path = "workflow/DEFINITION.md" },
+  { class = "authority", path = "workflow/USER_STOP.md" },
 ]
 
 [intake]
@@ -25,3 +27,8 @@ path = "implementation/workstreams/change-workflow-successor-product/BRAINSTORM.
 [research]
 class = "research"
 path = "implementation/workstreams/change-workflow-successor-product/RESEARCH.toml"
+
+
+[definition]
+class = "definition"
+path = "implementation/workstreams/change-workflow-successor-product/DEFINITION.toml"

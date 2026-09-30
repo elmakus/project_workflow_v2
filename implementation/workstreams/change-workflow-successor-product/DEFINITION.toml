@@ -1,0 +1,17 @@
+workstream_id = "change-workflow-successor-product"
+source_scope = "workflow-successor-product@1"
+revision = 1
+state = "GREEN"
+requirements_locator = "implementation/workstreams/change-workflow-successor-product/DEFINITION.md"
+decision_locators = [
+  "implementation/workstreams/change-workflow-successor-product/BRAINSTORM.toml",
+  "implementation/workstreams/change-workflow-successor-product/RESEARCH.toml",
+  "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_RESEARCH_FINAL_2026-09-30.md",
+  "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_RESEARCH_RECONCILIATION_OWNER_2026-09-30.md",
+  "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_BRAINSTORM_FINAL_CHALLENGE_POST_RESEARCH_2026-09-30.md",
+  "elmakus/project-research@research/workflow-successor-v1-integration-g3:projects/project_workflow_v2/successor-product/architecture-v1/FINAL_SYNTHESIS.md#blob=18e5e8de80db2fcdbda0e065016457b517b7bfc6"
+]
+completeness_audit = "GREEN"
+unresolved_user_product_choice = false
+premium_a = "due"
+premium_a_subject = "workflow-successor-product@1"
