@@ -15,10 +15,10 @@ Research archive:
 - repository: `elmakus/project-research`;
 - package root: `projects/orchestration-protocol-skill/v1-architecture`;
 - frozen research base: `5204c5a59f9ca84cb3e4b4d9986b7970ced7fbf7`;
-- complete package publication revision: `c460052f8d987bb6af7f8e86775769913a3e040b`;
+- complete package publication revision: `97e0935bef45a5ca3e0b7b2dc845255c342be6cf`;
 - analysis subject: `orchestration-protocol-skill-v1@1`;
 - allocator: `finite_branch_claim` with fenced claim-commit ownership;
-- finite lanes: W00 + R00 + L01-L25 = 27;
+- finite lanes: W00 + R00 + L01-L25 = 27;\n- current claim generation: 2 (partial reclaim only for L05, L07, L08, L12 and L16);\n- generation-2 reclaim record: `projects/orchestration-protocol-skill/v1-architecture/RECLAIM_GENERATION_2.md`;
 - overflow: enabled and supplemental only;
 - integration branch: `research/op-skill-v1-integration`;
 - integration output: `projects/orchestration-protocol-skill/v1-architecture/FINAL_SYNTHESIS.md`.
