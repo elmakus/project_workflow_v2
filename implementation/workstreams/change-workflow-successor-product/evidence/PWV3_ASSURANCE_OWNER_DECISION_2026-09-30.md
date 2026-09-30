@@ -26,12 +26,24 @@ This is true regardless of the runtime that produced the subject:
 
 - if Pi/Paseo/Main reaches an OP-selected boundary, it MUST NOT satisfy that OP obligation with Paseo child agents, Pi subagents, Generic Worker delegation or a local multi-agent substitute;
 - it MUST emit a mandatory runtime-neutral handoff to ChatGPT and stop at that boundary;
-- if ChatGPT itself authored/prepared the subject, the current authoring context still MUST hand off to the fresh independent ChatGPT orchestration wave rather than self-review;
+- if ChatGPT itself authored/prepared the subject, no cross-runtime handoff is needed; however any assurance step that requires fresh independence MUST launch fresh ChatGPT context(s) rather than self-review in the authoring context;
 - the completed integrated ChatGPT OP result is then consumed by the canonical PWV3 workflow, after which work may resume in either supported runtime as permitted by normal routing.
 
 Pi/Paseo may continue to use child agents/Generic Workers for ordinary runtime work and for non-OP assurance modes where the accepted product contract permits it. It may not impersonate an enabled OP boundary.
 
-Thus an enabled OP mode implies a **mandatory ChatGPT handoff boundary**, not merely a preferred reviewer implementation.
+Thus an enabled OP mode implies **mandatory fresh-ChatGPT realization**. A cross-runtime handoff is mandatory only when the current runtime is not ChatGPT. When the current runtime is already ChatGPT, the workflow may stay in ChatGPT and needs only the fresh-context launcher/locator required by the assurance protocol; ordinary same-context pre-planning transitions do not create ceremonial handoffs.
+
+
+## Handoff minimization rule
+
+Handoff exists to transfer work across a real boundary, not because a lifecycle label changed.
+
+- ChatGPT -> ChatGPT, same context allowed by the current obligation: continue directly; no handoff.
+- ChatGPT -> fresh ChatGPT required for independence/OP: emit only the minimal fresh-context launcher/locator needed to start the new context(s). This is a context handoff, not a runtime handoff.
+- Pi/Paseo -> ChatGPT because an enabled OP boundary was reached: emit a mandatory runtime-neutral handoff and stop until the durable integrated ChatGPT OP result exists.
+- ChatGPT -> Pi/Paseo, or Pi/Paseo -> ChatGPT for another capability reason: handoff only when the runtime actually changes or the target capability requires a fresh context.
+
+For the intended default construction flow, Brainstorming/Research/Definition and other pre-Planning work may remain continuously in ChatGPT unless an OP/fresh-independence boundary itself requires fresh ChatGPT contexts. Do not manufacture a separate handoff merely between semantic stages.
 
 ## Discovery behavior
 
