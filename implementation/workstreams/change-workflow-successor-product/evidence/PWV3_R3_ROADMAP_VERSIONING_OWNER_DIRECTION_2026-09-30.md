@@ -21,10 +21,14 @@ The owner does not want these previously proposed later-roadmap capabilities as 
 
 These are removed from planned 3.1/3.2+ scope. They may only return through a future genuine product decision backed by a concrete need.
 
-## Items still being evaluated
+## Additional roadmap removals
 
-- historical/status browser: clarify whether it is primarily owner/operator UX or agent functionality;
-- additional managed merge methods beyond the one qualified 3.0 merge path: clarify whether a real need exists.
+The owner also removes these previously proposed later-roadmap items:
+
+- historical/status browser; agents use canonical inspect/resume/state directly and no separate owner UI is required;
+- additional managed merge methods beyond the one qualified 3.0 merge path; support one qualified final integration method unless a future concrete repository requirement reopens the decision.
+
+These are not planned 3.1/3.2 backlog.
 
 ## Release numbering owner direction
 
