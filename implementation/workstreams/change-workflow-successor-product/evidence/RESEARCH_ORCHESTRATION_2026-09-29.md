@@ -132,3 +132,22 @@ A real L14 dual-writer race was also observed: two workers produced independent 
 The universal orchestration protocol now requires a unique fenced claim commit after branch reservation. Branch creation/readback at research_base alone no longer proves lane ownership. Competing workers create sibling claim commits; only one non-force ref update can win.
 
 Research package hardening publication: `29726931662cc456682a893fd85ca0d2d9b2d754`.
+
+
+## Runtime deep-dive launcher hardening — 2026-09-30
+
+Before first launch, the runtime-integration deep-dive was refreshed to include the latest orchestration fixes:
+- fenced claim-commit ownership from COORDINATOR_PROTOCOL §4.4.1;
+- overflow fallback instead of immediate EXHAUSTED;
+- owner-executed Android live-test boundary;
+- researcher-executable vs owner-device test separation.
+
+No runtime-deep-dive lane branch existed before this refresh.
+
+Current runtime deep-dive launch state:
+- package root: `projects/project_workflow_v2/successor-product/architecture-v1/runtime-integration-deepdive`
+- claim generation: `2`
+- research base: `6851fb3ee3a0b2975867da9235e768df650df7c9`
+- manifest publication: `404f8d7ac5c31d808dac94a63e8e56a021d5f783`
+- analysis subject: `workflow-successor-runtime-integration@3`
+- lane shape: 14 finite lanes plus supplemental overflow.
