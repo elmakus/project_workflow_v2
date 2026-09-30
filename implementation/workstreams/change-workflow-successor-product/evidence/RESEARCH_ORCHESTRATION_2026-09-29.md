@@ -66,3 +66,34 @@ The 30 targeted lanes are grouped across lifecycle/planning, durable state/evide
 Generation 2 was never launched; no generation-2 evidence is accepted into generation 3. Generation 3 is the only current launch package.
 
 No generation-3 lane is launched by this preparation update. Consumer `RESEARCH.toml` remains active with pending return reconciliation and no finding.
+
+
+## Supplemental runtime-integration deep-dive — 2026-09-30
+
+A separate formal Research wave is prepared because the main generation-3 wave had already been fully claimed before the owner requested deeper investigation of helper/runtime integration.
+
+Package:
+- repository: `elmakus/project-research`
+- root: `projects/project_workflow_v2/successor-product/architecture-v1/runtime-integration-deepdive`
+- protocol: repository-root `/COORDINATOR_PROTOCOL.md`
+- allocator: `finite_branch_claim`
+- research base: `79017df50f402fdbdfde1621e72084982fafc068`
+- manifest publication: `22715fc208af4014b7a4d7fd63a13297950b733b`
+- lane shape: 1 whole-scope + 1 red-team + 12 targeted lanes = 14 workers before integration
+
+The wave specifically researches:
+- Pi/Paseo extension/bootstrap/helper packaging;
+- native extension tools vs CLI vs MCP;
+- Pi/Paseo live tests;
+- ChatGPT Project/repo/bootstrap options;
+- ChatGPT helper execution strategies;
+- Android/mobile constraints;
+- ChatGPT live tests;
+- MCP value/cost;
+- contract/helper/runtime version handshakes;
+- performance/context economics;
+- failure/trust boundaries.
+
+The parent generation-3 integration prompt now requires the completed supplemental `FINAL_SYNTHESIS.md` before it may finalize the overall PWV3 architecture Research.
+
+This preparation does not itself launch any supplemental lane or consume a Research result.
