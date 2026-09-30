@@ -1,30 +1,30 @@
 workstream_id = "change-workflow-successor-product"
-state = "consumed"
+state = "active"
 origin_role = "brainstorming"
-origin_subject = "workflow-successor-product@2"
+origin_subject = "workflow-successor-product@3"
 return_target = "brainstorming"
-return_reconciliation = "applied"
-return_result = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_R2_RESEARCH_CROSS_RECONCILIATION_2026-09-30.md"
-finding = "Revision-2 Research reconciles release slicing, donor reuse, defect memory, Assurance/OP semantics and the PWV2 bridge into one coherent PWV3 product direction; no unresolved owner/product choice remains."
-limitations = "No production PWV3 implementation exists yet; live host evidence is version-bound; exact representation/API/file choices remain Definition/Planning details; bounded PWV2 doctorfix remains a separate prerequisite before relying on V2 as the construction harness."
-conflicts = "Resolved: roadmap proposed a minimal persisted OP selector kernel in 3.0 while assurance Research deferred the first-class profile to 3.1. Reconciliation keeps only narrow boundary-level OP interoperability in 3.0 and ships the first-class four-selector Assurance Profile in 3.1."
+return_reconciliation = "pending"
+return_result = ""
+finding = ""
+limitations = ""
+conflicts = ""
 
 [[sources]]
 class = "official_upstream"
-status = "checked"
+status = "pending"
 weight = "primary"
 
 [[sources]]
 class = "project_runtime"
-status = "checked"
+status = "pending"
 weight = "direct"
 
 [[sources]]
 class = "tracker_discussion"
-status = "checked"
+status = "pending"
 weight = "supporting"
 
 [[sources]]
 class = "practitioner_community"
-status = "checked"
+status = "pending"
 weight = "supporting"
