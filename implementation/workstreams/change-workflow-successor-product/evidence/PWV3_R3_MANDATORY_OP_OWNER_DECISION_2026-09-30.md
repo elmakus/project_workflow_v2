@@ -68,3 +68,34 @@ The previously proposed 3.1 Assurance Profile and its launch-form/profile-editin
 Likewise, future-roadmap items whose only purpose was to improve profile toggles, OP enablement UX, OP launchers, OP result visibility or profile defaults/presets are not PWV3 product backlog. Those concerns belong to Orchestration Protocol itself if ever desired.
 
 This revision does not alter the clean-rewrite, donor, regression, runtime-neutral authority, sequential execution, Recovery, Final Qualification or Close decisions already accepted.
+
+
+## Final Qualification OP use
+
+Orchestration Protocol Skill is also the planned orchestration mechanism for the required Final Qualification defect-discovery activities:
+
+1. Targeted Bug Hunt;
+2. Global Bug Hunt.
+
+PWV3 owns that those qualification obligations are due and binds the exact candidate/qualification surface. The Orchestration Protocol Skill owns the task-specific bug-hunt profile, lane topology, search partitioning, convergence and integration mechanics.
+
+Fresh independent final acceptance remains a separate PWV3 acceptance obligation unless a later owner decision explicitly moves it under an OP profile.
+
+Ordinary per-Card implementation Review is not automatically an OP invocation.
+
+## Ordinary PWV3 Review completeness
+
+For Reviews that are **not** delegated to Orchestration Protocol, PWV3 must still define a bounded-completeness rule: a reviewer evaluates the full declared review/acceptance surface and reports the material findings it discovers; it must not intentionally stop merely because the first valid defect is enough to make the verdict RED.
+
+This is ordinary single-review semantics, not orchestration. It does not imply lanes, swarms, profile selection, or OP worker mechanics.
+
+For OP-backed Research/Reviews/Bug Hunts, the corresponding discovery breadth, lane behavior, convergence and integration rules belong to the Orchestration Protocol Skill and must not be duplicated in PWV3.
+
+## External skill boundary
+
+The future Orchestration Protocol Skill lives in:
+
+- repository: `elmakus/orchestration-protocol-skill`;
+- seed design requirements: `DESIGN_REQUIREMENTS.md`.
+
+PWV3 should depend only on a stable compatible OP invocation/result contract. The skill may evolve its internal profiles and strength independently.
