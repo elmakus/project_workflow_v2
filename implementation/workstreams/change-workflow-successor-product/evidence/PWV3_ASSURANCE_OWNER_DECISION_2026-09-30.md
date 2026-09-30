@@ -45,6 +45,27 @@ Handoff exists to transfer work across a real boundary, not because a lifecycle 
 
 For the intended default construction flow, Brainstorming/Research/Definition and other pre-Planning work may remain continuously in ChatGPT unless an OP/fresh-independence boundary itself requires fresh ChatGPT contexts. Do not manufacture a separate handoff merely between semantic stages.
 
+
+## Coordinator ownership and OP abstraction boundary
+
+When the current runtime is already ChatGPT, the existing owner-facing/coordinator chat may remain the active PWV3 Main across Brainstorming, Research orchestration, Definition and other pre-Planning work.
+
+At an OP-selected boundary:
+
+- PWV3's responsibility is only to derive that the exact boundary requires `OP`, freeze/provide the exact subject and acceptance/review surface, and invoke the installed/current Orchestration Protocol capability;
+- the current ChatGPT coordinator invokes/uses the Orchestration Protocol skill/protocol and remains the coordinating conversation unless a separate semantic reason requires otherwise;
+- the Orchestration Protocol itself owns worker topology, fresh-context launchers, lane isolation, coverage, integration mechanics, discovery completion, and focused post-repair revalidation;
+- PWV3 MUST NOT duplicate those orchestration mechanics, lane counts, worker roles, prompt layouts, or protocol internals in its own semantic contract;
+- fresh worker/reviewer/integrator contexts required by OP are children/external contexts launched according to OP, while the owner-facing coordinator chat may stay in place;
+- if the Orchestration Protocol later evolves internally, PWV3 should not require a semantic/product change as long as the stable OP invocation/result contract remains compatible;
+- only a material change to the OP boundary contract (inputs, exact-subject binding, result/applicability contract, or safety guarantees) may require PWV3 contract evolution.
+
+The intended abstraction is therefore:
+
+`PWV3 semantic boundary -> OP required -> invoke Orchestration Protocol -> consume durable integrated OP result -> continue canonical PWV3 routing`.
+
+PWV3 selects **whether** OP is required. Orchestration Protocol selects **how** that OP wave is executed.
+
 ## Discovery behavior
 
 An OP research/review wave MUST NOT stop merely because one valid defect/finding was discovered.
