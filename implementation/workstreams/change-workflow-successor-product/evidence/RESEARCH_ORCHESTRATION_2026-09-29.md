@@ -117,3 +117,18 @@ The research package now uses partial reclaim generation 4 on the same original 
 The universal orchestration protocol and this wave launcher now also support opt-in overflow research after finite-lane exhaustion. Once all current finite lanes are claimed, an additional fresh worker receives a unique supplemental overflow run instead of immediately returning `EXHAUSTED`. Overflow evidence is supplemental and never substitutes for required lane completion.
 
 Protocol/package repair publication in `elmakus/project-research`: `6222c2b35bbf0e3a940d7da807e83cd5ac19774b`.
+
+
+## Generation-5 reclaim + claim-race hardening — 2026-09-30
+
+A fresh audit after generation-4 execution showed:
+- 17/19 reclaimed generation-4 lanes completed with declared outputs;
+- 2 lanes remained empty at exact research_base with no output: `L07 durable-state` and `L17 helper-architecture`.
+
+Generation 5 reclaims only L07 and L17 on new fenced branch names while preserving the same immutable research base.
+
+A real L14 dual-writer race was also observed: two workers produced independent L14 reports on the same g4 branch. Both reports remain recoverable in Git history. The first report has been preserved as supplemental evidence in the research package; the later branch-HEAD report remains the required canonical L14 output.
+
+The universal orchestration protocol now requires a unique fenced claim commit after branch reservation. Branch creation/readback at research_base alone no longer proves lane ownership. Competing workers create sibling claim commits; only one non-force ref update can win.
+
+Research package hardening publication: `29726931662cc456682a893fd85ca0d2d9b2d754`.
