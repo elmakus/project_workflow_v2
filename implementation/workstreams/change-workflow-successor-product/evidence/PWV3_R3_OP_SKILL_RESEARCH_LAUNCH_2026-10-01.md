@@ -2,7 +2,7 @@
 
 Date: 2026-10-01
 Brainstorm subject: `workflow-successor-product@3`
-Status: FORMAL RESEARCH ACTIVE / no Definition or implementation authorization
+Status: EXTERNAL PARALLEL PRODUCT RESEARCH / NONBLOCKING FOR PWV3 DEFINITION
 
 ## External OP Skill Research package
 
@@ -47,3 +47,16 @@ The wave determines the production architecture for a ChatGPT-Android-only Orche
 PWV3 remains responsible only for when an OP obligation is due and for exact subject/acceptance binding. This Research does not move OP internals into PWV3.
 
 The Research is non-authoritative evidence until reconciled into the correct product/workflow owner.
+
+
+## Separation correction
+
+This Research belongs to the separate product repository `elmakus/orchestration-protocol-skill`.
+
+It MUST NOT occupy or reactivate the canonical PWV3 workstream `RESEARCH.toml` slot, MUST NOT reset the PWV3 Brainstorming revision, and MUST NOT block promotion/Definition of `workflow-successor-product@3`.
+
+PWV3 only depends on a stable compatible OP invocation/result boundary. The internal skill architecture Research may proceed independently and in parallel.
+
+The already-launched 27 fresh ChatGPT research contexts for this package are therefore owned by the Orchestration Protocol Skill research effort, not by the PWV3 Brainstorm/Research state.
+
+A future PWV3 Planning/implementation dependency may consume the external skill contract when needed, but this external Research is not a precondition to authoring or reviewing the PWV3 Definition.
