@@ -1,30 +1,30 @@
 workstream_id = "change-workflow-successor-product"
-state = "active"
+state = "complete"
 origin_role = "brainstorming"
 origin_subject = "workflow-successor-product@1"
 return_target = "brainstorming"
 return_reconciliation = "pending"
 return_result = ""
-finding = ""
-limitations = ""
-conflicts = ""
+finding = "PWV3 is coherent and feasible as a clean successor; no material owner-level product choice remains before Definition. Exact integrated result: elmakus/project-research@research/workflow-successor-v1-integration-g3:projects/project_workflow_v2/successor-product/architecture-v1/FINAL_SYNTHESIS.md blob 18e5e8de80db2fcdbda0e065016457b517b7bfc6."
+limitations = "Representation/package/schema details remain implementation choices; invalid supplemental overflow R101 was excluded; runtime-specific observations require requalification after material host/runtime change."
+conflicts = "none material; disagreements were reconciled by owner-fixed authority, direct project/runtime evidence, official/upstream evidence, and simplest invariant-preserving mechanism."
 
 [[sources]]
 class = "official_upstream"
-status = "pending"
+status = "checked"
 weight = "primary"
 
 [[sources]]
 class = "project_runtime"
-status = "pending"
+status = "checked"
 weight = "direct"
 
 [[sources]]
 class = "tracker_discussion"
-status = "pending"
+status = "checked"
 weight = "supporting"
 
 [[sources]]
 class = "practitioner_community"
-status = "pending"
+status = "checked"
 weight = "supporting"
