@@ -1,6 +1,6 @@
 # Definition — Project Workflow V3 successor product
 
-Status: DRAFT / pending mandatory OP Definition Review  
+Status: DRAFT / pending mandatory Definition Review via current construction-time Orchestration Protocol; external OP Skill Research is non-blocking  
 Subject: `workflow-successor-product@3`  
 Definition revision: 2  
 Initial product release: `3.0.0`
@@ -377,6 +377,6 @@ Exact filenames, serialization, helper operation names, API schemas, package nam
 
 No unresolved owner/product choice remains in this draft.
 
-Before this Definition becomes GREEN, it requires the mandatory independent Orchestration Protocol Definition Review for this exact Definition subject and acceptance surface. The production OP Skill research is separate and need not finish first; current qualified Coordinator/Orchestration Protocol mechanics may be used for this construction-time review.
+Before this Definition becomes GREEN, it requires the mandatory independent Definition Review for this exact Definition subject and acceptance surface, realized with the current construction-time Orchestration Protocol mechanics. The 27-lane architecture Research for `elmakus/orchestration-protocol-skill` is a separate product effort: it is not a PWV3 Research obligation, not a gate for this Definition Review, and does not need to finish first. Those lanes may continue independently while PWV3 Definition proceeds.
 
 No Strategic Planning or PWV3 implementation is authorized by this draft.
