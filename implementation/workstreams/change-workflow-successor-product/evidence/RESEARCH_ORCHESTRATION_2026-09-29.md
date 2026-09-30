@@ -97,3 +97,23 @@ The wave specifically researches:
 The parent generation-3 integration prompt now requires the completed supplemental `FINAL_SYNTHESIS.md` before it may finalize the overall PWV3 architecture Research.
 
 This preparation does not itself launch any supplemental lane or consume a Research result.
+
+
+## Main-wave claim recovery and overflow fallback — 2026-09-30
+
+A mechanical audit of generation 3 found:
+- 32 declared/claimed lane branches;
+- 13 valid completed lane outputs;
+- 19 branches still exactly at the immutable research base with no declared output, therefore `CLAIMED_INCOMPLETE`.
+
+Valid completed g3 lanes:
+`W00, R00, L01, L02, L03, L08, L12, L18, L19, L20, L21, L22, L23`.
+
+Reclaimed/fenced incomplete lanes:
+`L04, L05, L06, L07, L09, L10, L11, L13, L14, L15, L16, L17, L24, L25, L26, L27, L28, L29, L30`.
+
+The research package now uses partial reclaim generation 4 on the same original research base for those 19 lanes. Old empty g3 claims remain as non-current evidence and are not deleted.
+
+The universal orchestration protocol and this wave launcher now also support opt-in overflow research after finite-lane exhaustion. Once all current finite lanes are claimed, an additional fresh worker receives a unique supplemental overflow run instead of immediately returning `EXHAUSTED`. Overflow evidence is supplemental and never substitutes for required lane completion.
+
+Protocol/package repair publication in `elmakus/project-research`: `6222c2b35bbf0e3a940d7da807e83cd5ac19774b`.
