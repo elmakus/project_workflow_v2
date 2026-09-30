@@ -12,7 +12,7 @@ decision_locators = [
   "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_R3_OP_SKILL_SEPARATION_2026-10-01.md",
   "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_R3_BRAINSTORM_FINAL_CHALLENGE_2026-10-01.md"
 ]
-completeness_audit = "pending_op_definition_review"
+completeness_audit = "pending_definition_review"
 unresolved_user_product_choice = false
 premium_a = "not_due"
 premium_a_subject = ""
