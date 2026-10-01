@@ -3,35 +3,53 @@
 Date: 2026-10-01
 Workstream: `change-workflow-successor-product`
 Scope: `workflow-successor-product@4`
-Status: ACTIVE OWNER INPUT / RELEASE PLACEMENT NOT YET PROMOTED
+Status: OWNER DECISION CONFIRMED
 
-## Owner-required behavior
+## Owner-fixed behavior
 
-After every Orchestration Protocol-backed operation reaches an advance-permitting accepted result (GREEN/clear-equivalent for that OP profile), PWV3 must establish a real user-authority stop before canonical continuation.
+After every Orchestration Protocol-backed operation reaches an advance-permitting accepted result (GREEN/clear-equivalent for that OP profile), PWV3 establishes a real user-authority stop before canonical continuation.
 
 At that stop the user chooses exactly one of:
 1. **CONTINUE** — consume the accepted OP result for forward progress and derive the canonical next workflow obligation;
 2. **RUN OP AGAIN** — keep the workflow at the same semantic boundary and launch another fresh OP operation over the same exact accepted subject/acceptance/coverage binding, with a new immutable OP attempt/result.
 
-This applies uniformly to every PWV3 boundary realized through OP, including Research/review/qualification discovery profiles where their profile-specific successful result would otherwise allow forward progress.
+The same stop recurs after every later advance-permitting OP result until the owner selects CONTINUE.
+
+## Scope
+
+This applies uniformly to every PWV3 boundary realized through OP, including:
+- Brainstorming Research;
+- Definition Review;
+- Plan Review;
+- Execution Prep / Execution Package Review;
+- Final Qualification Targeted Bug Hunt;
+- Final Qualification Global Bug Hunt;
+- any future PWV3 boundary that invokes OP through the stable OP caller/result contract.
 
 ## Loop semantics
 
 - RED / repair-required / BLOCKED / UNKNOWN does not create the post-GREEN choice gate; existing repair/revalidation/blocker semantics continue until an advance-permitting accepted OP result exists.
 - Every repeated OP attempt is distinct immutable evidence; earlier GREEN evidence is preserved and never overwritten.
-- A repeated OP operation does not silently broaden product scope or alter the subject. If scope/acceptance/authority materially changes, normal upstream routing applies instead.
-- After every later advance-permitting OP result, the same user-choice stop recurs.
-- No fixed retry/repeat limit is implied; each additional OP wave requires an explicit user choice.
-- The user-choice artifact is workflow authority for continuation, not runtime/session state.
+- Repeating OP does not silently broaden scope or alter the frozen subject/acceptance/coverage binding.
+- If scope, authority or acceptance materially changes, normal upstream routing applies and a new applicable subject is required rather than pretending it is another attempt on the old one.
+- No fixed repeat limit is imposed. Each additional OP wave requires an explicit owner choice.
+- The durable owner choice is workflow authority for continuation; runtime/session state is not.
 
-## Release-placement analysis
+## Release placement
 
-This behavior changes canonical lifecycle legality by inserting a mandatory user-authority gate after every successful OP boundary. It is therefore not patch-only behavior.
+Owner decision: **ship this invariant in PWV3 3.0.0**.
 
-Current recommendation: include it in **PWV3 3.0.0** because the product is not yet implemented and the owner requires it as a foundational invariant. If intentionally deferred, it belongs to a compatible minor line (for example 3.1), not 3.0.1.
+Reason:
+- it changes canonical continuation legality and user-authority boundaries;
+- PWV3 is not yet implemented, so there is no compatibility value in intentionally shipping 3.0 without a required foundational lifecycle invariant;
+- if this behavior were ever deferred, it would be compatible-minor semantics rather than a 3.0.1 patch.
 
-## Impact on current Definition status
+## Effect on prior Definition evidence
 
-The prior Definition revision 3 and its focused revalidation GREEN remain immutable evidence for `workflow-successor-product@3`, but this substantive lifecycle change creates Brainstorm revision 4 and makes prior promotion/Definition completeness inapplicable to the new scope until revision 4 is resolved, promoted, redefined and reviewed.
+Definition revision 3 and its focused revalidation GREEN remain immutable historical evidence for `workflow-successor-product@3`.
 
-Because this change materially alters lifecycle/user-stop semantics, the prior Definition Review applicability cannot simply be extended by focused revalidation. After revision-4 Definition repair, a fresh full Definition Review wave is required.
+They are not discarded. Revision 4 Definition must start from the complete repaired revision-3 Definition and apply only the accepted lifecycle delta plus directly required flow-down.
+
+Because the new invariant materially changes lifecycle/user-stop semantics, the prior Definition Review GREEN cannot be reused as acceptance of the new subject. After revision-4 Definition is produced, it requires a fresh full Definition Review wave.
+
+No prior FR-01..FR-20 repair is reopened merely because a new full review is required.
