@@ -2,7 +2,7 @@ workstream_id = "change-workflow-successor-product"
 source_scope_subject = "workflow-successor-product@4"
 revision = "D07"
 state = "active"
-completeness_audit = "pending_definition_review_repeat_a03"
+completeness_audit = "pending_owner_decisions_a03"
 premium_a = "not_due"
 
 [requirements]
@@ -88,3 +88,7 @@ path = "implementation/workstreams/change-workflow-successor-product/evidence/PW
 [[decisions]]
 class = "authority"
 path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_D07_DEFINITION_REVIEW_REPEAT_A03_2026-10-01.md"
+
+[[decisions]]
+class = "authority"
+path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_D07_A03_RED_PENDING_OWNER_DECISIONS_2026-10-01.md"

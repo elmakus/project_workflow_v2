@@ -3,7 +3,7 @@
 Date: 2026-10-01
 Workstream: `change-workflow-successor-product`
 Attempt identity: `D07-OP-DEFREV-A03`
-Status: **CURRENT / DUE**
+Status: **TERMINAL / RED — OWNER DECISIONS REQUIRED**
 
 ## Trigger
 
@@ -43,3 +43,15 @@ A03 must use materially different lenses from prior review/revalidation attempts
 - Only an advance-permitting accepted caller-visible A03 result creates the next owner gate.
 - If A03 is GREEN, the workflow stops again for CONTINUE or RUN OP AGAIN.
 - Premium A remains not due and Strategic Planning remains unauthorized.
+
+
+## Terminal A03 result
+
+Repository: `elmakus/project-research`
+Integration branch: `review/pwv3-definition-d07-a03-integration`
+Integration commit: `4fc3811774e07a5889584cc64d313e01fc69ad92`
+Result path: `projects/project_workflow_v2/successor-product/v3-definition-review-d07-a03/FINAL_REVIEW.md`
+Result blob: `81f7f10c0d39681002557cd37137168dd1361327`
+Disposition: **RED**
+
+A03 remains the sole current frontier and is terminal RED. No historical GREEN may authorize forward continuation.
