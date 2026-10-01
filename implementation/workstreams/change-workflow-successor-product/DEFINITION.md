@@ -1,8 +1,8 @@
 # Definition — Project Workflow V3 successor product
 
-Status: DRAFT / revision-3 bounded repair of RED Definition Review; pending fresh focused revalidation; external OP Skill Research is non-blocking  
-Subject: `workflow-successor-product@3`  
-Definition revision: 3  
+Status: DRAFT / revision-4 lifecycle delta over fully repaired revision 3; pending new full Definition Review; external OP Skill Research is non-blocking  
+Subject: `workflow-successor-product@4`  
+Definition revision: 4  
 Initial product release: `3.0.0`
 
 ## Product outcome
@@ -31,7 +31,7 @@ The semantic lifecycle is:
 14. one final managed integration path;
 15. Close from durable target-side evidence.
 
-Named lifecycle steps do not imply user stops. A stop exists only at genuine owner authority, required fresh-context/runtime boundary, non-remediable blocker, explicit pause or end-of-approved-scope.
+Named lifecycle steps do not imply user stops except where this Definition explicitly creates one. A stop exists at genuine owner authority, required fresh-context/runtime boundary, the mandatory post-OP accepted-result owner gate defined below, non-remediable blocker, explicit pause or end-of-approved-scope.
 
 Semantic return routing is deterministic. Genuine product-outcome or owner-choice change returns to Brainstorming. Requirement, product-scope or Definition-level acceptance meaning change returns to Definition. Strategy, decomposition or dependency meaning that remains inside the accepted Definition returns to Strategic Planning. Concrete execution-package refinement that preserves the reviewed Plan remains owned by Execution Prep. When multiple classes appear to apply, route to the earliest upstream semantic owner whose accepted meaning must change; no downstream stage may silently absorb an upstream semantic change.
 
@@ -52,9 +52,18 @@ PWV3 owns:
 - the exact durable result identity/type expected from that obligation;
 - the durable result applicability check;
 - single semantic consumption of an applicable result;
-- canonical continuation after consuming the result.
+- the mandatory post-OP accepted-result owner gate;
+- canonical continuation only after an explicit owner CONTINUE choice.
 
-For every OP-backed boundary, wrong-subject, stale, duplicate-as-new, incomplete, unsupported, BLOCKED or otherwise non-applicable evidence fails closed and cannot advance the lifecycle. Re-observing an already consumed exact result after restart is idempotent evidence, not permission to replay the semantic transition. GREEN/accepted evidence permits only the canonical next obligation. RED/repair-required evidence returns to the owning semantic stage; after bounded repair the OP obligation remains unresolved until a compatible applicable OP result establishes acceptance. UNKNOWN/BLOCKED cannot advance. Brainstorming Research additionally binds the exact Brainstorming return owner/obligation and may be reused only when applicability and freshness to that exact subject are proven.
+For every OP-backed boundary, wrong-subject, stale, duplicate-as-new, incomplete, unsupported, BLOCKED or otherwise non-applicable evidence fails closed and cannot advance the lifecycle. Re-observing an already consumed exact result after restart is idempotent evidence, not permission to replay the semantic transition.
+
+When an OP operation reaches an advance-permitting accepted result (GREEN/clear-equivalent for that profile), PWV3 must establish a real owner-authority stop before forward continuation. The owner chooses exactly one of:
+- **CONTINUE** — consume that accepted result for forward progress and derive the canonical next workflow obligation;
+- **RUN OP AGAIN** — remain at the same semantic OP boundary and launch a new fresh OP operation over the same exact subject + acceptance/coverage binding.
+
+RUN OP AGAIN creates a new immutable OP attempt/result; earlier accepted evidence is preserved and never overwritten. The same owner-authority stop recurs after every later advance-permitting accepted OP result until CONTINUE is chosen. Repeating OP is legal only while the exact subject/acceptance/coverage binding remains applicable. A material change to scope, acceptance or authority routes normally upstream and cannot be disguised as another attempt on the old subject. There is no fixed repeat limit.
+
+RED/repair-required evidence returns to the owning semantic stage; after bounded repair the OP obligation remains unresolved until a compatible applicable OP result establishes acceptance. BLOCKED/UNKNOWN cannot advance and do not create the post-GREEN choice gate. Brainstorming Research additionally binds the exact Brainstorming return owner/obligation and may be reused only when applicability and freshness to that exact subject are proven.
 
 PWV3 does **not** own:
 - lane counts;
@@ -396,10 +405,12 @@ Exact filenames, serialization, helper operation names, API schemas, package nam
 
 No unresolved owner/product choice remains in this draft.
 
-Definition revision 2 received a complete independent OP-backed review with overall RED and 20 canonical blocking findings. Revision 3 incorporates the bounded repair set without changing the accepted product outcome, lifecycle topology, supported runtimes, mandatory OP boundaries or release strategy. The original full discovery wave therefore remains applicable unless focused revalidation proves otherwise.
+Definition revision 2 received a complete independent OP-backed review with overall RED and 20 canonical blocking findings. Definition revision 3 incorporated and then independently revalidated all FR-01..FR-20 repairs as GREEN. Those repairs remain part of revision 4 and are not reopened merely by this lifecycle delta.
 
-Before this Definition becomes GREEN, revision 3 requires fresh independent focused revalidation of the repaired and directly affected neighbor surfaces. A new full Definition Review wave is required only if repair materially changes the product outcome/lifecycle/runtime/OP/release/bridge/acceptance surface, introduces a new owner choice or authority, produces unbounded impact, reveals a materially new defect class, or otherwise invalidates applicability of the revision-2 discovery wave.
+Revision 4 adds one owner-fixed 3.0.0 invariant: after every advance-permitting accepted OP result, PWV3 stops for explicit owner choice between CONTINUE and RUN OP AGAIN. This materially changes lifecycle/user-stop semantics while preserving the existing OP caller/result boundary and all prior repairs.
 
-The external architecture Research for `elmakus/orchestration-protocol-skill` remains a separate product effort and is not a gate for this Definition revalidation.
+Because lifecycle semantics changed materially, the revision-3 GREEN review/focused-revalidation evidence remains immutable historical evidence but cannot approve revision 4. Before this Definition becomes GREEN, revision 4 requires a new full independent OP-backed Definition Review over the exact revision-4 subject and acceptance surface.
+
+The external architecture Research for `elmakus/orchestration-protocol-skill` remains a separate product effort and is not a gate for authoring this Definition, though a compatible production OP capability remains a 3.0 implementation/qualification dependency.
 
 No Strategic Planning or PWV3 implementation is authorized by this draft.
