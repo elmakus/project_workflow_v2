@@ -6,7 +6,7 @@ Definition subject: `workflow-successor-product@4`
 Definition revision: `D07`
 Definition consumer commit: `29d192161c9826c1216a39175cc24b146b8372f4`
 Definition blob: `152a89fe95da6a66f414118dddb719c2f1f06bd7`
-Status: **GREEN RESULT ACCEPTED / PENDING HUMAN OWNER DISPOSITION**
+Status: **GREEN RESULT ACCEPTED / OWNER DISPOSITION = RUN OP AGAIN**
 
 ## Exact caller-visible OP result
 
@@ -36,7 +36,7 @@ Exactly one human owner disposition is required for this exact accepted result:
 - **CONTINUE** — consume this exact GREEN for forward progress, complete Definition acceptance and derive the next canonical obligation;
 - **RUN OP AGAIN** — close this exact GREEN for forward authority while preserving it as immutable evidence, remain at the same Definition Review OP boundary and launch one new fresh OP attempt over the same exact D07 subject and acceptance/coverage binding.
 
-Current disposition: **PENDING**
+Current disposition: **RUN OP AGAIN**
 
 Until resolved:
 - Definition remains active;
@@ -44,3 +44,19 @@ Until resolved:
 - Premium A is not due;
 - Strategic Planning remains unauthorized;
 - no earlier GREEN or owner choice may substitute for this exact current result/gate.
+
+
+## Durable owner disposition
+
+Owner disposition: **RUN OP AGAIN**
+
+This exact D07 GREEN remains immutable accepted historical evidence but is closed for forward-continuation authority. It cannot later be consumed by CONTINUE.
+
+The new current Definition Review frontier is:
+- attempt identity: `D07-OP-DEFREV-A03`;
+- exact semantic subject commit: `29d192161c9826c1216a39175cc24b146b8372f4`;
+- Definition subject/revision: `workflow-successor-product@4` / `D07`;
+- Definition blob: `152a89fe95da6a66f414118dddb719c2f1f06bd7`;
+- same mandatory Definition Review acceptance/coverage binding.
+
+No earlier GREEN/result/owner choice may authorize forward continuation while A03 is current.
