@@ -1,8 +1,8 @@
 # Definition — Project Workflow V3 successor product
 
-Status: DRAFT / revision-6 bounded repair of D05 repeat Definition Review A02; pending fresh focused revalidation; external OP Skill Research is non-blocking  
+Status: DRAFT / revision-7 bounded repair of D06 focused revalidation residuals; pending fresh focused revalidation; external OP Skill Research is non-blocking  
 Subject: `workflow-successor-product@4`  
-Definition revision: 6  
+Definition revision: 7  
 Initial product release: `3.0.0`
 
 ## Product outcome
@@ -27,7 +27,7 @@ The semantic lifecycle is:
 10. sequential Project Card execution;
 11. Result + proportional implementation Review/revalidation;
 12. Final Qualification, including OP Targeted Bug Hunt and OP Global Bug Hunt;
-13. fresh independent final acceptance;
+13. fresh terminal acceptance under the applicable exact terminal predicate;
 14. one final managed integration path;
 15. Close from durable target-side evidence.
 
@@ -262,7 +262,7 @@ Required in 3.0.0:
 - confirmed-defect health and bounded maintenance path;
 - Final Qualification semantics;
 - OP Targeted and Global Bug Hunt;
-- fresh independent final acceptance;
+- fresh terminal acceptance under the applicable exact terminal predicate;
 - one qualified final integration method;
 - target-side Close;
 - safe compatible patch adoption within the 3.0.x line.
@@ -414,7 +414,7 @@ Strategic Planning must preserve this Definition and cover at least:
 - donor extraction boundaries and non-authoritative provenance metadata;
 - regression corpus;
 - package/helper identity;
-- ChatGPT and Pi/Paseo adapters;
+- ChatGPT and Pi/Paseo host-realization and host-integration semantics;
 - external OP Skill invocation/result contract and build dependency;
 - mandatory OP boundary integration;
 - Planning/Execution Package/Result/Review semantics;
@@ -448,9 +448,17 @@ Definition revision 6 incorporates the bounded A02 repairs:
 - Pi/Paseo Definition text reduced to semantic host/runtime constraints rather than component topology;
 - non-blocking subjective “materially simpler” / “small checkpoint” wording made non-normative or objective.
 
-These changes preserve the owner-fixed CONTINUE / RUN OP AGAIN meaning and cardinality, the mandatory OP boundary set, the PWV3↔OP ownership split, supported runtimes, bridge/self-hosting purpose, release qualification ordering, versioning policy, final integration and Close semantics.
+Fresh focused revalidation of revision 6 closed A02-F01, A02-F02 and A02-F03 and confirmed A02-F06 cleanup, but remained RED on two residual incomplete repairs:
+- R1-F01 / A02-F04: lifecycle step 13 and the 3.0.0 required-scope list still said unconditional `fresh independent final acceptance`, contradicting owner Option B and the detailed `WAIVED_ACCEPTANCE` terminal predicate;
+- R1-F02 / A02-F05: Planning still normatively required `ChatGPT and Pi/Paseo adapters`, preserving a topology term that the repaired runtime section had explicitly returned to Planning/implementation freedom.
 
-Before this Definition becomes GREEN, revision 6 requires fresh independent focused revalidation of the A02 repair groups and their declared neighboring seams. A new full Definition Review is required only if focused revalidation finds material drift, unbounded impact, a materially new defect class, or loss of applicability of the A02 discovery result.
+Definition revision 7 applies only those two residual repairs:
+- higher-level lifecycle/release wording now requires fresh terminal acceptance under the already-defined applicable exact terminal predicate, preserving newly-produced post-QF freshness and Option B without requiring the independent-GREEN label for waived acceptance;
+- the Planning obligation now requires ChatGPT and Pi/Paseo host-realization and host-integration semantics rather than an adapter decomposition.
+
+These changes preserve the owner-fixed CONTINUE / RUN OP AGAIN meaning and cardinality, mandatory OP boundary set, PWV3↔OP ownership split, supported runtimes, bridge/self-hosting purpose, release qualification ordering, versioning policy, final integration and Close semantics.
+
+Before this Definition becomes GREEN, revision 7 requires fresh independent focused revalidation only of these two residual repairs and their direct terminal-acceptance / host-realization seams. A new full Definition Review is required only if that focused revalidation finds material drift, unbounded impact, a materially new defect class, or loss of applicability of the A02/D06 discovery and revalidation evidence.
 
 The external architecture Research for `elmakus/orchestration-protocol-skill` remains a separate product effort and is not a gate for authoring this Definition, though a compatible production OP capability remains a 3.0 implementation/qualification dependency.
 
