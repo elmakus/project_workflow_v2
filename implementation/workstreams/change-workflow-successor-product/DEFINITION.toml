@@ -1,8 +1,8 @@
 workstream_id = "change-workflow-successor-product"
 source_scope_subject = "workflow-successor-product@4"
-revision = "D04"
+revision = "D05"
 state = "active"
-completeness_audit = "pending_definition_review"
+completeness_audit = "pending_focused_definition_revalidation"
 premium_a = "not_due"
 
 [requirements]
@@ -52,3 +52,7 @@ path = "implementation/workstreams/change-workflow-successor-product/evidence/PW
 [[decisions]]
 class = "authority"
 path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_R4_DEFINITION_DELTA_2026-10-01.md"
+
+[[decisions]]
+class = "authority"
+path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_R4_DEFINITION_REVIEW_RED_CONSUMPTION_2026-10-01.md"

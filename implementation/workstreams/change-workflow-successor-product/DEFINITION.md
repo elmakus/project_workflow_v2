@@ -1,8 +1,8 @@
 # Definition — Project Workflow V3 successor product
 
-Status: DRAFT / revision-4 lifecycle delta over fully repaired revision 3; pending new full Definition Review; external OP Skill Research is non-blocking  
+Status: DRAFT / revision-5 bounded repair of full D04 Definition Review; pending fresh focused revalidation; external OP Skill Research is non-blocking  
 Subject: `workflow-successor-product@4`  
-Definition revision: 4  
+Definition revision: 5  
 Initial product release: `3.0.0`
 
 ## Product outcome
@@ -57,11 +57,24 @@ PWV3 owns:
 
 For every OP-backed boundary, wrong-subject, stale, duplicate-as-new, incomplete, unsupported, BLOCKED or otherwise non-applicable evidence fails closed and cannot advance the lifecycle. Re-observing an already consumed exact result after restart is idempotent evidence, not permission to replay the semantic transition.
 
-When an OP operation reaches an advance-permitting accepted result (GREEN/clear-equivalent for that profile), PWV3 must establish a real owner-authority stop before forward continuation. The owner chooses exactly one of:
-- **CONTINUE** — consume that accepted result for forward progress and derive the canonical next workflow obligation;
-- **RUN OP AGAIN** — remain at the same semantic OP boundary and launch a new fresh OP operation over the same exact subject + acceptance/coverage binding.
+When an OP operation returns the caller-visible terminal result that the compatible PWV3↔OP contract defines as advance-permitting for that exact bound obligation, PWV3 must establish exactly one real human user/workstream-owner authority gate before forward continuation. No agent, runtime, semantic-stage owner or coordinator may infer, default or synthesize either choice.
 
-RUN OP AGAIN creates a new immutable OP attempt/result; earlier accepted evidence is preserved and never overwritten. The same owner-authority stop recurs after every later advance-permitting accepted OP result until CONTINUE is chosen. Repeating OP is legal only while the exact subject/acceptance/coverage binding remains applicable. A material change to scope, acceptance or authority routes normally upstream and cannot be disguised as another attempt on the old subject. There is no fixed repeat limit.
+That pending gate is a canonical durable non-derivable routing fact. It binds:
+- the exact PWV3 OP boundary;
+- the exact accepted OP result and OP-attempt identity;
+- the exact subject + acceptance/coverage binding;
+- its unresolved/resolved status;
+- and, once resolved, exactly one durable owner disposition.
+
+The owner chooses exactly one of:
+- **CONTINUE** — authorize exactly one forward semantic consumption of that exact current accepted result and derive the canonical next workflow obligation;
+- **RUN OP AGAIN** — durably close that exact gate/result for forward authorization while preserving it as immutable historical evidence, remain at the same semantic OP boundary and establish exactly one new current repeat-attempt frontier over the same exact subject + acceptance/coverage binding.
+
+The owner disposition must be durably published and positively read back before either forward continuation or repeat launch is acted on. Re-observation of the same resolved gate/choice is idempotent and single-use; stale, mismatched, duplicate-as-new or differently bound choice evidence fails closed.
+
+After RUN OP AGAIN, the new repeat attempt is the sole current attempt frontier for that boundary/binding. No earlier accepted result or earlier owner choice may regain forward authority. RED/repair-required/BLOCKED/UNKNOWN at the current frontier remains non-advancing and cannot fall back to an older GREEN. Only an advance-permitting accepted result at the current frontier creates the next distinct owner gate.
+
+Repeating OP is legal only while the exact subject/acceptance/coverage binding remains applicable. Current applicability/freshness is rechecked when applying a pending choice; material or UNKNOWN scope/acceptance/authority drift fails closed and routes under the normal upstream rules rather than being disguised as another attempt on the old subject. There is no fixed repeat limit.
 
 RED/repair-required evidence returns to the owning semantic stage; after bounded repair the OP obligation remains unresolved until a compatible applicable OP result establishes acceptance. BLOCKED/UNKNOWN cannot advance and do not create the post-GREEN choice gate. Brainstorming Research additionally binds the exact Brainstorming return owner/obligation and may be reused only when applicability and freshness to that exact subject are proven.
 
@@ -132,19 +145,16 @@ Prior Review evidence is immutable. Reuse is an applicability decision.
 
 Changed dependency, implementation/integration subject, shared contract or acceptance surface invalidates the exact transitive materially affected cone over declared material-input dependencies, acceptance/Review dependencies and relevant shared surfaces. Preserve evidence outside the proven cone. If the cone or impact cannot be bounded safely, widen revalidation to the full potentially affected current acceptance surface rather than assuming narrow applicability.
 
-For OP-backed Plan Review and Execution Package Review:
-- one full discovery wave covers the frozen subject;
-- findings are integrated before ordinary repair;
-- bounded repair is followed by fresh focused independent revalidation;
-- another full wave is required only when applicability/coverage assumptions materially fail.
+For every OP-backed PWV3 boundary, PWV3 requires only the stable caller/result semantics defined in the Orchestration Protocol boundary: exact obligation/binding, an applicable caller-visible terminal result, fail-closed non-advancing outcomes, and the post-result owner gate. Discovery breadth, lane topology, integration, convergence, repair-loop realization, focused revalidation mechanics and any internal wave-count policy remain exclusively Orchestration Protocol Skill responsibility.
 
-The exact mechanics of discovery breadth, lanes and focused revalidation remain OP Skill responsibility.
+This does not weaken ordinary non-OP Review completeness or PWV3's responsibility to decide whether the caller-visible OP result permits semantic advancement.
 
 ## Recovery and external effects
 
 Recovery reconstructs durable truth and does not replay chat/session execution.
 
 - Durable accepted Result suppresses replay.
+- A pending/resolved post-OP owner gate and the current repeat-attempt frontier are reconstructed from canonical durable state. Recovery never re-prompts a resolved gate, reapplies an old choice to a later result, relaunches an already-established repeat attempt, or falls back from a current non-advancing repeat result to an older GREEN.
 - Local unpublished progress may continue only when the exact remote canonical predecessor/head against which that local attempt was based, together with the exact semantic authority inputs consumed by the attempt, is positively verified unchanged. If that relation cannot be proven, Recovery fails closed.
 - Remote canonical state wins over divergent stale local WIP.
 - No mandatory continuous WIP publication.
@@ -164,6 +174,7 @@ Required capabilities include:
 - derive version/evolution impact;
 - guarded publish/readback;
 - effect reconciliation;
+- exact reconstruction/validation of pending or resolved post-OP owner gate and current repeat-attempt frontier;
 - health;
 - runtime/package doctor/handshake.
 
@@ -250,7 +261,7 @@ Before qualified 3.0.0 GA:
 - live Pi/Paseo qualification is GREEN only when the exact frozen candidate demonstrates every applicable required Pi/Paseo realization semantic and declared blocker/failure behavior;
 - at least one real cross-host continuation is proven;
 - Targeted Bug Hunt runs;
-- exactly one required full Global Bug Hunt runs on the frozen qualification subject;
+- one mandatory baseline full Global Bug Hunt obligation/result is required on the frozen qualification subject; additional same-binding Global Bug Hunt attempts are legal only through explicit owner-selected RUN OP AGAIN and are supplemental rather than a second baseline obligation;
 - accepted findings are repaired/revalidated;
 - representative PWV3-on-PWV3 dogfood reaches valid Close and exercises, at minimum, Research/Definition/Planning, independent Plan Review, Execution Prep, dependent sequential Cards, routine and independently reviewed Results, restart/host transition, guarded external effect/readback, ordinary Final Qualification, Targeted/Global Hunts, repair/revalidation, fresh acceptance, final integration/Close and fresh terminal reconstruction;
 - the corrected exact final candidate QF first proves applicability of every required prior qualification item to QF/current acceptance, then receives fresh semantically independent final acceptance under the independence rule above;
@@ -405,11 +416,16 @@ Exact filenames, serialization, helper operation names, API schemas, package nam
 
 No unresolved owner/product choice remains in this draft.
 
-Definition revision 2 received a complete independent OP-backed review with overall RED and 20 canonical blocking findings. Definition revision 3 incorporated and then independently revalidated all FR-01..FR-20 repairs as GREEN. Those repairs remain part of revision 4 and are not reopened merely by this lifecycle delta.
+Definition revision 2 received a complete independent OP-backed review with overall RED and 20 canonical blocking findings. Definition revision 3 incorporated and independently revalidated all FR-01..FR-20 repairs as GREEN. Revision 4 added the owner-fixed 3.0.0 post-OP CONTINUE / RUN OP AGAIN invariant and then received a new complete full independent Definition Review.
 
-Revision 4 adds one owner-fixed 3.0.0 invariant: after every advance-permitting accepted OP result, PWV3 stops for explicit owner choice between CONTINUE and RUN OP AGAIN. This materially changes lifecycle/user-stop semantics while preserving the existing OP caller/result boundary and all prior repairs.
+That revision-4 full review was RED with three canonical bounded findings:
+- R4-F01: durable gate/choice/current-attempt frontier was incomplete;
+- R4-F02: PWV3 still leaked OP-internal discovery/integration/revalidation mechanics;
+- R4-F03: Global Bug Hunt baseline cardinality was ambiguous against owner-selected repeats.
 
-Because lifecycle semantics changed materially, the revision-3 GREEN review/focused-revalidation evidence remains immutable historical evidence but cannot approve revision 4. Before this Definition becomes GREEN, revision 4 requires a new full independent OP-backed Definition Review over the exact revision-4 subject and acceptance surface.
+Definition revision 5 incorporates those three bounded repairs without changing product outcome, lifecycle topology, supported runtimes, mandatory OP boundary set, bridge/self-hosting model, Final Qualification topology or accepted 3.0.0 scope. All prior FR-01..FR-20 repairs remain preserved.
+
+Before this Definition becomes GREEN, revision 5 requires fresh independent focused revalidation of the three repaired surfaces and their direct semantic seams. Another full Definition Review is required only if focused revalidation proves material scope/authority drift, unbounded impact, a materially new defect class, or loss of applicability of the revision-4 full review.
 
 The external architecture Research for `elmakus/orchestration-protocol-skill` remains a separate product effort and is not a gate for authoring this Definition, though a compatible production OP capability remains a 3.0 implementation/qualification dependency.
 
