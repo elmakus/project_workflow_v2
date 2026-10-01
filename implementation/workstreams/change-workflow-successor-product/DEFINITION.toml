@@ -2,7 +2,7 @@ workstream_id = "change-workflow-successor-product"
 source_scope_subject = "workflow-successor-product@4"
 revision = "D05"
 state = "active"
-completeness_audit = "pending_definition_review_repeat_a02"
+completeness_audit = "pending_owner_decision_a02_terminal_independence_waiver"
 premium_a = "not_due"
 
 [requirements]
@@ -64,3 +64,7 @@ path = "implementation/workstreams/change-workflow-successor-product/evidence/PW
 [[decisions]]
 class = "authority"
 path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_D05_DEFINITION_REVIEW_REPEAT_A02_2026-10-01.md"
+
+[[decisions]]
+class = "authority"
+path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_D05_A02_RED_PENDING_TERMINAL_INDEPENDENCE_OWNER_DECISION_2026-10-01.md"
