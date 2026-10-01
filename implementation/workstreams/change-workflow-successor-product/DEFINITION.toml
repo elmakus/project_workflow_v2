@@ -1,6 +1,6 @@
 workstream_id = "change-workflow-successor-product"
 source_scope = "workflow-successor-product@3"
-revision = 2
+revision = 3
 state = "active"
 requirements_locator = "implementation/workstreams/change-workflow-successor-product/DEFINITION.md"
 decision_locators = [
@@ -10,9 +10,10 @@ decision_locators = [
   "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_R3_ROADMAP_VERSIONING_OWNER_DIRECTION_2026-09-30.md",
   "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_R3_VERSION_COMPATIBILITY_OWNER_DECISION_2026-10-01.md",
   "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_R3_OP_SKILL_SEPARATION_2026-10-01.md",
-  "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_R3_BRAINSTORM_FINAL_CHALLENGE_2026-10-01.md"
+  "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_R3_BRAINSTORM_FINAL_CHALLENGE_2026-10-01.md",
+  "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_R3_DEFINITION_REVIEW_R2_RED_CONSUMPTION_2026-10-01.md"
 ]
-completeness_audit = "pending_definition_review"
+completeness_audit = "pending_focused_definition_revalidation"
 unresolved_user_product_choice = false
 premium_a = "not_due"
 premium_a_subject = ""
