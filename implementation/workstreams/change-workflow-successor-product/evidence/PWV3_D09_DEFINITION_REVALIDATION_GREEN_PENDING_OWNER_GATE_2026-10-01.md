@@ -6,7 +6,7 @@ Definition subject: `workflow-successor-product@4`
 Definition revision: `D09`
 Definition semantic subject commit: `1fd9ced61bdb662b6459c4657f8304ec1a5c874d`
 Definition blob: `0291d47b1889b3f19bf20389f7830fb8777bae6d`
-Status: **GREEN RESULT ACCEPTED / PENDING HUMAN OWNER DISPOSITION**
+Status: **GREEN RESULT ACCEPTED / OWNER DISPOSITION = CONTINUE**
 
 ## Exact caller-visible OP result
 
@@ -37,7 +37,7 @@ Exactly one human owner disposition is required:
 - **CONTINUE** — consume this exact GREEN once for forward progress, complete Definition acceptance and derive the next canonical obligation;
 - **RUN OP AGAIN** — close this exact GREEN for forward authority while preserving it as immutable evidence, remain at the same Definition Review OP boundary and launch one fresh repeat over the same exact D09 subject/acceptance binding.
 
-Current disposition: **PENDING**
+Current disposition: **CONTINUE**
 
 Until resolved:
 - Definition remains active;
@@ -45,3 +45,17 @@ Until resolved:
 - Premium A is not due;
 - Strategic Planning remains unauthorized;
 - no historical GREEN or prior owner choice may substitute for this exact current result/gate.
+
+
+## Durable owner disposition
+
+Owner disposition: **CONTINUE**
+
+The exact integrated GREEN at project-research commit `6701d360b98689ae7e6ad12578494d1d8d6c02ce` is consumed exactly once for forward progress.
+
+Consequences:
+- the mandatory Definition Review obligation for D09 is satisfied;
+- completeness audit becomes GREEN;
+- Definition D09 becomes GREEN;
+- Premium A becomes due;
+- Strategic Planning remains unauthorized until Premium A is explicitly satisfied.
