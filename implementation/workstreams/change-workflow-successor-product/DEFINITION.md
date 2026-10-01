@@ -1,8 +1,8 @@
 # Definition — Project Workflow V3 successor product
 
-Status: DRAFT / revision-8 bounded repair of D07 A03 repeat Definition Review; pending fresh focused revalidation; external OP Skill Research is non-blocking  
+Status: DRAFT / revision-9 bounded residual repair of D08 A03 focused revalidation; pending fresh focused revalidation; external OP Skill Research is non-blocking  
 Subject: `workflow-successor-product@4`  
-Definition revision: 8  
+Definition revision: 9  
 Initial product release: `3.0.0`
 
 ## Product outcome
@@ -66,7 +66,7 @@ Each current OP attempt has caller-visible semantic phases, independent of repre
 
 Dispatch/resume for the exact current attempt must be idempotent or durably acknowledged/read back. UNKNOWN occurrence never permits minting or blindly dispatching another attempt. Recovery from DUE may dispatch that same exact attempt; Recovery from IN_PROGRESS resumes/queries that same exact attempt; Recovery from TERMINAL consumes only its bound terminal result under current applicability rules.
 
-The **first** attempt frontier is established when an exact OP obligation first becomes dispatchable. A non-advancing TERMINAL result closes that attempt for advancement. If repair or upstream correction changes the subject/binding, the resulting exact unresolved OP obligation establishes one new first/current attempt for that new binding. If the same exact obligation remains due after a recoverable non-advancing terminal result and the blocker/UNKNOWN cause is positively resolved without semantic drift, the owning semantic stage may establish exactly one durable successor attempt frontier on the same binding; the predecessor attempt remains immutable history and can never regain currentness.
+The **first** attempt frontier is established when an exact OP obligation first becomes dispatchable. A non-advancing TERMINAL result closes that attempt for advancement. If repair or upstream correction changes the subject/binding, the resulting exact unresolved OP obligation establishes one new first/current attempt for that new binding. If the same exact obligation remains due after a recoverable non-advancing terminal result and the blocker/UNKNOWN cause is positively resolved without semantic drift, the owning semantic stage **must establish exactly one durable successor attempt frontier on the same binding as the sole next routing transition before any redispatch**; the predecessor attempt remains immutable history and can never regain currentness.
 
 When an OP operation returns the caller-visible terminal result that the compatible PWV3↔OP contract defines as advance-permitting for that exact bound obligation, PWV3 must establish exactly one real human user/workstream-owner authority gate before forward continuation. No agent, runtime, semantic-stage owner or coordinator may infer, default or synthesize either choice.
 
@@ -494,7 +494,11 @@ Definition revision 8 consumes that A03 RED and the owner decisions **OD-01=1A, 
 
 These repairs preserve the accepted lifecycle stage set, mandatory OP boundary set, owner-fixed CONTINUE / RUN OP AGAIN gate, supported runtimes, OP/PWV3 ownership split, release qualification ordering, versioning policy, final integration and Close semantics while making the previously under-specified currentness/authority transitions total.
 
-Before this Definition becomes GREEN, revision 8 requires fresh independent focused revalidation of A03-CF01..CF07 closure and their direct seams. Escalate to another complete full Definition Review only if focused revalidation finds material scope/authority drift, unbounded impact, a materially new defect class, loss of applicability of A03 evidence, or a change to the accepted product/lifecycle surface.
+Fresh focused revalidation of revision 8 closed A03-CF02..CF07 and preserved owner decisions OD-01=1A, OD-02=2B and OD-03=3A, but remained RED on one residual incomplete closure of A03-CF01: successor-frontier creation after a positively resolved same-binding recoverable non-advancing terminal result was permissive (`may establish`) rather than deterministic.
+
+Definition revision 9 applies only that residual repair: once the same exact OP obligation remains due and the recoverable blocker/UNKNOWN cause is positively resolved without semantic drift, the owning semantic stage must establish exactly one durable same-binding successor attempt frontier as the sole next routing transition before any redispatch. This preserves the one-current-frontier invariant, immutable predecessor history, UNKNOWN/no-blind-retry rules and current-result-only owner-gate creation.
+
+Before this Definition becomes GREEN, revision 9 requires fresh independent focused revalidation only of this residual A03-CF01 closure and its direct universal-attempt/Recovery seam. A new complete full Definition Review is required only if that focused revalidation finds material scope/authority drift, unbounded impact, a materially new defect class, loss of A03/D08 applicability, or a change to the accepted product/lifecycle surface.
 
 The external architecture Research for `elmakus/orchestration-protocol-skill` remains a separate product effort and is not a gate for authoring this Definition, though a compatible production OP capability remains a 3.0 implementation/qualification dependency.
 
