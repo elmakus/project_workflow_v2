@@ -1,5 +1,5 @@
 workstream_id = "change-workflow-successor-product"
-state = "complete"
+state = "consumed"
 origin_role = "brainstorming"
 origin_subject = "workflow-successor-product@5"
 return_target = "brainstorming"
