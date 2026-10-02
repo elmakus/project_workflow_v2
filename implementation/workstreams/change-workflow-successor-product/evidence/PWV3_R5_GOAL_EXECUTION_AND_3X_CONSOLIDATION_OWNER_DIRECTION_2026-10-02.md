@@ -38,31 +38,63 @@ This includes the current Definition's deferred/evolution candidates such as:
 
 Explicitly removed/out-of-roadmap product ideas remain excluded unless separately reopened by owner authority. The research must distinguish “move into 3.0” from impossible future-only semantics that need reformulation rather than literal implementation.
 
-### 2. Add a second execution mode using Pi `/goal`
+### 2. Add a second autonomous goal execution mode; provider/runtime is NOT selected yet
 
 PWV3 must support an execution choice in addition to native PWV3 Card-by-Card execution:
 
 - **native PWV3 execution** — the existing deterministic PWV3 execution path;
-- **`/goal` execution** — hand the accepted implementation objective/package to a Pi goal-mode runtime that autonomously implements the product, runs tests, fixes known/discovered implementation bugs within accepted scope, and continues until its exact completion/stop condition is met.
+- **goal execution** — hand the accepted implementation objective/package to a qualified goal-capable Pi/Paseo realization that autonomously implements the product, runs tests, repairs implementation defects within accepted scope, and continues until its exact completion/stop condition is met.
 
-The target owner intent for `/goal` mode is:
-- build/implement the accepted functionality;
-- run and repair tests;
-- fix known implementation defects found during execution when doing so does not require upstream product/Definition/Plan authority changes;
-- deliver a working candidate;
-- stop before the independent **Global Bug Hunt** boundary;
-- Global Bug Hunt remains a separate ChatGPT/OP operation after goal execution rather than being delegated to `/goal`.
+No specific implementation is preselected. `pi-mono-goal` is one candidate to evaluate, not accepted product authority. Research must compare it with other current Pi/Paseo goal/autonomous execution implementations and with a bounded custom/forked adapter/extension if existing options are insufficient.
 
-No final decision is yet made on whether `/goal` begins after accepted Plan Review or only after accepted Execution Package Review.
+### 3. Subagent-capable goal execution is mandatory
 
-No final decision is yet made on whether Plan / Execution Package artifacts must differ by execution mode, or whether one execution-neutral package can support both and the mode can be selected only immediately before execution.
+The selected goal execution path must be able to use **subagents / delegated workers**, not only one main agent loop.
+
+Research must establish:
+- which candidate goal runtimes can spawn/use Pi/Paseo subagents today;
+- whether delegation is native, extension-provided or requires a PWV3 adapter;
+- how subagent work is scoped, isolated, merged/reconciled and recovered;
+- whether subagents can be used for implementation, testing, verification and bounded repair without becoming separate PWV3 semantic owners;
+- what limits are needed to avoid uncontrolled recursive delegation.
+
+A candidate that fundamentally cannot support qualified subagent delegation is not sufficient for the target PWV3 goal mode unless a realistic adapter/extension closes that gap.
+
+### 4. Goal should carry work as far as safely possible; independent Global Bug Hunt stays outside
+
+The target owner preference is that goal execution should do **all normal autonomous delivery work** after its launch boundary:
+- implementation;
+- test creation/execution;
+- fixing known/discovered implementation bugs that do not require upstream semantic authority changes;
+- routine verification/revalidation;
+- the non-independent portions of Final Qualification that can safely be automated inside the execution engine;
+- producing a working candidate ready for the independent Global Bug Hunt.
+
+The owner wants the **independent Global Bug Hunt** to remain a separate ChatGPT/OP operation outside goal execution. Research must determine the exact split for Targeted Bug Hunt, ordinary Final Qualification checks, terminal acceptance, and any repair/requalification loop after Global Bug Hunt findings.
+
+The preferred operator experience is that the human manually performs only the independent Global Bug Hunt boundary, while deterministic/authorized repair-and-requalification work may route back through goal execution if semantically legal.
+
+### 5. Strong preference for one shared Plan / Execution artifact and late execution-mode choice
+
+The owner strongly prefers **no separate goal-specific Plan or Execution Package**.
+
+Research should first attempt to prove a design in which:
+- the same reviewed Plan and/or Execution Package is valid for both `native_pwv3` and goal execution;
+- execution mode is selected as late as safely possible;
+- the user does not have to predeclare the mode during Planning;
+- the same launchable artifact/prompt can be used either with native PWV3 execution or pasted/invoked into a goal runtime;
+- any mode-specific data is limited to a small late-bound runtime launch profile rather than a separate semantic Plan/Execution Package.
+
+If exact evidence shows full neutrality is unsafe or impossible, Research must identify the minimum mode-specific delta and why it cannot remain late-bound.
+
+No final decision is yet made on whether goal begins after accepted Plan Review or only after accepted Execution Package Review.
 
 ## Required research questions
 
 Research must establish, from official/upstream evidence, actual runtime/project evidence, tracker/discussion evidence and practitioner/community evidence:
 
 1. What current Pi `/goal` implementations actually guarantee: persistence, auto-continuation, branch/session behavior, completion/blocking, testing/verification behavior, safety limits and recovery.
-2. Whether a goal can reliably consume a detailed reviewed Plan directly, or whether it needs a concretized Execution Package/task decomposition before autonomous work.
+2. Whether any qualified goal-capable runtime (not only pi-mono-goal) can reliably consume a detailed reviewed Plan directly, or whether it needs a concretized Execution Package/task decomposition before autonomous work.
 3. Which boundary is safer and simpler:
    - launch `/goal` after accepted Plan Review and let it perform execution-prep-like decomposition itself; or
    - launch only after accepted Execution Package Review and make `/goal` a pure execution engine.
