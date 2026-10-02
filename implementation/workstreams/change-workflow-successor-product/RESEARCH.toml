@@ -16,15 +16,15 @@ weight = "primary"
 
 [[sources]]
 class = "project_runtime"
-status = "pending"
+status = "checked"
 weight = "direct"
 
 [[sources]]
 class = "tracker_discussion"
-status = "pending"
+status = "checked"
 weight = "supporting"
 
 [[sources]]
 class = "practitioner_community"
-status = "pending"
+status = "checked"
 weight = "supporting"
