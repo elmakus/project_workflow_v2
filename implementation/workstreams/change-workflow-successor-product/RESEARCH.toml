@@ -1,17 +1,17 @@
 workstream_id = "change-workflow-successor-product"
-state = "active"
+state = "complete"
 origin_role = "brainstorming"
 origin_subject = "workflow-successor-product@5"
 return_target = "brainstorming"
 return_reconciliation = "pending"
-return_result = ""
-finding = ""
-limitations = ""
-conflicts = ""
+return_result = "elmakus/project-research@0bdfccd332b78caa0795283ec64d366def01b511:projects/project_workflow_v2/successor-product/v3-r5-goal-execution-and-3x-consolidation-research-r1/FINAL_SYNTHESIS.md#blob=94753f446542d03171f81a2827cb188420cf1df2"
+finding = "Integrated 20-lane formal Research supports one provider-neutral execution architecture: one reviewed Execution Package shared by native_pwv3 and goal; late mode choice after Execution Package Review; mandatory qualified subagents for goal; goal owns implementation, tests, bounded repair and non-independent Final Qualification through pre-Global readiness; independent Global Bug Hunt stays external; compatible-evolution foundations move into 3.0 except performance-only material-fingerprint optimization."
+limitations = "No production goal provider bundle is selected or qualified yet; provider choice remains a conformance result against the proposed PGC suite. Exact future contract readers/converters cannot exist before future schemas."
+conflicts = "Resolved in integration: post-Execution-Package Review beats post-Plan launch; reviewed Execution Package is the common direct launch artifact; provider completion is non-authoritative; Targeted Qualification becomes internal/non-independent by default; Global remains the external independent hunt; provider selection is deferred to conformance rather than owner guess."
 
 [[sources]]
 class = "official_upstream"
-status = "pending"
+status = "checked"
 weight = "primary"
 
 [[sources]]
