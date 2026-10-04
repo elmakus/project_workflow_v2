@@ -12,7 +12,7 @@ premium_a = "satisfied"
 premium_a_subject = "definition:D12|planning-cycle:1"
 premium_b = "satisfied"
 premium_b_subject = "elmakus/project_workflow_v2@c67645f7cd0a0887003da178bc8eaaf44357668b:planning/PWV3_3_0_MASTER_PLAN.md@ba2990d773cdd30673f2ce23a6bc74700c6c56cf"
-premium_c = "due"
+premium_c = "satisfied"
 premium_c_subject = "elmakus/project_workflow_v2@c67645f7cd0a0887003da178bc8eaaf44357668b:planning/PWV3_3_0_MASTER_PLAN.md@ba2990d773cdd30673f2ce23a6bc74700c6c56cf"
 
 [subject]
