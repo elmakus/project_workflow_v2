@@ -6,7 +6,7 @@ Boundary: mandatory OP Definition Review / focused revalidation
 Definition subject: `workflow-successor-product@6`
 Definition revision: `D11`
 Current attempt identity: `D11-OP-DEFREV-R01`
-Phase: **DUE**
+Phase: **IN_PROGRESS**
 
 ## Exact obligation
 
@@ -40,8 +40,30 @@ Orchestration package:
 - integration branch: `review/pwv3-definition-d11-r1-integration`
 - expected result: `projects/project_workflow_v2/successor-product/v3-definition-revalidation-d11-r1/FINAL_REVALIDATION.md`
 
-Publishing this orchestration pointer does not change the frozen D11 Definition or Definition-state blobs and does not by itself acknowledge review execution. Phase remains **DUE** until an exact current lane obtains valid fenced ownership and begins work.
+Publishing this orchestration pointer does not change the frozen D11 Definition or Definition-state blobs and does not by itself acknowledge review execution. The exact OP execution has been positively acknowledged by valid fenced lane claims/results; phase is **IN_PROGRESS** until one caller-visible integrated result is durably bound and positively read back.
 
 ## Independence
 
 The context that authored the D11 repair is not eligible to independently accept D11. Execution of this attempt must therefore occur through a fresh independent OP review context/harness.
+
+
+## Positive lane execution readback
+
+Observed after the user reported lane completion on 2026-10-04.
+
+All eight required manifest lanes have valid fenced claims from the exact research base/tree, result HEADs descending from those claims, and exactly their declared lane outputs after claim:
+
+| Lane | Claim | Result HEAD | Output blob | Disposition |
+|---|---|---|---|---|
+| W00 | `920aeb3c0edc8d03e39ebc62e2fd6dd5f3b00952` | `33fdbd5285f438d985a1cc4fa4656d9f513d9bb2` | `4d89734df6ca4b71f290b530332851769975a7f6` | RED |
+| A01 | `91d6e44a202f48c5d4a4c091c9ce412e9f9660ed` | `299f4d7f25d1af696686d3a81ee44ef7558e5752` | `f10041d3f7776aa5e09ceaf4fc5b80c7637a045b` | RED |
+| A02 | `2dcf278037ee835cc080df00c3c4f4a779db4c67` | `4b2b9d4c0700de01f21b57811201061f613467c1` | `9cdbb8db94b9dcc5a29aa4cc44f9ee4cc788ebb3` | RED |
+| B01 | `80a7faa1649abd6a6591d603151cdd8f14a4b845` | `1d20af5bddbf2270fa57fff5ce31c4a22e2c7b90` | `7f788e8d7d2632680f56bf55ac1cdcb5c9897dc7` | GREEN |
+| C01 | `b456bbf3544b1186eb93554eb204edf6f997cf4c` | `455157cdfea64ce60503f0f10bdd354c2ed60680` | `195e3e0ddeab41c576286947f7d78af1a65d334d` | GREEN |
+| C02 | `74a05afcffbab6420aa3b3ec9c326f5122c7aba3` | `2a3432b79f0cc7da9378ac6063aa0e282886e722` | `169086eb13fac9165a6fe51e40c9e6a76a197d6d` | GREEN |
+| D01 | `14641f3aa498f0f1f934c95c8b4a1aafd5610727` | `b0232623323f6fcc855bca1d6f82b641d88749f7` | `78b01ea4f46ed8e06f6232612e0bdf4de6768de3` | GREEN |
+| R00 | `ba0bf2721f0d7a82579728db0eaf5945454de454` | `9fb65e667b47d86683001e05f729f77d460fc860` | `53c82807792e9057b497af5a037eb977e710bc58` | RED |
+
+Pre-integration observation only: the four RED lanes independently converge on one bounded residual D10-F02 ambiguity in the normative `before closure` Global-repeat summary; all report no full-wave escalation trigger. This observation is not the caller-visible integrated OP result.
+
+The next OP obligation is the package's one fresh integration chat. R01 remains non-terminal until that fresh integrator publishes and positively reads back `FINAL_REVALIDATION.md`.
