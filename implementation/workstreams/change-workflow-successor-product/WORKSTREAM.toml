@@ -13,6 +13,8 @@ authority = [
   { class = "authority", path = "workflow/AUTHORITY.md" },
   { class = "authority", path = "workflow/CONTINUATION.md" },
   { class = "authority", path = "workflow/DEFINITION.md" },
+  { class = "authority", path = "workflow/PLANNING.md" },
+  { class = "authority", path = "workflow/PLAN_REVIEW.md" },
   { class = "authority", path = "workflow/USER_STOP.md" },
 ]
 
@@ -32,3 +34,7 @@ path = "implementation/workstreams/change-workflow-successor-product/RESEARCH.to
 [definition]
 class = "definition"
 path = "implementation/workstreams/change-workflow-successor-product/DEFINITION.toml"
+
+[planning]
+class = "planning"
+path = "implementation/workstreams/change-workflow-successor-product/PLANNING.toml"
