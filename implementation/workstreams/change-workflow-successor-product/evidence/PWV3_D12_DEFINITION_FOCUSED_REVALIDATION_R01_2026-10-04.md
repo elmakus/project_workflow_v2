@@ -6,7 +6,7 @@ Boundary: mandatory OP Definition Review / single-seam focused revalidation
 Definition subject: `workflow-successor-product@6`
 Definition revision: `D12`
 Current attempt identity: `D12-OP-DEFREV-R01`
-Phase: **DUE**
+Phase: **TERMINAL**
 
 ## Exact obligation
 
@@ -50,3 +50,19 @@ One-off independent OP package:
 - expected caller-visible result: `projects/project_workflow_v2/successor-product/v3-definition-revalidation-d12-r1/FINAL_REVALIDATION.md`
 
 This is intentionally a single fresh independent reviewer with no lane swarm and no separate integrator because only one bounded residual seam remains.
+
+
+## Terminal independent review readback
+
+Observed on 2026-10-04:
+- review repository: `elmakus/project-research`
+- review branch: `review/pwv3-definition-d12-r1`
+- review commit: `1704c68a3e2f2839f3dd83adbaece45281104dd2`
+- result path: `projects/project_workflow_v2/successor-product/v3-definition-revalidation-d12-r1/FINAL_REVALIDATION.md`
+- result blob: `e386fb1bc888fd671e99409cdf274e365a36303b`
+- caller-visible disposition: **GREEN**
+- residual `D11-R01-F01 / D10-F02`: **CLOSED**
+- D10-F01 and D10-F03..F09: remain **CLOSED/APPLICABLE**
+- full-wave escalation: **NO**
+
+This exact GREEN is advance-permitting evidence for the non-Global Definition Review boundary. It does not itself authorize forward continuation. The mandatory exact-result human owner gate is now pending.
