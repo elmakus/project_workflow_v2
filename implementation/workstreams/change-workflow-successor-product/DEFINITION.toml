@@ -2,7 +2,7 @@ workstream_id = "change-workflow-successor-product"
 source_scope_subject = "workflow-successor-product@6"
 revision = "D10"
 state = "active"
-completeness_audit = "pending_full_definition_review_d10_a01"
+completeness_audit = "red_d10_a01_pending_owner_decision_f02_and_bounded_repairs"
 premium_a = "not_due"
 
 [requirements]
