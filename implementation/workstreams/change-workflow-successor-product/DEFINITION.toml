@@ -3,7 +3,7 @@ source_scope_subject = "workflow-successor-product@6"
 revision = "D12"
 state = "green"
 completeness_audit = "green"
-premium_a = "due"
+premium_a = "satisfied"
 
 [requirements]
 class = "authority"
