@@ -63,3 +63,18 @@ Observed on 2026-10-04:
 - D10-F02 requires an owner decision; the other findings are bounded Definition repairs unless repair exposes a new owner choice.
 
 No historical GREEN may advance D10. Premium A remains not due and Strategic Planning remains unauthorized.
+
+
+## Terminal integration readback
+
+Observed on 2026-10-04:
+- integration branch: `review/pwv3-definition-d10-r1-integration`
+- integration commit: `722c321f3386fc8205257436420a985d70ff4370`
+- result path: `projects/project_workflow_v2/successor-product/v3-definition-review-d10-r1/FINAL_REVIEW.md`
+- result blob: `40beb0406bb0facfe6b79e9095bc200039a45f7f`
+- caller-visible disposition: **RED**
+- all eight required lanes admitted;
+- nine canonical blocking findings D10-F01..D10-F09;
+- D10-F02 requires OWNER_DECISION before bounded Definition repair can complete.
+
+This exact A01 result is the sole terminal result for the current D10 Definition Review attempt. Strategic Planning remains unauthorized.
