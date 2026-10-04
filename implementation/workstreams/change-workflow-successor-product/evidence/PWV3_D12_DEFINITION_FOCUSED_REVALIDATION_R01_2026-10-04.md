@@ -31,3 +31,22 @@ The attempt becomes IN_PROGRESS only after positive acknowledgement that this ex
 The context that authored the D12 repair is not eligible to independently accept D12. This residual revalidation must execute in one fresh independent OP review context/harness.
 
 No swarm is required for this single residual seam. Strategic Planning remains unauthorized.
+
+
+## Orchestration package
+
+Exact frozen review subject:
+- consumer commit: `e368521578af4858858849da9b6a63904d761844`
+- Definition blob: `f8cbe2416de455c45adb2319bfd82a97b8b43360`
+- Definition-state blob: `bd88507c5ba3c9c0b1ff2a1b7575baf7a0d2ead6`
+
+One-off independent OP package:
+- repository: `elmakus/project-research`
+- package revision: `26b58814b87a114f2f2bff971def67b782179072`
+- package root: `projects/project_workflow_v2/successor-product/v3-definition-revalidation-d12-r1`
+- research base: `bfe39180d13bd9bb390528fb6b3d0ed04dee239d`
+- research-base tree: `e42278ebf2c8b3e5a6814e0cd4b2378cfd6166e2`
+- review branch: `review/pwv3-definition-d12-r1`
+- expected caller-visible result: `projects/project_workflow_v2/successor-product/v3-definition-revalidation-d12-r1/FINAL_REVALIDATION.md`
+
+This is intentionally a single fresh independent reviewer with no lane swarm and no separate integrator because only one bounded residual seam remains.
