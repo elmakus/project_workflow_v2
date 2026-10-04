@@ -1,0 +1,2 @@
+# EP1/1: immutable snapshots preserve source bytes and Markdown hard line breaks.
+snapshots/** -text whitespace=-blank-at-eol

@@ -1,0 +1,157 @@
+{
+  "artifact_kind": "construction-card-contracts",
+  "producing_contract": "EP1/1",
+  "common_contract": "README.md#3-stable-card-contract-and-inputs",
+  "total_order": ["PWV3-S01", "PWV3-S02", "PWV3-S03", "PWV3-S04", "PWV3-S05", "PWV3-S06", "PWV3-S07", "PWV3-S08", "PWV3-S09", "PWV3-S10", "PWV3-S11", "PWV3-S12", "PWV3-S13"],
+  "cards": [
+    {
+      "id": "PWV3-S01", "plan_slot": "S01", "milestone": "M1",
+      "title": "Native recipient, contracts and corpus",
+      "scope": "Initialize recipient construction branch and Node ESM test/package skeleton; define native artifact envelopes and per-kind versions, deterministic JSON/UTF-8/path/number rules, parsed versus verified identity interfaces, checkpoint ownership/transition tables and conformance-scenario schema. Import exact self-contained EP1 authority/provenance and complete coverage manifest without turning archived PWV2 state into native state.",
+      "excluded": "No runtime lifecycle implementation, OP dispatch, host installation, GA release or production donor module copy. Scenario definitions for later components are requirements, not already GREEN product tests.",
+      "writes": ["package.json", "package-lock.json", ".gitignore", "README.md", "src/contracts/", "schemas/", "test/support/", "test/slots/s01.test.mjs", "test/corpus/", "docs/contracts/", "docs/provenance/", "construction/package/EP1/", ".github/workflows/test.yml"],
+      "material_inputs": [],
+      "acceptance": ["Real clean clone installs/builds/tests on qualified Node LTS with minimum Node 22 APIs; no donor fetch/import or hidden local dependency.", "Every planned durable artifact kind has an explicit producing version, identity/ownership contract and transition table; duplicate-key JSON, ambiguous encoding, unsupported numbers and unsafe paths reject with golden vectors.", "All 36 families, 20 guards, 23 removed negatives and ten D12 seams have concrete scenario ownership; D12 C01-C26 all covered. Original authority snapshots retain exact bytes and decision order.", "Licence/provenance audit records native original code versus historical documents/scenarios, no unlicensed source import; removed machinery has structural guards."],
+      "tests": ["node --test test/slots/s01.test.mjs", "npm test"],
+      "review": "ordinary_required", "dependency_gates": ["DEP-PUBLICATION"],
+      "delegation_required_unit": null
+    },
+    {
+      "id": "PWV3-S02", "plan_slot": "S02", "milestone": "M1",
+      "title": "Verified identity and fenced publication",
+      "scope": "Implement actual Git object/repository/path/type resolution, safe write envelopes, independent consumer/package/object freshness, verified remote observations, expected-old atomic publication with positive readback, local-versus-remote admission and bounded effect transport interfaces.",
+      "excluded": "No boolean-only identity, check-then-unfenced mutation, silent stale-WIP rebase, native lifecycle or GitHub integration qualification claim.",
+      "writes": ["src/identity/", "src/publication/", "src/ports/git/", "test/support/git/", "test/slots/s02.test.mjs", "docs/contracts/identity-publication.md"],
+      "material_inputs": ["PWV3-S01"],
+      "acceptance": ["Disposable real Git repos prove commit:path/blob and tree identity, repository mismatch, missing object, dirty bytes, symlink and unsafe write denial.", "Two writers against one expected predecessor cannot both succeed; real transport fence rejects stale update. Before/after mutation/ack/readback crash cases reconcile actual remote bytes with no blind replay.", "Actual writer validates bytes, publishes, positively reads back and fresh process consumes without producer memory; consumer/package/pointed-object freshness fail independently.", "Safe local descendant resumes only with unchanged remote predecessor and semantic inputs; divergence or UNKNOWN is preserved for recovery."],
+      "tests": ["node --test test/slots/s02.test.mjs"],
+      "review": "ordinary_required", "dependency_gates": [],
+      "delegation_required_unit": {"condition": "goal-capable Pi/Paseo invocation", "scope": "Implement bounded verified Git object resolver and its disposable-repository negative controls under accepted S01 interfaces.", "writes": ["src/identity/", "test/slots/s02.test.mjs"], "reads": ["EP1", "accepted PWV3-S01 Result and contracts"], "evidence": "Exact patch/commit, command results, real object controls and positively observed caller-scoped child relationship; coordinator verifies and incorporates the useful implementation.", "stops": "No recursive delegation, ref publication, shared authority/schema rewrite or global continuation; report interface conflict to coordinator."}
+    },
+    {
+      "id": "PWV3-S03", "plan_slot": "S03", "milestone": "M2",
+      "title": "Immutable evidence primitives",
+      "scope": "Native Result, exact accepted-input, Review/history and effect intent/attempt/readback artifacts; producing-reader validation, exact acceptance identity, material independence and ordinary waiver honesty.",
+      "excluded": "No implicit terminal fallthrough, rewriting terminal attempts, old GREEN fallback, blanket OP/QF waiver or runtime identity as authority.",
+      "writes": ["src/evidence/", "src/effects/", "test/slots/s03.test.mjs", "docs/contracts/evidence-effects.md"],
+      "material_inputs": ["PWV3-S01", "PWV3-S02"],
+      "acceptance": ["Malformed/arbitrary/nonexistent Result subject and missing or changed evidence reject independently; immutable Result and append-only Review terminal history verified.", "Subject and acceptance mutations each invalidate reuse; pending/in-progress remain nonterminal; unsupported states fail closed; authorship and exact waiver behavior are exhaustive.", "Intent precedes attempt; idempotency binds exact intent, not identical parameters. Expected/no/unexpected/UNKNOWN readback branches and all crash windows tested.", "Durable Result suppresses replay but not acceptance; positive historical fixtures validated by declared producing reader."],
+      "tests": ["node --test test/slots/s03.test.mjs"], "review": "ordinary_required", "dependency_gates": [], "delegation_required_unit": null
+    },
+    {
+      "id": "PWV3-S04", "plan_slot": "S04", "milestone": "M2",
+      "title": "Checkpoint, derive-next and recovery",
+      "scope": "One versioned current/recovery checkpoint and pure relational owner validation/derive-next; exact Research return, explicit-stop precedence, continuation/no-progress, universal first/current/successor OP frontier and non-Global human gate cuts.",
+      "excluded": "No Task Board mirror, runtime DB, product scheduler, OP internals, inferred human choice or production OP qualification from doubles.",
+      "writes": ["src/checkpoint/", "src/kernel/", "src/recovery/", "src/op/consumer-contract.mjs", "test/support/op-double.mjs", "test/slots/s04.test.mjs", "docs/contracts/owner-frontiers.md"],
+      "material_inputs": ["PWV3-S01", "PWV3-S02", "PWV3-S03"],
+      "acceptance": ["Table/property tests derive exactly one legal owner or fail closed on orphan/contradictory state, even with runnable downstream work; stops outrank execution.", "Research return consumes once; worker/role completion continues after fresh reread; claimed unchanged successful reconciliation and evidence-free cycles reject without fixed semantic retry limits.", "Labelled OP doubles exercise first frontier before dispatch, DUE/IN_PROGRESS/TERMINAL acknowledgment loss, same-attempt resume and no duplicate under UNKNOWN.", "Resolved same-binding non-advancing terminal establishes exactly one successor before redispatch. CONTINUE/repeat choices require exact published human evidence; resolved repeat revalidates at its single cut and cannot restore old GREEN."],
+      "tests": ["node --test test/slots/s04.test.mjs"], "review": "ordinary_required", "dependency_gates": [], "delegation_required_unit": null
+    },
+    {
+      "id": "PWV3-S05", "plan_slot": "S05", "milestone": "M2",
+      "title": "Native planning and portable package lifecycle",
+      "scope": "Brainstorm/Definition/Plan/Package writers, logical-slot refinement, native acceptance and mandatory OP boundary admission, exact freeze/applicability and composed total-order/material-input/acceptance graph validation.",
+      "excluded": "No Premium lifecycle, execution-mode field, implicit package Review applicability, planning inside provider-local state or invention of external OP schema.",
+      "writes": ["src/lifecycle/preexecution/", "src/packages/", "src/graph/", "test/slots/s05.test.mjs", "docs/contracts/plan-package.md"],
+      "material_inputs": ["PWV3-S01", "PWV3-S02", "PWV3-S03", "PWV3-S04"],
+      "acceptance": ["Actual writers through fenced publication/readback/fresh derive-next prove lifecycle transitions and exact subject/acceptance history.", "Joint cycle counterexamples include acceptance depending on downstream work, not merely an invalid order graph; valid sequential logical Results bind later without fake hashes.", "All materialized Cards have explicit decidable Review, scope/write/evidence/dependency boundaries; same exact package admitted by different invocation envelopes without changing semantics.", "Earliest upstream meaning wins on owner/product, Definition, strategy or bounded package change; required OP gates cannot be replaced by ordinary local review."],
+      "tests": ["node --test test/slots/s05.test.mjs"], "review": "ordinary_required", "dependency_gates": [], "delegation_required_unit": null
+    },
+    {
+      "id": "PWV3-S06", "plan_slot": "S06", "milestone": "M3",
+      "title": "Sequential acceptance and affected-cone repair",
+      "scope": "One stable current Card through implementation/Result/checks/Review/revalidation; semantic-preserving subordinate refinement, complete ordinary Review, nonrecursive worker envelopes, causal repair and exact materially affected cone/proof-based reuse.",
+      "excluded": "No early dependency release, renamed repair Card, second repair schedule, blanket evidence reset, opaque narrow cone or provider-completion authority.",
+      "writes": ["src/execution/", "src/impact/", "src/workers/", "test/slots/s06.test.mjs", "docs/contracts/execution-impact.md"],
+      "material_inputs": ["PWV3-S01", "PWV3-S02", "PWV3-S03", "PWV3-S04", "PWV3-S05"],
+      "acceptance": ["Restart re-admits Card/authority/exact accepted inputs; Result before required Review never advances. Implementation-only RED repairs same stable Card with new Result and invalidated checks.", "Review completes entire declared bounded surface after first defect; material authorship independence/waiver remains honest and boundary-scoped.", "Input, acceptance and shared-surface changes propagate transitive impact; diagnostics name invalidated evidence/edges/preserved boundary/widening reasons and UNKNOWN conservatively widens.", "Qualification findings reopen earliest affected completed Card in total order; every changed implementation gets new Result and all invalidated acceptance before qualification resumes.", "Worker envelope rejects recursive/out-of-scope writes, semantic Card splits and authority changes; coordinator consumes exact readback, not child completion."],
+      "tests": ["node --test test/slots/s06.test.mjs"], "review": "ordinary_required", "dependency_gates": [],
+      "delegation_required_unit": {"condition": "goal-capable Pi/Paseo invocation", "scope": "Implement transitive material/acceptance/shared-surface affected-cone algorithm and isolated positive/negative controls against accepted interfaces.", "writes": ["src/impact/", "test/slots/s06.test.mjs"], "reads": ["EP1", "accepted PWV3-S01 through PWV3-S05 Results and contracts"], "evidence": "Exact implemented patch/commit, bounded versus UNKNOWN cone tests, preserved-outside proof cases and observed actual caller-scoped delegation; coordinator verifies useful integration.", "stops": "No recursive delegation, package/dependency policy changes, checkpoint writes or global continuation; ambiguous impact contract returns to coordinator."}
+    },
+    {
+      "id": "PWV3-S07", "plan_slot": "S07", "milestone": "M3",
+      "title": "Complete compatible-evolution foundations",
+      "scope": "Historical-reader dispatch/current projection, explicit compatibility matrix, multiple synthetic generations/conversion, retirement/compaction, one guarded adoption/migration writer cut, downgrade refusal and subordinate material-fingerprint acceleration.",
+      "excluded": "No production future schema fabrication, legacy V2 reader, automatic rollback controller, second compatibility state DB or fingerprint authority.",
+      "writes": ["src/evolution/", "src/fingerprints/", "test/fixtures/evolution/", "test/slots/s07.test.mjs", "docs/contracts/evolution.md"],
+      "material_inputs": ["PWV3-S01", "PWV3-S02", "PWV3-S03", "PWV3-S04", "PWV3-S05", "PWV3-S06"],
+      "acceptance": ["Every historical positive fixture validates with its declared producing reader; current projection/multi-generation conversion and unknown-newer/malformed rejection proven without pretending synthetic generations shipped.", "Bind exact source/target package/helper/contract sets, proof and adoption/migration mode. Migration has exact-source dry-run/staging/idempotent readback before fenced writer cut.", "Pre-cut source only, cut-UNKNOWN blocks both unauthorized mutation paths, post-cut target only; preserve immutable history and required readers, prove retirement/downgrade support.", "Normal patch preserves 3.0 contracts; fingerprint optimized and conservative paths agree, with incomplete input/version/collision/UNKNOWN fallback and no skipped mandatory readback."],
+      "tests": ["node --test test/slots/s07.test.mjs"], "review": "ordinary_required", "dependency_gates": [], "delegation_required_unit": null
+    },
+    {
+      "id": "PWV3-S08", "plan_slot": "S08", "milestone": "M3",
+      "title": "GitHub health, effects and integration contracts",
+      "scope": "Confirmed-applicable-defect health/query evidence and narrow maintenance; Issue dedup/intent/readback/anomaly helpers; one precomputed two-parent candidate integration path with atomic expected-base fast-forward update; target-side Close and safe cleanup.",
+      "excluded": "No live provider qualification claim from simulation, alternate merge method, repository protection weakening, generalized Issue authorization or second Close PR.",
+      "writes": ["src/github/", "src/health/", "src/integration/", "src/close/", "src/cleanup/", "test/support/github-double.mjs", "test/slots/s08.test.mjs", "docs/contracts/github-close.md"],
+      "material_inputs": ["PWV3-S01", "PWV3-S02", "PWV3-S03", "PWV3-S04", "PWV3-S05", "PWV3-S06", "PWV3-S07"],
+      "acceptance": ["HEALTHY only with complete trustworthy zero-applicable-confirmed query; incomplete pagination/classification is UNKNOWN; maintenance exemption cannot cover unrelated defects. Recheck boundaries and exact diagnostics tested.", "Issue effect uncertainty reconciles before retry, exact intent idempotency and nonblocking anomaly classification cannot mask a blocker.", "Deterministic doubles/disposable Git prove H/B/C parents, source/target/check identity, full write envelope, atomic expected-B rejection, nonmaterial proof versus material/UNKNOWN revalidation and effect readback.", "Durable integration intent excludes same-epoch Global repeat; Close reconstructs from target evidence after source deletion/later target advance; cleanup preserves dirty/divergent/UNKNOWN state."],
+      "tests": ["node --test test/slots/s08.test.mjs"], "review": "ordinary_required", "dependency_gates": [], "delegation_required_unit": null
+    },
+    {
+      "id": "PWV3-S09", "plan_slot": "S09", "milestone": "M4",
+      "title": "Distributable stateless helper and trust",
+      "scope": "Immutable package manifest/origin resolution, helper/API/runtime handshake, CLI/debug and host-neutral operation protocol, inspect/doctor/resume diagnostics and deterministic context packs over the one core.",
+      "excluded": "No host-local semantic policy, mutable latest execution identity, helper DB, mandatory MCP or guessed capability from product names.",
+      "writes": ["src/helper/", "src/context/", "src/trust/", "bin/", "package.json", "package-lock.json", "packaging/", "test/slots/s09.test.mjs", "docs/helper/"],
+      "material_inputs": ["PWV3-S01", "PWV3-S02", "PWV3-S03", "PWV3-S04", "PWV3-S05", "PWV3-S06", "PWV3-S07", "PWV3-S08"],
+      "acceptance": ["Same exact inputs produce reproducible payload/context-pack bytes and one semantic outcome across helper entrypoints; mandatory authority/material/acceptance closure cannot be omitted for optimization.", "Wrong/mixed/shadow/unsupported package/helper/API/artifact identities deny mutation. Fixed owner-controlled origin cannot be overridden by consumer prose.", "Diagnostics expose code/identity/severity/next obligation/allowed remediation; unique safe qualified handoff versus zero/multiple/UNKNOWN fails closed as specified.", "Clean offline-donor clone builds/tests/runs helper; no hidden caches or historical repository availability required; minimum Node API baseline qualified."],
+      "tests": ["node --test test/slots/s09.test.mjs", "npm pack --dry-run"], "review": "ordinary_required", "dependency_gates": [], "delegation_required_unit": null
+    },
+    {
+      "id": "PWV3-S10", "plan_slot": "S10", "milestone": "M4",
+      "title": "Production external OP caller integration",
+      "scope": "Bind positively identified compatible external OP caller/result contract; implement only PWV3 envelopes/admission/dispatch acknowledgment/readback/applicability for all five boundaries using S09 helper and external ChatGPT OP capability.",
+      "excluded": "No in-product OP lanes/workers/convergence, schema invented from seed requirements, ordinary-child substitute or dependence on unfinished S11 bootstrap.",
+      "writes": ["src/op/", "test/conformance/op/", "test/slots/s10.test.mjs", "docs/contracts/op-binding.md"],
+      "material_inputs": ["PWV3-S04", "PWV3-S05", "PWV3-S09"],
+      "acceptance": ["Exact compatible external release/contract identity and actual ChatGPT dispatch/ack/result/readback evidence for Research, Definition, Plan, Package and Global, bound to S09 helper envelopes.", "Wrong subject/surface/type, stale/duplicate/incomplete/BLOCKED/UNKNOWN terminal never advances. Resume/ack loss/current-attempt successor and owner-disposition single cuts preserve exact frontier.", "Non-Global accepted result requires explicit owner gate; Global uses owner launch and deterministic applicable CLEAR with no routine CONTINUE. Doubles labelled separately cannot satisfy live rows."],
+      "tests": ["node --test test/slots/s10.test.mjs", "node --test test/conformance/op/*.test.mjs"], "review": "ordinary_required", "dependency_gates": ["DEP-OP", "DEP-HOST", "DEP-LIVE-TEST", "DEP-PUBLICATION"], "delegation_required_unit": null
+    },
+    {
+      "id": "PWV3-S11", "plan_slot": "S11", "milestone": "M4",
+      "title": "ChatGPT host realization",
+      "scope": "Minimal Project Instructions/live discovery, qualified locator fallback, immutable helper/action handshake, guarded canonical read/write/readback and exact handoff receive/delivery over shared core.",
+      "excluded": "No static Project Source requirement, alternate semantics, mandatory MCP, trusted consumer-prose override or fresh-context ceremony for every phase.",
+      "writes": ["hosts/chatgpt/", "test/conformance/chatgpt/", "test/slots/s11.test.mjs", "docs/hosts/chatgpt.md"],
+      "material_inputs": ["PWV3-S09", "PWV3-S10"],
+      "acceptance": ["Live exact helper/action surface demonstrates trusted immutable discovery/fallback, independent consumer/package/object freshness and real guarded remote mutation/readback.", "Read-only/denied/missing/ambiguous write paths hand off only to one verified receiver or block, not narrate completion; valid/stale/replayed handoff and active/terminal reconstruction without chat memory proven.", "Instructions cannot override trust/authority; all P1 section-8 ChatGPT rows have exact evidence; later integrated-candidate rerun remains S14."],
+      "tests": ["node --test test/slots/s11.test.mjs", "node --test test/conformance/chatgpt/*.test.mjs"], "review": "ordinary_required", "dependency_gates": ["DEP-HOST", "DEP-LIVE-TEST", "DEP-PUBLICATION"], "delegation_required_unit": null
+    },
+    {
+      "id": "PWV3-S12", "plan_slot": "S12", "milestone": "M4",
+      "title": "Pi/Paseo host realization",
+      "scope": "Global exact package binding over shared helper/native/CLI, invocation provenance cut/rebinding, useful bounded worker capability/use enforcement, inert unrelated repos and managed-host conformance.",
+      "excluded": "No provider selection/install authority, semantic Paseo plugin, custom daemon/shell spawner, recursive workers or separate runtime workflow state.",
+      "writes": ["hosts/pi/", "hosts/paseo/", "test/conformance/pi-paseo/", "test/slots/s12.test.mjs", "docs/hosts/pi-paseo.md"],
+      "material_inputs": ["PWV3-S06", "PWV3-S07", "PWV3-S09", "PWV3-S10"],
+      "acceptance": ["Actual global managed-host package, native/CLI parity, project-local trust denial, pinned identity, mismatch/mixed/shadow rejection and repair/re-handshake/reload proven with exact readback.", "Actual caller-scoped child relationship and useful bounded implementation use demonstrated where required; no brittle argv witness or child-text acceptance; nonrecursive envelope enforced.", "Post-launch exact bundle provenance is read back before first material effect; UNKNOWN cut blocks, host transition rebinds same package without replay. Fresh independent reviewer by authorship and remote-over-stale-local controls proven.", "Inert unrelated repository and every P1 Pi/Paseo live row have evidence; S14 reruns on integrated candidate."],
+      "tests": ["node --test test/slots/s12.test.mjs", "node --test test/conformance/pi-paseo/*.test.mjs"], "review": "ordinary_required", "dependency_gates": ["DEP-HOST", "DEP-LIVE-TEST", "DEP-PUBLICATION"], "delegation_required_unit": null
+    },
+    {
+      "id": "PWV3-S13", "plan_slot": "S13", "milestone": "M5",
+      "title": "Integrated runnable candidate and safety hardening",
+      "scope": "Compose already accepted native lifecycle and qualification interfaces, Global-repeat exclusion and sole terminal-currentness frontier; full host-neutral corpus/structural negatives/crash/meta-tests, reproducible packaging and donor purge into immutable runnable Q0.",
+      "excluded": "No claim of S14-S16 live/release qualification, Global/terminal acceptance, GA or partial-native construction authority. Component defects are attributed/reopened, not silently overwritten here.",
+      "writes": ["src/lifecycle/qualification/", "test/integrated/", "test/slots/s13.test.mjs", "test/structural/", "test/meta/", "packaging/", "docs/qualification/", ".github/workflows/test.yml"],
+      "material_inputs": ["PWV3-S01", "PWV3-S02", "PWV3-S03", "PWV3-S04", "PWV3-S05", "PWV3-S06", "PWV3-S07", "PWV3-S08", "PWV3-S09", "PWV3-S10", "PWV3-S11", "PWV3-S12"],
+      "acceptance": ["All 36 host-neutral families, 20 guards, 23 negatives and D12 seams GREEN on exact runnable Q0; no required skip/TODO or test-double live substitution.", "Actual lifecycle writer-to-publication-to-fresh-consumer trajectories, isolated high-risk mutation controls and crash cuts pass, including current Global/terminal/no-stale-success and intent-repeat exclusion.", "Clean donor-unavailable build/test/runtime and complete original provenance/licence audit; reproducible package and exact Q0 payload/acceptance identities separated from evidence packaging.", "All prior component Results/Reviews remain applicable; Q0 and all-Cards-accepted opens S14 only. S13 acceptance does not depend on Final Qualification entry or release acceptance."],
+      "tests": ["node --test test/slots/s13.test.mjs", "npm test", "npm pack --dry-run"], "review": "ordinary_required", "dependency_gates": [], "delegation_required_unit": null
+    }
+  ],
+  "post_implementation": [
+    {"id": "S14", "kind": "qualification", "material_inputs": ["PWV3-S13"], "contract": "QUALIFICATION.md#s14--exact-live-cross-host-and-provider-qualification", "dependency_gates": ["DEP-HOST", "DEP-INTEGRATION", "DEP-LIVE-TEST", "DEP-PUBLICATION"]},
+    {"id": "S15", "kind": "qualification", "material_inputs": ["PWV3-S13", "S14"], "contract": "QUALIFICATION.md#s15--native-dogfood-and-internal-targeted-qualification", "dependency_gates": ["DEP-OP", "DEP-HOST", "DEP-INTEGRATION", "DEP-LIVE-TEST", "DEP-PUBLICATION"]},
+    {"id": "S16", "kind": "qualification_integration", "material_inputs": ["PWV3-S01", "PWV3-S02", "PWV3-S03", "PWV3-S04", "PWV3-S05", "PWV3-S06", "PWV3-S07", "PWV3-S08", "PWV3-S09", "PWV3-S10", "PWV3-S11", "PWV3-S12", "PWV3-S13", "S14", "S15"], "contract": "QUALIFICATION.md#s16--global-fresh-terminal-integration-and-ga", "dependency_gates": ["DEP-OP", "DEP-HOST", "DEP-INTEGRATION", "DEP-LIVE-TEST", "DEP-PUBLICATION"]}
+  ],
+  "extra_acceptance_edges": [],
+  "shared_impact_surfaces": [
+    {"surface": "native schema, canonical encoding, verified identity and publication", "producers": ["PWV3-S01", "PWV3-S02"], "consumers": ["PWV3-S03", "PWV3-S04", "PWV3-S05", "PWV3-S06", "PWV3-S07", "PWV3-S08", "PWV3-S09", "PWV3-S10", "PWV3-S11", "PWV3-S12", "PWV3-S13", "S14", "S15", "S16"]},
+    {"surface": "evidence, current owner, package, execution and applicability contracts", "producers": ["PWV3-S03", "PWV3-S04", "PWV3-S05", "PWV3-S06"], "consumers": ["PWV3-S07", "PWV3-S08", "PWV3-S09", "PWV3-S10", "PWV3-S11", "PWV3-S12", "PWV3-S13", "S14", "S15", "S16"]},
+    {"surface": "reader/writer evolution and fingerprint conservative fallback", "producers": ["PWV3-S07"], "consumers": ["PWV3-S08", "PWV3-S09", "PWV3-S10", "PWV3-S11", "PWV3-S12", "PWV3-S13", "S14", "S15", "S16"]},
+    {"surface": "health, GitHub effects, integration and Close", "producers": ["PWV3-S08"], "consumers": ["PWV3-S09", "PWV3-S10", "PWV3-S11", "PWV3-S12", "PWV3-S13", "S14", "S15", "S16"]},
+    {"surface": "helper operation/packaging and external OP caller/result contracts", "producers": ["PWV3-S09", "PWV3-S10"], "consumers": ["PWV3-S11", "PWV3-S12", "PWV3-S13", "S14", "S15", "S16"]},
+    {"surface": "supported-host realization and integrated qualification oracles", "producers": ["PWV3-S11", "PWV3-S12", "PWV3-S13"], "consumers": ["S14", "S15", "S16"]}
+  ]
+}

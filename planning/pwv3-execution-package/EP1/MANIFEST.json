@@ -1,0 +1,476 @@
+{
+  "artifact_kind": "construction-package-inventory",
+  "producing_contract": "EP1/1",
+  "self_binding": "immutable containing Git subtree; manifest excluded from its own inventory",
+  "files": [
+    {
+      "path": ".gitattributes",
+      "bytes": 126,
+      "sha256": "47b730354f1802eff31b07637cc3422e5cbf39f0243dd4c82dae924d77e81bd7",
+      "git_blob": "9a1317a07bb2f68172cc065b23e82c3aee42ba23",
+      "producing_contract": "EP1/1"
+    },
+    {
+      "path": "CONTRACTS.json",
+      "bytes": 26534,
+      "sha256": "6a9a47f8402ff7a6fd65ce1bc4fa69654b4b62e49b012597927e575b87fc5949",
+      "git_blob": "b03d8e2dc4e7cdcbf057de209ffa00f39b9e4b2f",
+      "producing_contract": "EP1/1"
+    },
+    {
+      "path": "COVERAGE.json",
+      "bytes": 56196,
+      "sha256": "9db077f176c385987fe985e717f09156575901531e51b3a313f0d90d2335cca0",
+      "git_blob": "c3b923ae9bbfbc4198fc3b8189fe972614d5227a",
+      "producing_contract": "EP1/1"
+    },
+    {
+      "path": "DEPENDENCIES.md",
+      "bytes": 4051,
+      "sha256": "858242dd90decc8dbb8d4a990efcfcb6cc894262ee0e92466c695cf87e8edae3",
+      "git_blob": "23e78187cce5cb59a62b6c21bb931ed1784e9eca",
+      "producing_contract": "EP1/1"
+    },
+    {
+      "path": "DONORS.json",
+      "bytes": 28292,
+      "sha256": "eabd264bbbb6bc04b8ff5b3ca93d664bff1cb4d80c45a97c7f387c15156649d7",
+      "git_blob": "99183074edfaa444db6e004b6bf586fdfa9fc7e0",
+      "producing_contract": "EP1/1"
+    },
+    {
+      "path": "QUALIFICATION.md",
+      "bytes": 12663,
+      "sha256": "6fade71ee3374f15477eaafd5bd8bfd37931dee55b6ee95fc19cf4be10ccd2ab",
+      "git_blob": "e200b2cb6335312e01d6e4bf18bfed4fc111b128",
+      "producing_contract": "EP1/1"
+    },
+    {
+      "path": "README.md",
+      "bytes": 14058,
+      "sha256": "9db10c2b6fcb0985adcd47caf8314a1e34ef74d857321c551199676417db9da4",
+      "git_blob": "7dbf6442c187c3af1f6f2dec74715070e139399e",
+      "producing_contract": "EP1/1"
+    },
+    {
+      "path": "SNAPSHOTS.json",
+      "bytes": 32317,
+      "sha256": "298ef40d61f7de6e2d99a7322e0f1a24215ff9bf0927d42b8f6e7493f5c3ab07",
+      "git_blob": "cec4618dab3c76ad1a5daf584711ee7d5478b844",
+      "producing_contract": "EP1/1"
+    },
+    {
+      "path": "snapshots/acceptance/P1_ONLY_WAIVER.md",
+      "bytes": 1668,
+      "sha256": "87c6479dded1227b3c819742ab05e3d32014f6db28ccacd4e6dfce96c72c594a",
+      "git_blob": "d5d740d58eddd6b4ed6cf98218738b21b45a31c8",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/acceptance/P1_REVIEW.md",
+      "bytes": 3009,
+      "sha256": "41e3090cc5bae024d23dd092988c99b5fc1c39d3287285842e61829fb994bebc",
+      "git_blob": "183a8cca4a60017cca9eeee0cc70bd32800cf263",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/acceptance/PLANNING.toml",
+      "bytes": 963,
+      "sha256": "138a327135bd9a5902f9f2f7e145e07aa3414c9a2a357c97611653e4faacdf0d",
+      "git_blob": "81a65ebb7de7394e33f4ca55c795328e6cec4dd0",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/acceptance/PLAN_REVIEW.toml",
+      "bytes": 810,
+      "sha256": "bccd95d05b1420107cdcce789d9d491670080507b88e67ae73e5cee326f1108e",
+      "git_blob": "8b2a3159ab16cd2621585a162db894ae9eac3e59",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/acceptance/PREMIUM_C_ENTRY.md",
+      "bytes": 1312,
+      "sha256": "8ba3e5c537c53d4fd66bad8b2be823eafbceec78f4005acb66b70bc4d78974dd",
+      "git_blob": "7ad0a94c2ef3ce224a47e86f89a05317f986f7f1",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/authority/DECISION_BINDING.md",
+      "bytes": 2310,
+      "sha256": "fffdb78d0b4a6845da56fdab9425ec383972de392d18f0554626306586258e86",
+      "git_blob": "69e818521010ab53ed96e694a18ed584cb37e25e",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/authority/DEFINITION.md",
+      "bytes": 56303,
+      "sha256": "8dbb8e3d79928ac716f2d32ea0a0e764cc48fe93dd41f121424662620b808b60",
+      "git_blob": "f8cbe2416de455c45adb2319bfd82a97b8b43360",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/authority/DEFINITION.toml",
+      "bytes": 7524,
+      "sha256": "e2abf7c56098721064081c525b4399303af119395654853e7673aca2cac28b7c",
+      "git_blob": "c1e52e7676a8f6ce05118dfda91982e214838594",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/authority/REQUIREMENTS_BINDING.md",
+      "bytes": 2103,
+      "sha256": "73cecffbd6530b0092bc87f256538a762e2ebcd347a3721b3f7ad9be429d2b1c",
+      "git_blob": "0c1af76642bea16a3c4bbaba5c87565c593814f4",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/01_BRAINSTORM.toml",
+      "bytes": 259,
+      "sha256": "4ad0e503ac08aaeb7e51d548171e0294d82e87d9290adf7a5f6c764d7e0b0a82",
+      "git_blob": "ba33b5e5807ca118672116c54a715b5359113f4b",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/02_PWV3_R2_RESEARCH_CROSS_RECONCILIATION_2026-09-30.md",
+      "bytes": 12890,
+      "sha256": "56903d1896d740e9947295a2753aaa27279f4361ca312fbcd69d899abaf5a44a",
+      "git_blob": "311155fdfcb90bcc529909441e7c52e611931219",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/03_PWV3_R3_MANDATORY_OP_OWNER_DECISION_2026-09-30.md",
+      "bytes": 5331,
+      "sha256": "5ff7aa2f818f2da241ca969ec635dce0033763f153de5dbdf9bfa2df35740464",
+      "git_blob": "8347cf99048eda2e5a41c15c43b5cac140877bf5",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/04_PWV3_R3_ROADMAP_VERSIONING_OWNER_DIRECTION_2026-09-30.md",
+      "bytes": 2341,
+      "sha256": "1df3c02cdfe9a005b6bc837097b1ea07de4f9d75864ac9b1934b5d85a415b3cd",
+      "git_blob": "f0b63837559feb86af6b961e89fca041c4af3f28",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/05_PWV3_R3_VERSION_COMPATIBILITY_OWNER_DECISION_2026-10-01.md",
+      "bytes": 2472,
+      "sha256": "8d8dd1d7cb4b91bf4c5c427bc1b284813f6540b830ddccbfbe2d77a92c132609",
+      "git_blob": "ba60e4550cda93ad4b4d54c5c7e66b3bed5e9ebc",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/06_PWV3_R3_OP_SKILL_SEPARATION_2026-10-01.md",
+      "bytes": 1321,
+      "sha256": "7696172cb562d8cbf7be05baa7d197e734fb9e92a0c2528ecdbb80cfaf5702dd",
+      "git_blob": "2cf1686692fbf3c4df8ae4046520aa48a0ae9b20",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/07_PWV3_R3_DEFINITION_REVIEW_R2_RED_CONSUMPTION_2026-10-01.md",
+      "bytes": 2729,
+      "sha256": "0bc5a7275c91a6b7fb0a04306ba826dc50c2dca6cf0c66bf963005b90e79258c",
+      "git_blob": "12aec8251629338ee207d5736b07385291755ac4",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/08_PWV3_R3_DEFINITION_FOCUSED_REVALIDATION_2026-10-01.md",
+      "bytes": 9002,
+      "sha256": "1fea73a9391edd171e19d2e0f95c781c944044ddc076ed34b1d2f40597ab9e71",
+      "git_blob": "7a281d1dba5c6f654b355391bc8d410c320dd7d8",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/09_PWV3_R4_POST_OP_GREEN_USER_GATE_2026-10-01.md",
+      "bytes": 3230,
+      "sha256": "2f37d233a0cf6b29b6277a1f14b46b19987bc1ff1661d5864d3714047434e60a",
+      "git_blob": "c653f75ea07bed99f10b8447dd1b48503acdd91f",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/10_PWV3_R4_BRAINSTORM_FINAL_CHALLENGE_2026-10-01.md",
+      "bytes": 2867,
+      "sha256": "b391a81804c18d96affbc6c5d7d1f2506ad5b991ea69c62ecf4b27a577083e43",
+      "git_blob": "1c8eae7afc028e86f79497c596910ea3eeaf7f8a",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/11_PWV3_R4_DEFINITION_DELTA_2026-10-01.md",
+      "bytes": 1723,
+      "sha256": "e8c740f3d0d9c73014aabe976eada38b4f112298fc98cf8a9af385b29dba2c3d",
+      "git_blob": "1960adbcf10cc39c97e4a6a817371a38d3ddaa41",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/12_PWV3_R4_DEFINITION_REVIEW_RED_CONSUMPTION_2026-10-01.md",
+      "bytes": 2634,
+      "sha256": "efe0aba73ac20309dac32995f9d36bd6ec3c95bada9e5cb02cb10a57ed049d54",
+      "git_blob": "f0a29f12c1372d783634fd68dd2065814ed051c5",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/13_PWV3_D05_DEFINITION_REVALIDATION_GREEN_PENDING_OWNER_GATE_2026-10-01.md",
+      "bytes": 2822,
+      "sha256": "dda700b82a6e8eacd306f525bffc8b0871e12cae953f45a5a0df9970aaa05c45",
+      "git_blob": "c60aeae8b9d7d28e26b95495e0d47be297fe681d",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/14_PWV3_D05_DEFINITION_REVIEW_REPEAT_A02_2026-10-01.md",
+      "bytes": 1937,
+      "sha256": "dc76695280959c986be74838958fff9592b1bf0ba90fa4e64599a2680563491f",
+      "git_blob": "5cc298d32da8ce26110b869c6526a9b9265bf7e8",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/15_PWV3_D05_A02_RED_PENDING_TERMINAL_INDEPENDENCE_OWNER_DECISION_2026-10-01.md",
+      "bytes": 3638,
+      "sha256": "4718f35c78a26fa060bc4e2da52a4568201d1845bc6f2dc335782bf7e5c05c9d",
+      "git_blob": "264bb79e53e750771e434ce2f736424b109a24a1",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/16_PWV3_D05_A02_TERMINAL_INDEPENDENCE_OWNER_DECISION_2026-10-01.md",
+      "bytes": 1367,
+      "sha256": "d9ce70ee81da9444c80e3bb2cd82b6ee99d106a7a71bc3441edc72f65c403026",
+      "git_blob": "1002c3bd00079df50a60731d9e5fb9b53fc4b5ce",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/17_PWV3_D06_A02_RED_CONSUMPTION_2026-10-01.md",
+      "bytes": 2617,
+      "sha256": "ea0fa0ddb73aab7e4205f5b605fecf188c3c8ed4328be4b17d248873d3209bd8",
+      "git_blob": "0c3eaccd9dc405dfb28bae2e9bf76ce9e66a45ce",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/18_PWV3_D07_D06_REVALIDATION_RED_CONSUMPTION_2026-10-01.md",
+      "bytes": 2068,
+      "sha256": "b201aceb74efaac9ce27ae3e52cb85dd6fb191ec36e482f2e50e951761035beb",
+      "git_blob": "76ea7e3cdaefaa3c756d2d0d96f229321b225cf9",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/19_PWV3_D07_DEFINITION_REVALIDATION_GREEN_PENDING_OWNER_GATE_2026-10-01.md",
+      "bytes": 3009,
+      "sha256": "6c64df1af1bb60abe793a0652f36bd8072c374623ea43ac142d7fabd29404847",
+      "git_blob": "6cb109c5cbff87c8ac53b19ae30a0d216de1c246",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/20_PWV3_D07_DEFINITION_REVIEW_REPEAT_A03_2026-10-01.md",
+      "bytes": 2535,
+      "sha256": "994bb660725d626934c76ac8b3b3b010bc0f6976511339b9333c208ddfb10fac",
+      "git_blob": "769fb6215b3fcc40f93a6101c539dcdaae9ab941",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/21_PWV3_D07_A03_RED_PENDING_OWNER_DECISIONS_2026-10-01.md",
+      "bytes": 4681,
+      "sha256": "b8dea9b2d5d48988de2a7dc7aa4bb569de427a146b517c4e400b22f6c564faf4",
+      "git_blob": "d86d74af3144e9ee64570dd26fd736f284481407",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/22_PWV3_D07_A03_OWNER_DECISIONS_2026-10-01.md",
+      "bytes": 1604,
+      "sha256": "69dd36322137d7c8154f797a68e74d678d00fcbeaabad633a6cad4b2df8b6762",
+      "git_blob": "a766a0bc3d1901bc81a86ac64bd21bf7ec4f0c0e",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/23_PWV3_D08_A03_RED_CONSUMPTION_2026-10-01.md",
+      "bytes": 2224,
+      "sha256": "160da839da0767837cad0f0b511e816afd8dd9e66dc3c14fe021c2463260f662",
+      "git_blob": "df7c3c8930606bd83cae5dd25fb06a4d96b6babc",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/24_PWV3_D09_D08_REVALIDATION_RED_CONSUMPTION_2026-10-01.md",
+      "bytes": 1953,
+      "sha256": "581eb834a150e3789553859feb76193ca96a34a679eadc7f28b59981f71e6649",
+      "git_blob": "d7b81a9a0954d7f25eb727262b9202d0573e76fc",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/25_PWV3_D09_DEFINITION_REVALIDATION_GREEN_PENDING_OWNER_GATE_2026-10-01.md",
+      "bytes": 2742,
+      "sha256": "480dc4b6847a06c64235c71dc59b3c5d5a3d3dfa5edfb78e0ffdead21e6864a7",
+      "git_blob": "88bf64e389c457a5546233a715709cbdb08c95dc",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/26_PWV3_D09_DEFINITION_GREEN_PREMIUM_A_DUE_2026-10-01.md",
+      "bytes": 1200,
+      "sha256": "4d03b19066e9d2b30c760dc7c9aeacd314b916d20efa185930e5972707bea600",
+      "git_blob": "9e6f9e7502165cde974ef70b987586041dde619c",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/27_PWV3_R5_GOAL_3X_RESEARCH_RECONCILIATION_2026-10-02.md",
+      "bytes": 7197,
+      "sha256": "bd4b0dadcf594499b3592a83263a893310997567521f4bcf746140d58c6910d5",
+      "git_blob": "9c226acd2f9881b4b0e2dae4e79bf1497a3ca56d",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/28_PWV3_R5_FINAL_CHALLENGE_OWNER_DECISIONS_2026-10-02.md",
+      "bytes": 6144,
+      "sha256": "d086bd56e86b521f54f8d3627172dcdb3f887a9a555268d69ffa848be60ba343",
+      "git_blob": "f55b98b51d035b8a774a0947d826eb2eae9c0355",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/29_PWV3_R5_FINAL_CHALLENGE_GREEN_2026-10-02.md",
+      "bytes": 354,
+      "sha256": "4da3ed80099603a269cac5a4931bd71ac06d92df4d0eada9cfc5d0da2ac50499",
+      "git_blob": "4ae153078b7568f239a19b139f4dbc4c9898a649",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/30_PWV3_R6_INVOCATION_DERIVED_EXECUTOR_OWNER_DIRECTION_2026-10-02.md",
+      "bytes": 1946,
+      "sha256": "5c32a4d66acb1814d56b755209936e993e74379f4309368a5002635780d489e3",
+      "git_blob": "86f2ca30a397631ad8faf84d49002d10a820acee",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/31_PWV3_R6_FINAL_CHALLENGE_GREEN_2026-10-02.md",
+      "bytes": 1726,
+      "sha256": "99336177eb499b461c55843a3413fa5bb2d507c3f84b09eb487ad362e5b36948",
+      "git_blob": "6300809c9ae110e80002e17bdb65adacdac7158e",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/32_PWV3_D10_CONSTRUCTION_HANDOFF_OWNER_DIRECTION_2026-10-04.md",
+      "bytes": 1372,
+      "sha256": "ced821052105f6c156c60f71b5aed3c47eff459b9dd92333f236b93b4b27b24c",
+      "git_blob": "5f3716c3dfa677485bb422cfd3b96fdef71d68d9",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/33_PWV3_R6_DEFINITION_D10_DELTA_2026-10-04.md",
+      "bytes": 3672,
+      "sha256": "d5fc5c6b021ecad53dd7a45aa4c17c255c278a8653dbd535e19f8c55804e485a",
+      "git_blob": "61b1941ec9b42c3eda7b8a21db0b512ffa99f013",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/34_PWV3_D10_DEFINITION_REVIEW_A01_2026-10-04.md",
+      "bytes": 4298,
+      "sha256": "7ee077e7929dad0e2376f2916e175691c1fdae906738bb7d898109a94bc13fbb",
+      "git_blob": "f4f8315c87791775bf817fe3b54a548ee98019f8",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/35_PWV3_D10_A01_RED_PENDING_GLOBAL_REPEAT_OWNER_DECISION_2026-10-04.md",
+      "bytes": 3425,
+      "sha256": "e49af0e35b9903af2e251a30e4593c9162c969c36c4d2d8b85e65058070aec1c",
+      "git_blob": "af1dab68804f2bc42c8e82834c265b0788a2a46c",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/36_PWV3_D10_A01_RED_PENDING_OWNER_DECISION_2026-10-04.md",
+      "bytes": 3134,
+      "sha256": "374097793ae68e6674374b5d4bc3d05e8ef188a072bbab458ddb9dc25bcc6462",
+      "git_blob": "ea78ec34b4c4924ebf915adcc1e841c12f85e113",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/37_PWV3_D10_F02_GLOBAL_REPEAT_OWNER_DECISION_OPTION_A_2026-10-04.md",
+      "bytes": 1835,
+      "sha256": "fef79d96478a8e4e675177a19046a972af91aa66259d184569df472fd5f48c92",
+      "git_blob": "d07f17f2c45087cbe7885e5f753dc7df7606b41b",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/38_PWV3_D11_A01_BOUNDED_REPAIR_2026-10-04.md",
+      "bytes": 2301,
+      "sha256": "17711a2b4fb5416193fa2491b9551b647b9055f41969770f42413ffebc495602",
+      "git_blob": "a8dad42f00cb8fec2abaf3a5f47b02e2645f91f1",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/39_PWV3_D11_DEFINITION_FOCUSED_REVALIDATION_R01_2026-10-04.md",
+      "bytes": 8134,
+      "sha256": "87beaee010d7dfa83eff4b9d095c18099d9cce21f614ce9fd0f86d7fec3f923e",
+      "git_blob": "73aac8d43513383322a71956d396b0735100a492",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/40_PWV3_D12_D11_R01_RED_CONSUMPTION_2026-10-04.md",
+      "bytes": 3448,
+      "sha256": "4a48ecd6733049bc4b89809f5ebb8ce012a5a3e79116dd477c8f91894f5a06b6",
+      "git_blob": "c8e282a6d1db8475f5596029de1894b85d9c2ff2",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/41_PWV3_D12_DEFINITION_FOCUSED_REVALIDATION_R01_2026-10-04.md",
+      "bytes": 3403,
+      "sha256": "c12adc0ca14ce8e02af53296fcdd71fd1c34f164efb94dad1723f712e72bacf8",
+      "git_blob": "5c35104a19fa59eb61ba5c395e11e1873698c444",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/42_PWV3_D12_DEFINITION_REVALIDATION_GREEN_PENDING_OWNER_GATE_2026-10-04.md",
+      "bytes": 2442,
+      "sha256": "a1d52a00af9a3292f702fd53a854eccb1ecca3134289fe4edae31986644a5bc0",
+      "git_blob": "283a53b62de338c1e8edfbd8ae3fa3d8033c0788",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/decisions/43_PWV3_D12_DEFINITION_GREEN_PREMIUM_A_DUE_2026-10-04.md",
+      "bytes": 1196,
+      "sha256": "dadf10a3729b8f75f6a7d22560a99c535d552474ea30ddfbdd65135ff8e0115e",
+      "git_blob": "7fa6fc61583307c816d99b553b4a7df545b83fcd",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/plan/P1.md",
+      "bytes": 77244,
+      "sha256": "4274586bc9c491843a4a99a01ddd325e00177693a86cfdb8c59191152f1b92ff",
+      "git_blob": "ba2990d773cdd30673f2ce23a6bc74700c6c56cf",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/research/corpus.md",
+      "bytes": 63639,
+      "sha256": "5d2c773d14fa3a581a248d37b3eb429bb941602fd3c0b17a8b98e084f6e714ec",
+      "git_blob": "1f29a31f6bfa0b2b9486654c2a20eb6c1258c1a6",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/research/d12-review.md",
+      "bytes": 8190,
+      "sha256": "2a9d98a349f966830cd224be5d44d68b470ea863b307e70350357ef2778a66f5",
+      "git_blob": "e386fb1bc888fd671e99409cdf274e365a36303b",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/research/donor.md",
+      "bytes": 39718,
+      "sha256": "45eca6df1f847d7d5b9b7bb70b4bb48eb3b231ab82d4f81d36fa291cf941ea1e",
+      "git_blob": "d6d6329bdb58196ba1127c6a98620bdedc299f56",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "snapshots/research/r5.md",
+      "bytes": 54875,
+      "sha256": "acdb46c17f5fa80635bdd0a7bb4f57b194bd653355d82a2277618a3d40bf56d3",
+      "git_blob": "94753f446542d03171f81a2827cb188420cf1df2",
+      "producing_contract": "historical-unversioned; original bytes retained"
+    },
+    {
+      "path": "test_verify.py",
+      "bytes": 6408,
+      "sha256": "524998da446892739dac400ba54d338ae04ae97b9ccc90b93ebb019b0fcfc43b",
+      "git_blob": "85119686f47199341d566a6a32f3c8362d860429",
+      "producing_contract": "EP1/1"
+    },
+    {
+      "path": "verify.py",
+      "bytes": 12468,
+      "sha256": "8e3c81705919d8bc3f8c8bbc6b5571cf7df0d383f4c031b2a83f31016afb1a9d",
+      "git_blob": "bdbcf47ad41001824e713cb382d321e9c8b70c9a",
+      "producing_contract": "EP1/1"
+    }
+  ]
+}

@@ -1,0 +1,1508 @@
+{
+  "artifact_kind": "construction-coverage-map",
+  "producing_contract": "EP1/1",
+  "authority": "D12 and P1; historical research oracle wording is translated only as expressly superseded by these authorities",
+  "test_rule": "S01 defines all scenarios without claiming unfinished tests pass. Owner Cards implement bounded facets; S13 executes all host-neutral families, guards, negatives and D12 seams. Required live evidence is separately S10-S12 and S14-S16. No skip or mock is GREEN live evidence.",
+  "definition_coverage": [
+    {
+      "id": "C01",
+      "surface": "C01 Product outcome, authority invariants",
+      "acceptance": "One runtime-neutral semantic path, remote canonical truth, one current obligation/checkpoint, exact identity, no runtime authority",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S02",
+        "PWV3-S03",
+        "PWV3-S04",
+        "PWV3-S09",
+        "PWV3-S13"
+      ],
+      "plan_gate_text": "S01–S04, S09, S13; G2–G7"
+    },
+    {
+      "id": "C02",
+      "surface": "C02 Canonical lifecycle/upstream routing",
+      "acceptance": "Entire lifecycle including Brainstorming Research and exact once-only return; earliest upstream meaning wins, real stops only",
+      "owners": [
+        "PWV3-S04",
+        "PWV3-S05",
+        "PWV3-S06",
+        "PWV3-S13",
+        "S15"
+      ],
+      "plan_gate_text": "S04–S06, S13, S15; G2–G5"
+    },
+    {
+      "id": "C03",
+      "surface": "C03 Five mandatory OP boundaries/ownership",
+      "acceptance": "External OP Research, Definition, Plan, Package, Global; no profile/topology leakage or worker substitute",
+      "owners": [
+        "PWV3-S04",
+        "PWV3-S05",
+        "PWV3-S10",
+        "PWV3-S11",
+        "PWV3-S12",
+        "S15",
+        "S16"
+      ],
+      "plan_gate_text": "S04–S05, S10–S12, S15–S16; DEP-OP, G0–G5"
+    },
+    {
+      "id": "C04",
+      "surface": "C04 Universal OP frontier/recovery",
+      "acceptance": "First/successor attempt, DUE/IN_PROGRESS/TERMINAL, idempotent acknowledgement/readback, deterministic same-binding successor and no old-success fallback",
+      "owners": [
+        "PWV3-S03",
+        "PWV3-S04",
+        "PWV3-S10",
+        "PWV3-S13"
+      ],
+      "plan_gate_text": "S03–S04, S10, S13; G2–G5"
+    },
+    {
+      "id": "C05",
+      "surface": "C05 Non-Global owner gate",
+      "acceptance": "Explicit human CONTINUE/RUN OP AGAIN, exact result binding, disposition publication, repeat consumption/freshness/single cut",
+      "owners": [
+        "PWV3-S04",
+        "PWV3-S05",
+        "PWV3-S10",
+        "PWV3-S13"
+      ],
+      "plan_gate_text": "S04–S05, S10, S13; G0–G5"
+    },
+    {
+      "id": "C06",
+      "surface": "C06 Global exception/repeat cut",
+      "acceptance": "Owner launch; deterministic CLEAR; repeat only before durable integration intent; supersede Global and derived terminal success",
+      "owners": [
+        "PWV3-S04",
+        "PWV3-S08",
+        "PWV3-S10",
+        "PWV3-S13",
+        "S16"
+      ],
+      "plan_gate_text": "S04, S08, S10, S13, S16; G4–G6"
+    },
+    {
+      "id": "C07",
+      "surface": "C07 Plan/Execution Package",
+      "acceptance": "Strategy + optional Plan-owned design, logical slots, stable portable Cards, total order and combined dependency/acceptance satisfiability",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S05",
+        "PWV3-S06"
+      ],
+      "plan_gate_text": "S01, S05–S06; G1–G2"
+    },
+    {
+      "id": "C08",
+      "surface": "C08 Invocation binding/subordinate refinement",
+      "acceptance": "No execution mode/provider choice in package; exact post-launch provenance/readback before material effects; semantic-preserving subordinate steps only",
+      "owners": [
+        "PWV3-S02",
+        "PWV3-S05",
+        "PWV3-S06",
+        "PWV3-S09",
+        "PWV3-S11",
+        "PWV3-S12",
+        "PWV3-S13",
+        "S14"
+      ],
+      "plan_gate_text": "S02, S05–S06, S09, S11–S14; G1–G3"
+    },
+    {
+      "id": "C09",
+      "surface": "C09 Card completion/repair",
+      "acceptance": "Single Card through Result and all checks/Review/revalidation, new immutable Result on change, total-order qualification repair of affected stable Cards",
+      "owners": [
+        "PWV3-S03",
+        "PWV3-S06",
+        "PWV3-S13",
+        "S14",
+        "S15",
+        "S16"
+      ],
+      "plan_gate_text": "S03, S06, S13–S16; G2–G5"
+    },
+    {
+      "id": "C10",
+      "surface": "C10 Ordinary Review",
+      "acceptance": "Complete bounded surface, immutable exact subject+acceptance attempts, decidable applicability, material independence and honest boundary-scoped waiver",
+      "owners": [
+        "PWV3-S03",
+        "PWV3-S05",
+        "PWV3-S06",
+        "PWV3-S13",
+        "S15"
+      ],
+      "plan_gate_text": "S03, S05–S06, S13, S15; G1–G5"
+    },
+    {
+      "id": "C11",
+      "surface": "C11 Applicability/affected cone",
+      "acceptance": "Material inputs + acceptance/Review/shared edges, exact reuse proof, preserved cone, conservative widening and explanatory diagnostics",
+      "owners": [
+        "PWV3-S06",
+        "PWV3-S07",
+        "PWV3-S13",
+        "S14",
+        "S15",
+        "S16"
+      ],
+      "plan_gate_text": "S06–S07, S13–S16; G2–G6"
+    },
+    {
+      "id": "C12",
+      "surface": "C12 Recovery/local remote/effects",
+      "acceptance": "Accepted Result no replay, exact predecessor/authority local-WIP admission, remote wins, intent/attempt/readback/UNKNOWN",
+      "owners": [
+        "PWV3-S02",
+        "PWV3-S03",
+        "PWV3-S04",
+        "PWV3-S08",
+        "PWV3-S13",
+        "S14",
+        "S15",
+        "S16"
+      ],
+      "plan_gate_text": "S02–S04, S08, S13–S16; G2–G7"
+    },
+    {
+      "id": "C13",
+      "surface": "C13 Stateless helper/context/doctor",
+      "acceptance": "Required operations and objective diagnostics, deterministic bounded input-complete packs, no DB/cache authority",
+      "owners": [
+        "PWV3-S04",
+        "PWV3-S07",
+        "PWV3-S08",
+        "PWV3-S09",
+        "PWV3-S13",
+        "S14"
+      ],
+      "plan_gate_text": "S04, S07–S09, S13–S14; G2–G3"
+    },
+    {
+      "id": "C14",
+      "surface": "C14 Capability handoff",
+      "acceptance": "Exactly one positively qualified safe receiver first; receiver re-admission; ambiguity/UNKNOWN blocker",
+      "owners": [
+        "PWV3-S04",
+        "PWV3-S09",
+        "PWV3-S10",
+        "PWV3-S11",
+        "PWV3-S12",
+        "S14"
+      ],
+      "plan_gate_text": "S04, S09–S12, S14; G2–G3"
+    },
+    {
+      "id": "C15",
+      "surface": "C15 ChatGPT realization/trust",
+      "acceptance": "Minimal live-discovery instructions, locator fallback, no static source, immutable origin/package/handshake, verified write/readback",
+      "owners": [
+        "PWV3-S09",
+        "PWV3-S10",
+        "PWV3-S11",
+        "S14",
+        "S15"
+      ],
+      "plan_gate_text": "S09–S11, S14–S15; DEP-HOST, G2–G3"
+    },
+    {
+      "id": "C16",
+      "surface": "C16 Pi/Paseo/Generic Workers",
+      "acceptance": "Global exact package, shared core, actual qualified bounded delegation for goal-capable realization, nonrecursive, native relation proof, no OP substitute/plugin requirement",
+      "owners": [
+        "PWV3-S06",
+        "PWV3-S09",
+        "PWV3-S10",
+        "PWV3-S12",
+        "S14",
+        "S15"
+      ],
+      "plan_gate_text": "S06, S09–S10, S12, S14–S15; G2–G3"
+    },
+    {
+      "id": "C17",
+      "surface": "C17 Donor/historical memory",
+      "acceptance": "Native recipient, no V2 runtime/build/readers, selective invariant-first ports, exact non-authoritative provenance/notices, reproduce/dedup before Issues",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S02",
+        "PWV3-S03",
+        "PWV3-S08",
+        "PWV3-S09",
+        "PWV3-S13"
+      ],
+      "plan_gate_text": "S01–S03, S08–S09, S13; G2–G3"
+    },
+    {
+      "id": "C18",
+      "surface": "C18 Regression floor/live/cross-host",
+      "acceptance": "All 36 families, guards and negatives under D12, actual writer/consumer, both live surfaces and real cross-host repair/continuation",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S02",
+        "PWV3-S03",
+        "PWV3-S04",
+        "PWV3-S05",
+        "PWV3-S06",
+        "PWV3-S07",
+        "PWV3-S08",
+        "PWV3-S09",
+        "PWV3-S10",
+        "PWV3-S11",
+        "PWV3-S12",
+        "PWV3-S13",
+        "S14",
+        "S15",
+        "S16"
+      ],
+      "plan_gate_text": "S01–S16; G2–G7"
+    },
+    {
+      "id": "C19",
+      "surface": "C19 Full Final Qualification/dogfood",
+      "acceptance": "Targeted internal, Global external, all required finding disposition/causal repair, native representative lifecycle through Close",
+      "owners": [
+        "PWV3-S13",
+        "S14",
+        "S15",
+        "S16"
+      ],
+      "plan_gate_text": "S13–S16; G3–G5"
+    },
+    {
+      "id": "C20",
+      "surface": "C20 Fresh terminal/current attempt",
+      "acceptance": "Newly produced post-QF exact result, independent GREEN or explicit exact waiver, newest attempt only, automatic qualified independent reviewer allowed",
+      "owners": [
+        "PWV3-S03",
+        "PWV3-S04",
+        "PWV3-S13",
+        "S16"
+      ],
+      "plan_gate_text": "S03–S04, S13, S16; G5–G6"
+    },
+    {
+      "id": "C21",
+      "surface": "C21 Version/compatibility line",
+      "acceptance": "Artifact versions from first write, separate compatibility axes, normal patch preservation, minor/major rules, immutable history",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S03",
+        "PWV3-S07",
+        "PWV3-S09",
+        "S14"
+      ],
+      "plan_gate_text": "S01, S03, S07, S09, S14; G2–G3"
+    },
+    {
+      "id": "C22",
+      "surface": "C22 All evolution foundations",
+      "acceptance": "Reader registry/projection, multiple generations, retirement/compaction, guarded adoption/migration/downgrade and one-writer transition including UNKNOWN recovery",
+      "owners": [
+        "PWV3-S07",
+        "PWV3-S09",
+        "PWV3-S13",
+        "S14",
+        "S15"
+      ],
+      "plan_gate_text": "S07, S09, S13–S15; G2–G3"
+    },
+    {
+      "id": "C23",
+      "surface": "C23 Fingerprints/ergonomics/anomalies/cleanup",
+      "acceptance": "Required non-authoritative fingerprint optimization with fallback, context/worker ergonomics, exact Issue helpers/nonblocking dedup, dirty/divergent-safe cleanup",
+      "owners": [
+        "PWV3-S06",
+        "PWV3-S07",
+        "PWV3-S08",
+        "PWV3-S09",
+        "PWV3-S12",
+        "PWV3-S13",
+        "S14"
+      ],
+      "plan_gate_text": "S06–S09, S12–S14; G2–G3, G6"
+    },
+    {
+      "id": "C24",
+      "surface": "C24 Health/maintenance",
+      "acceptance": "Sole Issue-authority exception, complete applicable confirmed-defect query, exact maintenance exemption, all recheck boundaries",
+      "owners": [
+        "PWV3-S04",
+        "PWV3-S08",
+        "PWV3-S13",
+        "S14",
+        "S15",
+        "S16"
+      ],
+      "plan_gate_text": "S04, S08, S13–S16; G2–G7"
+    },
+    {
+      "id": "C25",
+      "surface": "C25 Integration/Close/release",
+      "acceptance": "One qualified exact source/base/candidate method, atomic target fence, impact refresh, positive merge/containment, target-side recovery, no second Close PR",
+      "owners": [
+        "PWV3-S08",
+        "PWV3-S09",
+        "PWV3-S13",
+        "S14",
+        "S15",
+        "S16"
+      ],
+      "plan_gate_text": "S08–S09, S13–S16; DEP-INTEGRATION, G3, G6–G7"
+    },
+    {
+      "id": "C26",
+      "surface": "C26 Construction handoff/exclusions",
+      "acceptance": "PWV2 pre-execution only; self-contained externally executed package; no partial-native construction cut; self-hosting only qualification; all exclusions preserved",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13",
+        "S14",
+        "S15",
+        "S16"
+      ],
+      "plan_gate_text": "This section 2, S01, S13–S16; G0–G7"
+    }
+  ],
+  "regression_families": [
+    {
+      "id": "PWV3-REG-ADMISSION-FRESHNESS-001",
+      "owners": [
+        "PWV3-S02",
+        "PWV3-S09"
+      ],
+      "emphasis": "Consumer, package and pointed objects independently fresh; network/ref-race UNKNOWN",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-admission-freshness-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-ADMISSION-FRESHNESS-001.s02.test.mjs",
+        "test/regressions/PWV3-REG-ADMISSION-FRESHNESS-001.s09.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-ROUTE-OWNER-CLOSURE-001",
+      "owners": [
+        "PWV3-S04",
+        "PWV3-S05"
+      ],
+      "emphasis": "Orphan/contradictory current owner cannot be ignored",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-route-owner-closure-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-ROUTE-OWNER-CLOSURE-001.s04.test.mjs",
+        "test/regressions/PWV3-REG-ROUTE-OWNER-CLOSURE-001.s05.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-STOP-PRECEDENCE-001",
+      "owners": [
+        "PWV3-S04"
+      ],
+      "emphasis": "Explicit authority stop versus runnable downstream; no synthetic verdict stop",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-stop-precedence-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-STOP-PRECEDENCE-001.s04.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-RESEARCH-RETURN-001",
+      "owners": [
+        "PWV3-S04",
+        "PWV3-S10"
+      ],
+      "emphasis": "Exact owner, crash recovery, once-only return",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-research-return-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-RESEARCH-RETURN-001.s04.test.mjs",
+        "test/regressions/PWV3-REG-RESEARCH-RETURN-001.s10.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-CONT-NONSTOP-001",
+      "owners": [
+        "PWV3-S04",
+        "PWV3-S13"
+      ],
+      "emphasis": "Durable reread/continue, no role/worker-completion stop",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-cont-nonstop-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-CONT-NONSTOP-001.s04.test.mjs",
+        "test/regressions/PWV3-REG-CONT-NONSTOP-001.s13.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-HANDOFF-BOUNDARY-001",
+      "owners": [
+        "PWV3-S09",
+        "PWV3-S11",
+        "PWV3-S12"
+      ],
+      "emphasis": "Required delivery, untrusted receive, exact consume-once, stale/forged/replayed rejection",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-handoff-boundary-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-HANDOFF-BOUNDARY-001.s09.test.mjs",
+        "test/regressions/PWV3-REG-HANDOFF-BOUNDARY-001.s11.test.mjs",
+        "test/regressions/PWV3-REG-HANDOFF-BOUNDARY-001.s12.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-PLAN-GRAPH-001",
+      "owners": [
+        "PWV3-S05"
+      ],
+      "emphasis": "Combined order/material/acceptance cycle, not just topological Card order",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-plan-graph-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-PLAN-GRAPH-001.s05.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-PLANREVIEW-NONTERM-001",
+      "owners": [
+        "PWV3-S03",
+        "PWV3-S05"
+      ],
+      "emphasis": "Exhaustive pending/in-progress/terminal handling",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-planreview-nonterm-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-PLANREVIEW-NONTERM-001.s03.test.mjs",
+        "test/regressions/PWV3-REG-PLANREVIEW-NONTERM-001.s05.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-REVIEW-SUBJECT-ACCEPT-001",
+      "owners": [
+        "PWV3-S03",
+        "PWV3-S06"
+      ],
+      "emphasis": "Independently mutate subject and acceptance; old GREEN unusable",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-review-subject-accept-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-REVIEW-SUBJECT-ACCEPT-001.s03.test.mjs",
+        "test/regressions/PWV3-REG-REVIEW-SUBJECT-ACCEPT-001.s06.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-REVIEW-HISTORY-001",
+      "owners": [
+        "PWV3-S03"
+      ],
+      "emphasis": "Append-only terminal attempts, invalid old GREEN retained but non-advancing",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-review-history-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-REVIEW-HISTORY-001.s03.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-REVIEW-INDEP-001",
+      "owners": [
+        "PWV3-S03",
+        "PWV3-S12"
+      ],
+      "emphasis": "Authorship semantics, ordinary waiver default versus OP/QF separation",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-review-indep-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-REVIEW-INDEP-001.s03.test.mjs",
+        "test/regressions/PWV3-REG-REVIEW-INDEP-001.s12.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-EXEC-RESUME-001",
+      "owners": [
+        "PWV3-S06"
+      ],
+      "emphasis": "Fresh authority/dependency verification on active Card",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-exec-resume-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-EXEC-RESUME-001.s06.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-EXEC-ONE-CARD-001",
+      "owners": [
+        "PWV3-S04",
+        "PWV3-S06"
+      ],
+      "emphasis": "One current stable Card; no product scheduler",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-exec-one-card-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-EXEC-ONE-CARD-001.s04.test.mjs",
+        "test/regressions/PWV3-REG-EXEC-ONE-CARD-001.s06.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-RESULT-SUBJECT-001",
+      "owners": [
+        "PWV3-S02",
+        "PWV3-S03"
+      ],
+      "emphasis": "Permitted immutable implementation identity only",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-result-subject-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-RESULT-SUBJECT-001.s02.test.mjs",
+        "test/regressions/PWV3-REG-RESULT-SUBJECT-001.s03.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-RESULT-OBJECT-001",
+      "owners": [
+        "PWV3-S02",
+        "PWV3-S03"
+      ],
+      "emphasis": "Real disposable Git objects, dirty/same-path/nonexistent controls",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-result-object-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-RESULT-OBJECT-001.s02.test.mjs",
+        "test/regressions/PWV3-REG-RESULT-OBJECT-001.s03.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-EVIDENCE-PRESENCE-001",
+      "owners": [
+        "PWV3-S03"
+      ],
+      "emphasis": "Every required pointer resolves exact durable bytes",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-evidence-presence-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-EVIDENCE-PRESENCE-001.s03.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-RESULT-NOREPLAY-RELEASE-001",
+      "owners": [
+        "PWV3-S03",
+        "PWV3-S06"
+      ],
+      "emphasis": "Result suppresses replay but does not release unresolved Review",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-result-noreplay-release-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-RESULT-NOREPLAY-RELEASE-001.s03.test.mjs",
+        "test/regressions/PWV3-REG-RESULT-NOREPLAY-RELEASE-001.s06.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-TERMINAL-PROOF-001",
+      "owners": [
+        "PWV3-S06",
+        "PWV3-S08"
+      ],
+      "emphasis": "DONE/close-ready labels cannot replace exact acceptance proof",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-terminal-proof-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-TERMINAL-PROOF-001.s06.test.mjs",
+        "test/regressions/PWV3-REG-TERMINAL-PROOF-001.s08.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-OBS-PENDING-001",
+      "owners": [
+        "PWV3-S03",
+        "PWV3-S08"
+      ],
+      "emphasis": "Pending/missing/negative/positive exact checks, no fallthrough",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-obs-pending-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-OBS-PENDING-001.s03.test.mjs",
+        "test/regressions/PWV3-REG-OBS-PENDING-001.s08.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-EFFECT-UNKNOWN-001",
+      "owners": [
+        "PWV3-S02",
+        "PWV3-S03"
+      ],
+      "emphasis": "Intent/attempt/readback; no blind retry, explicit continuation after readback",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-effect-unknown-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-EFFECT-UNKNOWN-001.s02.test.mjs",
+        "test/regressions/PWV3-REG-EFFECT-UNKNOWN-001.s03.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-EFFECT-IDEMPOTENCY-001",
+      "owners": [
+        "PWV3-S03",
+        "PWV3-S08"
+      ],
+      "emphasis": "One token per exact intent, separate identical-parameter intents",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-effect-idempotency-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-EFFECT-IDEMPOTENCY-001.s03.test.mjs",
+        "test/regressions/PWV3-REG-EFFECT-IDEMPOTENCY-001.s08.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-PUB-WRITER-READER-001",
+      "owners": [
+        "PWV3-S02",
+        "PWV3-S13"
+      ],
+      "emphasis": "Actual writer→validation→remote readback→fresh canonical consumer",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-pub-writer-reader-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-PUB-WRITER-READER-001.s02.test.mjs",
+        "test/regressions/PWV3-REG-PUB-WRITER-READER-001.s13.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-PUB-CAS-CRASH-001",
+      "owners": [
+        "PWV3-S02"
+      ],
+      "emphasis": "Atomic expected-old interleaving and acknowledgement-loss cases",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-pub-cas-crash-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-PUB-CAS-CRASH-001.s02.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-REMOTE-PRECEDENCE-001",
+      "owners": [
+        "PWV3-S02",
+        "PWV3-S04"
+      ],
+      "emphasis": "Safe local WIP only with unchanged predecessor+authority; divergent/UNKNOWN fails closed",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-remote-precedence-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-REMOTE-PRECEDENCE-001.s02.test.mjs",
+        "test/regressions/PWV3-REG-REMOTE-PRECEDENCE-001.s04.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-INTEGRATION-DRIFT-001",
+      "owners": [
+        "PWV3-S08",
+        "S14"
+      ],
+      "emphasis": "Source/target/material/UNKNOWN/last-moment target race on actual selected method",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-integration-drift-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-INTEGRATION-DRIFT-001.s08.test.mjs",
+        "test/regressions/PWV3-REG-INTEGRATION-DRIFT-001.s14.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-MERGE-READBACK-001",
+      "owners": [
+        "PWV3-S08",
+        "S14"
+      ],
+      "emphasis": "Exact PR/candidate/target proof, uncertain effect reconciliation without replay",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-merge-readback-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-MERGE-READBACK-001.s08.test.mjs",
+        "test/regressions/PWV3-REG-MERGE-READBACK-001.s14.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-CLOSE-RESTART-001",
+      "owners": [
+        "PWV3-S08",
+        "S15"
+      ],
+      "emphasis": "Target-side recovery after source deletion and later unrelated target advance",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-close-restart-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-CLOSE-RESTART-001.s08.test.mjs",
+        "test/regressions/PWV3-REG-CLOSE-RESTART-001.s15.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-VERSION-BOUNDARY-001",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S07"
+      ],
+      "emphasis": "Per-kind versions; producing-reader parity, synthetic generations and unsupported-newer refusal",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-version-boundary-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-VERSION-BOUNDARY-001.s01.test.mjs",
+        "test/regressions/PWV3-REG-VERSION-BOUNDARY-001.s07.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-IMPACT-REVALIDATION-001",
+      "owners": [
+        "PWV3-S06",
+        "PWV3-S07"
+      ],
+      "emphasis": "Material/transitive/shared cone, preserved outside boundary, full widening",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-impact-revalidation-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-IMPACT-REVALIDATION-001.s06.test.mjs",
+        "test/regressions/PWV3-REG-IMPACT-REVALIDATION-001.s07.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-CLEAN-LINEAGE-001",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S09"
+      ],
+      "emphasis": "No ordinary legacy interpretation or V2 build/runtime dependency",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-clean-lineage-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-CLEAN-LINEAGE-001.s01.test.mjs",
+        "test/regressions/PWV3-REG-CLEAN-LINEAGE-001.s09.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-RUNTIME-PACKAGE-CAPABILITY-001",
+      "owners": [
+        "PWV3-S09",
+        "PWV3-S11",
+        "PWV3-S12"
+      ],
+      "emphasis": "Immutable origin/package, mixed/helper/contract/capability denial",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-runtime-package-capability-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-RUNTIME-PACKAGE-CAPABILITY-001.s09.test.mjs",
+        "test/regressions/PWV3-REG-RUNTIME-PACKAGE-CAPABILITY-001.s11.test.mjs",
+        "test/regressions/PWV3-REG-RUNTIME-PACKAGE-CAPABILITY-001.s12.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-WORKER-BOUNDARY-001",
+      "owners": [
+        "PWV3-S06",
+        "PWV3-S12"
+      ],
+      "emphasis": "Bounded actual delegation, relation/readback, no recursive or completion-text authority",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-worker-boundary-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-WORKER-BOUNDARY-001.s06.test.mjs",
+        "test/regressions/PWV3-REG-WORKER-BOUNDARY-001.s12.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-ADAPTER-PARITY-001",
+      "owners": [
+        "PWV3-S09",
+        "PWV3-S11",
+        "PWV3-S12"
+      ],
+      "emphasis": "Equivalent exact inputs → same semantic result/UNKNOWN across shipped surfaces",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-adapter-parity-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-ADAPTER-PARITY-001.s09.test.mjs",
+        "test/regressions/PWV3-REG-ADAPTER-PARITY-001.s11.test.mjs",
+        "test/regressions/PWV3-REG-ADAPTER-PARITY-001.s12.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-DISCOVERY-CLOSURE-001",
+      "owners": [
+        "PWV3-S10",
+        "S15",
+        "S16"
+      ],
+      "emphasis": "Complete internal bounded Targeted coverage; consume OP caller disposition without implementing its internal convergence",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-discovery-closure-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-DISCOVERY-CLOSURE-001.s10.test.mjs",
+        "test/regressions/PWV3-REG-DISCOVERY-CLOSURE-001.s15.test.mjs",
+        "test/regressions/PWV3-REG-DISCOVERY-CLOSURE-001.s16.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-REPAIR-CAUSAL-001",
+      "owners": [
+        "PWV3-S06",
+        "S15",
+        "S16"
+      ],
+      "emphasis": "Root cause plus implicated siblings, exact repair/revalidation and upstream escalation",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-repair-causal-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-REPAIR-CAUSAL-001.s06.test.mjs",
+        "test/regressions/PWV3-REG-REPAIR-CAUSAL-001.s15.test.mjs",
+        "test/regressions/PWV3-REG-REPAIR-CAUSAL-001.s16.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    },
+    {
+      "id": "PWV3-REG-FINAL-ACCEPTANCE-001",
+      "owners": [
+        "PWV3-S13",
+        "S16"
+      ],
+      "emphasis": "Fresh post-QF current attempt only; honest independent/waived predicate and no stale-success fallback",
+      "oracle": "snapshots/research/corpus.md#pwv3-reg-final-acceptance-001",
+      "test_paths": [
+        "test/regressions/PWV3-REG-FINAL-ACCEPTANCE-001.s13.test.mjs",
+        "test/regressions/PWV3-REG-FINAL-ACCEPTANCE-001.s16.test.mjs"
+      ],
+      "release_gate": "S13 host-neutral full suite, exact applicability maintained through S16"
+    }
+  ],
+  "structural_guards": [
+    {
+      "id": "PWV3-GUARD-01",
+      "requirement": "One canonical derive-next semantic contract; host adapters do not maintain independent routing tables.",
+      "owners": [
+        "PWV3-S04"
+      ],
+      "test_path": "test/structural/guard-01.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 7 item 1"
+    },
+    {
+      "id": "PWV3-GUARD-02",
+      "requirement": "One exact Git identity resolver distinguishes parsed identity from verified object/bytes.",
+      "owners": [
+        "PWV3-S02"
+      ],
+      "test_path": "test/structural/guard-02.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 7 item 2"
+    },
+    {
+      "id": "PWV3-GUARD-03",
+      "requirement": "Caller assertions such as observed=true are not authoritative unless the calling contract supplies verified evidence.",
+      "owners": [
+        "PWV3-S02",
+        "PWV3-S03"
+      ],
+      "test_path": "test/structural/guard-03.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 7 item 3"
+    },
+    {
+      "id": "PWV3-GUARD-04",
+      "requirement": "Relational closure is validated before fallback routing.",
+      "owners": [
+        "PWV3-S04"
+      ],
+      "test_path": "test/structural/guard-04.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 7 item 4"
+    },
+    {
+      "id": "PWV3-GUARD-05",
+      "requirement": "Current checkpoint publication is expected-old/freshness fenced and positively read back.",
+      "owners": [
+        "PWV3-S02"
+      ],
+      "test_path": "test/structural/guard-05.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 7 item 5"
+    },
+    {
+      "id": "PWV3-GUARD-06",
+      "requirement": "Review state handling is exhaustive; default else never means RED, GREEN, Execution or Close.",
+      "owners": [
+        "PWV3-S03"
+      ],
+      "test_path": "test/structural/guard-06.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 7 item 6"
+    },
+    {
+      "id": "PWV3-GUARD-07",
+      "requirement": "Result/Review/accepted Plan history is immutable and append-only.",
+      "owners": [
+        "PWV3-S03",
+        "PWV3-S05"
+      ],
+      "test_path": "test/structural/guard-07.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 7 item 7"
+    },
+    {
+      "id": "PWV3-GUARD-08",
+      "requirement": "Semantic independence records material authorship/repair facts, not runtime/model/session IDs.",
+      "owners": [
+        "PWV3-S03"
+      ],
+      "test_path": "test/structural/guard-08.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 7 item 8"
+    },
+    {
+      "id": "PWV3-GUARD-09",
+      "requirement": "One current writer per artifact kind; historical readers never become alternate historical writers.",
+      "owners": [
+        "PWV3-S07"
+      ],
+      "test_path": "test/structural/guard-09.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 7 item 9"
+    },
+    {
+      "id": "PWV3-GUARD-10",
+      "requirement": "Artifact-version dispatch is explicit PWV3 lineage + artifact kind + declared producing contract; no inference from file age, release number, branch or runtime package.",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S07"
+      ],
+      "test_path": "test/structural/guard-10.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 7 item 10"
+    },
+    {
+      "id": "PWV3-GUARD-11",
+      "requirement": "Compatibility policy is code/test policy, not a second per-workstream compatibility database.",
+      "owners": [
+        "PWV3-S07"
+      ],
+      "test_path": "test/structural/guard-11.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 7 item 11"
+    },
+    {
+      "id": "PWV3-GUARD-12",
+      "requirement": "Context packs/optimization include mandatory authority/dependency/acceptance closure or fall back safely; context pack is never authority.",
+      "owners": [
+        "PWV3-S09"
+      ],
+      "test_path": "test/structural/guard-12.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 7 item 12"
+    },
+    {
+      "id": "PWV3-GUARD-13",
+      "requirement": "Runtime/package update machinery never silently migrates semantic state.",
+      "owners": [
+        "PWV3-S07",
+        "PWV3-S09"
+      ],
+      "test_path": "test/structural/guard-13.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 7 item 13"
+    },
+    {
+      "id": "PWV3-GUARD-14",
+      "requirement": "Native Pi tool, CLI and any optional adapter share one semantic core.",
+      "owners": [
+        "PWV3-S09",
+        "PWV3-S12"
+      ],
+      "test_path": "test/structural/guard-14.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 7 item 14"
+    },
+    {
+      "id": "PWV3-GUARD-15",
+      "requirement": "Generic Worker recursive delegation is absent from v1 authority; runtime enforcement plus acceptance fencing prevents out-of-envelope effects.",
+      "owners": [
+        "PWV3-S06",
+        "PWV3-S12"
+      ],
+      "test_path": "test/structural/guard-15.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 7 item 15"
+    },
+    {
+      "id": "PWV3-GUARD-16",
+      "requirement": "Worker publication is accepted only after exact remote readback.",
+      "owners": [
+        "PWV3-S06",
+        "PWV3-S12"
+      ],
+      "test_path": "test/structural/guard-16.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 7 item 16"
+    },
+    {
+      "id": "PWV3-GUARD-17",
+      "requirement": "ChatGPT Project Instructions, project AGENTS or other prose cannot redefine trusted package origin, workflow legality, credentials or canonical state.",
+      "owners": [
+        "PWV3-S09",
+        "PWV3-S11",
+        "PWV3-S12"
+      ],
+      "test_path": "test/structural/guard-17.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 7 item 17"
+    },
+    {
+      "id": "PWV3-GUARD-18",
+      "requirement": "Global Pi package remains inert outside a PWV3 repository/lineage.",
+      "owners": [
+        "PWV3-S12"
+      ],
+      "test_path": "test/structural/guard-18.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 7 item 18"
+    },
+    {
+      "id": "PWV3-GUARD-19",
+      "requirement": "Duplicate/shadow helper identity is rejected or deterministically resolved to the exact qualified package; nearest-copy-wins is not authority.",
+      "owners": [
+        "PWV3-S09",
+        "PWV3-S12"
+      ],
+      "test_path": "test/structural/guard-19.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 7 item 19"
+    },
+    {
+      "id": "PWV3-GUARD-20",
+      "requirement": "Regression-oracle quality is itself guarded by mutation/meta-tests for high-risk structured predicates.",
+      "owners": [
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/guard-20.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 7 item 20"
+    }
+  ],
+  "removed_negatives": [
+    {
+      "id": "PWV3-NEG-PREMIUM-NAMES-001",
+      "requirement": "no semantic dependency on Premium A/B/C/D names",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-PREMIUM-NAMES-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-V2-INTERPRETER-001",
+      "requirement": "normal PWV3 startup does not natively interpret V1/V2/V2.2 lifecycle state",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-V2-INTERPRETER-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-BROAD-TASKBOARD-001",
+      "requirement": "no broad V2 Task Board projection as a second authority",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-BROAD-TASKBOARD-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-PARALLEL-CARDS-001",
+      "requirement": "no product Card scheduler/claims/frontier/fan-in state",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-PARALLEL-CARDS-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-MULTI-ACTIVE-CARD-001",
+      "requirement": "no two ordinary active Project Cards",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-MULTI-ACTIVE-CARD-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-STACKED-001",
+      "requirement": "no stacked-workstream core",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-STACKED-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-FIXED-REPAIR-COUNT-001",
+      "requirement": "no fixed semantic repair-attempt count as convergence authority",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-FIXED-REPAIR-COUNT-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-MANDATORY-MCP-001",
+      "requirement": "no mandatory MCP/Paseo semantic plugin",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-MANDATORY-MCP-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-GAUNTLET-001",
+      "requirement": "no Gauntlet stage/skill/comparator in semantic acceptance",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-GAUNTLET-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-RUNTIME-AUTH-001",
+      "requirement": "no model/provider/session/worker identity as workflow authority or Review independence",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-RUNTIME-AUTH-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-SESSION-LEDGER-001",
+      "requirement": "no durable runtime/session/agent registry as recovery authority",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-SESSION-LEDGER-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-HELPER-DB-001",
+      "requirement": "no helper cache/database as canonical workflow truth",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-HELPER-DB-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-BRANCH-IDENTITY-001",
+      "requirement": "branch/ref name alone never satisfies immutable subject identity",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-BRANCH-IDENTITY-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-TRANSPORT-SUCCESS-001",
+      "requirement": "API/tool return alone never satisfies canonical publication/effect success",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-TRANSPORT-SUCCESS-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-PERMANENT-MIGRATION-001",
+      "requirement": "no permanent pre-PWV3 compatibility adapter",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-PERMANENT-MIGRATION-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-GLOBAL-EPOCH-001",
+      "requirement": "no global release/epoch number used as artifact legality/staleness authority",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-GLOBAL-EPOCH-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-SOURCE-SURVIVAL-001",
+      "requirement": "source branch survival is not required for Close/recovery",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-SOURCE-SURVIVAL-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-CLEANUP-CLOSE-001",
+      "requirement": "branch cleanup is not canonical Close authority",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-CLEANUP-CLOSE-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-SECOND-CLOSE-PR-001",
+      "requirement": "normal Close needs no second metadata/cleanup PR",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-SECOND-CLOSE-PR-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-LKG-AUTHORITY-001",
+      "requirement": "no mutable LAST_KNOWN_GOOD pointer as workflow authority",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-LKG-AUTHORITY-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-FORK-RELEASE-001",
+      "requirement": "no ordinary fork-release policy in semantic core",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-FORK-RELEASE-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-OLD-CHILD-BRIDGE-001",
+      "requirement": "no V2 temporary daemon/spawner/shell delegation workaround",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-OLD-CHILD-BRIDGE-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    },
+    {
+      "id": "PWV3-NEG-TOOLNAME-CAPABILITY-001",
+      "requirement": "no literal create_agent or other tool name as semantic capability definition",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/structural/PWV3-NEG-TOOLNAME-CAPABILITY-001.test.mjs",
+      "release_gate": "S13",
+      "oracle": "snapshots/research/corpus.md section 13"
+    }
+  ],
+  "d12_seams": [
+    {
+      "id": "PWV3-D12-01",
+      "requirement": "Universal OP frontier: first attempt before dispatch; crash before/after ack; same-binding resolved non-advancing terminal produces exactly one successor; changed binding cannot reuse old attempt.",
+      "owners": [
+        "PWV3-S04",
+        "PWV3-S10",
+        "PWV3-S13"
+      ],
+      "test_path": "test/integrated/d12-01.test.mjs",
+      "oracle": "snapshots/plan/P1.md section 8.2",
+      "live_gate": "S14-S16 where applicable"
+    },
+    {
+      "id": "PWV3-D12-02",
+      "requirement": "Non-Global gate: no synthetic owner choice; resolved RUN OP AGAIN rechecks drift before its cut; crash before/after cut; old GREEN/choice cannot return; duplicate TERMINAL consumption is idempotent.",
+      "owners": [
+        "PWV3-S04",
+        "PWV3-S05",
+        "PWV3-S10",
+        "PWV3-S13"
+      ],
+      "test_path": "test/integrated/d12-02.test.mjs",
+      "oracle": "snapshots/plan/P1.md section 8.2",
+      "live_gate": "S14-S16 where applicable"
+    },
+    {
+      "id": "PWV3-D12-03",
+      "requirement": "Global seam: no routine CLEAR owner gate; explicit same-binding repeat just before intent, at intent-UNKNOWN and after cut; terminal acceptance superseded; current non-advancing Global blocks old CLEAR.",
+      "owners": [
+        "PWV3-S04",
+        "PWV3-S08",
+        "PWV3-S13",
+        "S16"
+      ],
+      "test_path": "test/integrated/d12-03.test.mjs",
+      "oracle": "snapshots/plan/P1.md section 8.2",
+      "live_gate": "S14-S16 where applicable"
+    },
+    {
+      "id": "PWV3-D12-04",
+      "requirement": "QF: old applicable acceptance is not fresh; terminal successor supersedes success before execution; current RED/BLOCKED/UNKNOWN prevents fallback; automatic read-only independence versus executor self-review; exact authorized waiver honesty.",
+      "owners": [
+        "PWV3-S03",
+        "PWV3-S13",
+        "S16"
+      ],
+      "test_path": "test/integrated/d12-04.test.mjs",
+      "oracle": "snapshots/plan/P1.md section 8.2",
+      "live_gate": "S14-S16 where applicable"
+    },
+    {
+      "id": "PWV3-D12-05",
+      "requirement": "Card seam: Result before Review never advances; qualification repair attributes/conservatively widens affected Cards, reopens in total order, new Result + invalidated checks, upstream semantic change not absorbed locally.",
+      "owners": [
+        "PWV3-S06",
+        "PWV3-S13",
+        "S15",
+        "S16"
+      ],
+      "test_path": "test/integrated/d12-05.test.mjs",
+      "oracle": "snapshots/plan/P1.md section 8.2",
+      "live_gate": "S14-S16 where applicable"
+    },
+    {
+      "id": "PWV3-D12-06",
+      "requirement": "Invocation seam: provenance publish/readback before first material write/effect, crash/UNKNOWN cut, rebind same package on another host; no mode field; goal-capable actual delegated implementation use, not idle capability.",
+      "owners": [
+        "PWV3-S12",
+        "S14"
+      ],
+      "test_path": "test/integrated/d12-06.test.mjs",
+      "oracle": "snapshots/plan/P1.md section 8.2",
+      "live_gate": "S14-S16 where applicable"
+    },
+    {
+      "id": "PWV3-D12-07",
+      "requirement": "Capability: one safe qualified receiver versus zero, two non-equivalent, unavailable or UNKNOWN routes; re-derive same obligation after handoff without extra invented user confirmation.",
+      "owners": [
+        "PWV3-S09",
+        "PWV3-S11",
+        "PWV3-S12",
+        "S14"
+      ],
+      "test_path": "test/integrated/d12-07.test.mjs",
+      "oracle": "snapshots/plan/P1.md section 8.2",
+      "live_gate": "S14-S16 where applicable"
+    },
+    {
+      "id": "PWV3-D12-08",
+      "requirement": "Evolution seam: adoption and migration exact source/target sets, staged non-current artifacts, dry-run/proof, writer-cut crash, retirement/downgrade proof, immutable history; fingerprint incomplete/version/collision fallback.",
+      "owners": [
+        "PWV3-S07",
+        "S14"
+      ],
+      "test_path": "test/integrated/d12-08.test.mjs",
+      "oracle": "snapshots/plan/P1.md section 8.2",
+      "live_gate": "S14-S16 where applicable"
+    },
+    {
+      "id": "PWV3-D12-09",
+      "requirement": "Health/diagnostics: complete-query/classification failures, narrow maintenance exemption, rechecks after patch and before new work; exact diagnostics and deterministic context closure; anomaly filing cannot mask a blocker.",
+      "owners": [
+        "PWV3-S08",
+        "PWV3-S09",
+        "S14"
+      ],
+      "test_path": "test/integrated/d12-09.test.mjs",
+      "oracle": "snapshots/plan/P1.md section 8.2",
+      "live_gate": "S14-S16 where applicable"
+    },
+    {
+      "id": "PWV3-D12-10",
+      "requirement": "Construction boundary: no PWV2 implementation after package acceptance, no partial-native SH0 cut, portable self-contained export with no provider-specific authority.",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "test_path": "test/integrated/d12-10.test.mjs",
+      "oracle": "snapshots/plan/P1.md section 8.2",
+      "live_gate": "S14-S16 where applicable"
+    }
+  ],
+  "live_matrix": [
+    {
+      "surface": "ChatGPT",
+      "requirement": "Trusted live discovery + locator fallback; immutable handshake; fresh consumer/package/object admission; no chat/static-source dependency; actual guarded canonical write/readback; read-only/denied/missing helper; ambiguous write recovery; valid/stale/replayed handoff; active and terminal fresh reconstruction; consumer prose cannot override trust/authority",
+      "contract": "QUALIFICATION.md",
+      "gate": "S14",
+      "oracle": "snapshots/plan/P1.md section 8.4"
+    },
+    {
+      "surface": "Pi/Paseo",
+      "requirement": "Global exact package under actual managed host; project-local trust denial does not bypass global verification; pinned rather than latest; mismatch/mixed/shadow helper refusal; repair followed by re-handshake; restart/reload; shared native/CLI semantic parity; true caller-scoped child relation and bounded useful delegation; no child-text acceptance or recursive delegation; independent reviewer by authorship; remote beats stale worktree/cache; inert unrelated repository",
+      "contract": "QUALIFICATION.md",
+      "gate": "S14",
+      "oracle": "snapshots/plan/P1.md section 8.4"
+    },
+    {
+      "surface": "Cross-host",
+      "requirement": "Same exact inputs yield same obligation/error/UNKNOWN; Result on one host resumes Review/finalization on the other; swap during repair/revalidation preserves outstanding exact work; at least one real required capability handoff/checkpoint continuation; no session/worker memory needed for no replay",
+      "contract": "QUALIFICATION.md",
+      "gate": "S14",
+      "oracle": "snapshots/plan/P1.md section 8.4"
+    },
+    {
+      "surface": "GitHub/provider",
+      "requirement": "Selected actual PR/head/base/candidate/check and atomic expected-base integration method; target race rejected; positive merge/containment and source deletion readback; fresh target-side Close; Issue create/dedup/close when claimed; safe no-effect/ambiguous-result reconciliation controls, not destructive production fault injection",
+      "contract": "QUALIFICATION.md",
+      "gate": "S14",
+      "oracle": "snapshots/plan/P1.md section 8.4"
+    },
+    {
+      "surface": "Evolution/maintenance",
+      "requirement": "Qualified compatible 3.0.x identity adoption without rewriting immutable history; source/target contract proof and fresh readback; health reevaluation before paused consumers resume; incompatible/UNKNOWN downgrade refusal",
+      "contract": "QUALIFICATION.md",
+      "gate": "S14",
+      "oracle": "snapshots/plan/P1.md section 8.4"
+    },
+    {
+      "surface": "Native dogfood",
+      "requirement": "Entire section 5.3 lifecycle with real OP boundaries and required owner gates; both routine and independently reviewed Cards; restart/effect/readback/repair; Final Qualification, Global, terminal, integration and fresh Close",
+      "contract": "QUALIFICATION.md",
+      "gate": "S15",
+      "oracle": "snapshots/plan/P1.md section 8.4"
+    }
+  ]
+}

@@ -1,0 +1,679 @@
+{
+  "artifact_kind": "construction-donor-inventory",
+  "producing_contract": "EP1/1",
+  "policy": "Choose native REIMPLEMENT for all production responsibilities; TEST_ONLY historical scenario evidence and DROP removed machinery. No COPY/PORT permission is issued. Source locators are non-authoritative provenance; the locally exported contracts/oracles suffice with donors offline.",
+  "units": [
+    {
+      "id": "DONOR-01",
+      "invariant": "Canonical encoding/path/object/fence contracts, not donor lineage/epoch or host assumptions",
+      "repository": "elmakus/project_workflow_v2",
+      "commit": "dcf02ce9d385fe77104d70018f7a2b2a2aa7b20c",
+      "path": "tools/pwv22_native_foundation.py",
+      "blob": "88612bd5da9f77cf01707ebf2f27de22e6b90c94",
+      "symbols": [
+        "canonical_json",
+        "safe_path",
+        "exact_blob",
+        "material_fingerprint",
+        "guarded_publish",
+        "validate_atomic_candidate",
+        "remote_ref_head",
+        "guarded_git_ref_publish"
+      ],
+      "dropped_symbols": ["admit_native"],
+      "disposition": "REIMPLEMENT",
+      "target": "src/contracts/; src/identity/; src/publication/",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S02"
+      ],
+      "transformation": "Original PWV3 implementation from accepted D12/P1/EP1 and native scenarios; no donor executable code import.",
+      "licence_notice": "No source code copied or ported. Root licence/notice not observed in these source trees; no permissive grant inferred. Any later code reuse requires rights/notice and purity audit plus revised applicable inventory/review.",
+      "tests": [
+        "test/slots/s01.test.mjs",
+        "test/slots/s02.test.mjs"
+      ]
+    },
+    {
+      "id": "DONOR-02",
+      "invariant": "Exact accepted Results and conservative transitive impact, native types",
+      "repository": "elmakus/project_workflow_v2",
+      "commit": "dcf02ce9d385fe77104d70018f7a2b2a2aa7b20c",
+      "path": "tools/pwv22_native_results.py",
+      "blob": "4d5dea6eeabafc9e6e09229b97286c31c26f8106",
+      "symbols": [
+        "_req",
+        "exact_identity",
+        "typed_result",
+        "accepted_dependency",
+        "result_fingerprint",
+        "material_fresh",
+        "affected_results",
+        "append_result"
+      ],
+      "dropped_symbols": ["readiness", "frontier"],
+      "disposition": "REIMPLEMENT",
+      "target": "src/evidence/; src/impact/",
+      "owners": [
+        "PWV3-S03",
+        "PWV3-S06"
+      ],
+      "transformation": "Original PWV3 implementation from accepted D12/P1/EP1 and native scenarios; no donor executable code import.",
+      "licence_notice": "No source code copied or ported. Root licence/notice not observed in these source trees; no permissive grant inferred. Any later code reuse requires rights/notice and purity audit plus revised applicable inventory/review.",
+      "tests": [
+        "test/slots/s03.test.mjs",
+        "test/slots/s06.test.mjs"
+      ]
+    },
+    {
+      "id": "DONOR-03",
+      "invariant": "Append-only subject+acceptance and authorship/waiver contracts; no safe_deferred",
+      "repository": "elmakus/project_workflow_v2",
+      "commit": "dcf02ce9d385fe77104d70018f7a2b2a2aa7b20c",
+      "path": "tools/pwv22_review.py",
+      "blob": "eb5b67c839f4769879372e5fddde8497389f8e63",
+      "symbols": [
+        "_req",
+        "typed_attempt",
+        "append_attempt",
+        "reviewer_publication",
+        "deterministic_finalization"
+      ],
+      "dropped_symbols": ["typed_finding", "completion_allowed", "blocked_results", "must_repair_before", "convergence_mode", "fresh_closure_required"],
+      "disposition": "REIMPLEMENT",
+      "target": "src/evidence/",
+      "owners": [
+        "PWV3-S03"
+      ],
+      "transformation": "Original PWV3 implementation from accepted D12/P1/EP1 and native scenarios; no donor executable code import.",
+      "licence_notice": "No source code copied or ported. Root licence/notice not observed in these source trees; no permissive grant inferred. Any later code reuse requires rights/notice and purity audit plus revised applicable inventory/review.",
+      "tests": [
+        "test/slots/s03.test.mjs"
+      ]
+    },
+    {
+      "id": "DONOR-04",
+      "invariant": "Intent-scoped idempotency/readback, not old artifact shape",
+      "repository": "elmakus/project_workflow_v2",
+      "commit": "f1158d315938994341f7256416cc68c494f2fab5",
+      "path": "tools/pwv22_effects.py",
+      "blob": "455e041d2607bc260fdeb59e40eab81abe76b8c0",
+      "symbols": [
+        "_req",
+        "effect_intent",
+        "record_attempt",
+        "record_readback",
+        "retry_allowed",
+        "effect_complete"
+      ],
+      "disposition": "REIMPLEMENT",
+      "target": "src/effects/",
+      "owners": [
+        "PWV3-S03"
+      ],
+      "transformation": "Original PWV3 implementation from accepted D12/P1/EP1 and native scenarios; no donor executable code import.",
+      "licence_notice": "No source code copied or ported. Root licence/notice not observed in these source trees; no permissive grant inferred. Any later code reuse requires rights/notice and purity audit plus revised applicable inventory/review.",
+      "tests": [
+        "test/slots/s03.test.mjs"
+      ]
+    },
+    {
+      "id": "DONOR-05",
+      "invariant": "Per-kind producing readers and full D12 one-writer evolution, no global epoch",
+      "repository": "elmakus/project_workflow_v2",
+      "commit": "405d40c45ba254f4545231c3bcfed303d0a6fee6",
+      "path": "tools/pwv22_evolution.py",
+      "blob": "819f004cba65c3e155f004e161bd5b40eb6ab08e",
+      "symbols": [
+        "_req",
+        "classify_evolution",
+        "revalidation_attachment"
+      ],
+      "dropped_symbols": ["activation_allowed"],
+      "disposition": "REIMPLEMENT",
+      "target": "src/evolution/; src/fingerprints/",
+      "owners": [
+        "PWV3-S07"
+      ],
+      "transformation": "Original PWV3 implementation from accepted D12/P1/EP1 and native scenarios; no donor executable code import.",
+      "licence_notice": "No source code copied or ported. Root licence/notice not observed in these source trees; no permissive grant inferred. Any later code reuse requires rights/notice and purity audit plus revised applicable inventory/review.",
+      "tests": [
+        "test/slots/s07.test.mjs"
+      ]
+    },
+    {
+      "id": "DONOR-06",
+      "invariant": "No-replay/pending/nonstop semantics, no old route strings or evidence-epoch state",
+      "repository": "elmakus/project_workflow_v2",
+      "commit": "d3ab917f02e4de91b7dbb17915c2287c2387333e",
+      "path": "tools/continuation_contract.py",
+      "blob": "59ef785549f99e02bd262d14a268127670b47c0a",
+      "symbols": [
+        "ContinuationContractError",
+        "ContinuationDecision",
+        "classify_route_completion",
+        "classify_external_evidence",
+        "ProgressObservation",
+        "classify_progress",
+        "resume_action"
+      ],
+      "disposition": "REIMPLEMENT",
+      "target": "src/kernel/; src/recovery/",
+      "owners": [
+        "PWV3-S04"
+      ],
+      "transformation": "Original PWV3 implementation from accepted D12/P1/EP1 and native scenarios; no donor executable code import.",
+      "licence_notice": "No source code copied or ported. Root licence/notice not observed in these source trees; no permissive grant inferred. Any later code reuse requires rights/notice and purity audit plus revised applicable inventory/review.",
+      "tests": [
+        "test/slots/s04.test.mjs"
+      ]
+    },
+    {
+      "id": "DONOR-07",
+      "invariant": "Native bounded execution/Result, no Markdown parser contract",
+      "repository": "elmakus/project_workflow_v2",
+      "commit": "d3ab917f02e4de91b7dbb17915c2287c2387333e",
+      "path": "tools/execution_contract.py",
+      "blob": "f192b0184878971fce336847ca8e89b02806b279",
+      "symbols": [
+        "ExecutionContractError",
+        "_require",
+        "choose_realization",
+        "classify_return",
+        "parse_card_result"
+      ],
+      "disposition": "REIMPLEMENT",
+      "target": "src/execution/",
+      "owners": [
+        "PWV3-S06"
+      ],
+      "transformation": "Original PWV3 implementation from accepted D12/P1/EP1 and native scenarios; no donor executable code import.",
+      "licence_notice": "No source code copied or ported. Root licence/notice not observed in these source trees; no permissive grant inferred. Any later code reuse requires rights/notice and purity audit plus revised applicable inventory/review.",
+      "tests": [
+        "test/slots/s06.test.mjs"
+      ]
+    },
+    {
+      "id": "DONOR-08",
+      "invariant": "Ordinary Review separated from mandatory external OP and terminal predicate",
+      "repository": "elmakus/project_workflow_v2",
+      "commit": "d3ab917f02e4de91b7dbb17915c2287c2387333e",
+      "path": "tools/review_contract.py",
+      "blob": "8180e51cc33b6a174435d2dfd4f525f6dbcc109e",
+      "symbols": [
+        "select_review_realization",
+        "review_delivery_policy"
+      ],
+      "disposition": "REIMPLEMENT",
+      "target": "src/evidence/; src/op/",
+      "owners": [
+        "PWV3-S03",
+        "PWV3-S10"
+      ],
+      "transformation": "Original PWV3 implementation from accepted D12/P1/EP1 and native scenarios; no donor executable code import.",
+      "licence_notice": "No source code copied or ported. Root licence/notice not observed in these source trees; no permissive grant inferred. Any later code reuse requires rights/notice and purity audit plus revised applicable inventory/review.",
+      "tests": [
+        "test/slots/s03.test.mjs",
+        "test/slots/s10.test.mjs"
+      ]
+    },
+    {
+      "id": "DONOR-09",
+      "invariant": "Exact durable recovery, no old owner vocabulary",
+      "repository": "elmakus/project_workflow_v2",
+      "commit": "d3ab917f02e4de91b7dbb17915c2287c2387333e",
+      "path": "tools/recovery_contract.py",
+      "blob": "67321d28d73b85747f65ce1ab18313043378faa1",
+      "symbols": [
+        "RecoveryContractError",
+        "classify_resolution",
+        "exact_result_subject",
+        "review_subject"
+      ],
+      "disposition": "REIMPLEMENT",
+      "target": "src/recovery/",
+      "owners": [
+        "PWV3-S04"
+      ],
+      "transformation": "Original PWV3 implementation from accepted D12/P1/EP1 and native scenarios; no donor executable code import.",
+      "licence_notice": "No source code copied or ported. Root licence/notice not observed in these source trees; no permissive grant inferred. Any later code reuse requires rights/notice and purity audit plus revised applicable inventory/review.",
+      "tests": [
+        "test/slots/s04.test.mjs"
+      ]
+    },
+    {
+      "id": "DONOR-10",
+      "invariant": "Untrusted exact handoff admission, no Premium or old lifecycle authority",
+      "repository": "elmakus/project_workflow_v2",
+      "commit": "d3ab917f02e4de91b7dbb17915c2287c2387333e",
+      "path": "tools/receive_contract.py",
+      "blob": "f9bdb4fa10957ca7f64becc6920bc9bf929c9961",
+      "symbols": [
+        "ReceiveContractError",
+        "FreshContextLocator",
+        "ReceiveExpectation",
+        "ReceiveDecision",
+        "_clean",
+        "parse_fresh_context_locator",
+        "validate_receive",
+        "ReceiveContinuationDecision",
+        "consume_handoff_and_classify"
+      ],
+      "disposition": "REIMPLEMENT",
+      "target": "src/helper/; hosts/",
+      "owners": [
+        "PWV3-S09",
+        "PWV3-S11",
+        "PWV3-S12"
+      ],
+      "transformation": "Original PWV3 implementation from accepted D12/P1/EP1 and native scenarios; no donor executable code import.",
+      "licence_notice": "No source code copied or ported. Root licence/notice not observed in these source trees; no permissive grant inferred. Any later code reuse requires rights/notice and purity audit plus revised applicable inventory/review.",
+      "tests": [
+        "test/slots/s09.test.mjs",
+        "test/slots/s11.test.mjs",
+        "test/slots/s12.test.mjs"
+      ]
+    },
+    {
+      "id": "DONOR-11",
+      "invariant": "Delivery follows real boundary, no Premium map",
+      "repository": "elmakus/project_workflow_v2",
+      "commit": "d3ab917f02e4de91b7dbb17915c2287c2387333e",
+      "path": "tools/user_stop_contract.py",
+      "blob": "39582a700160e5f7e63fbe9695d3cf447935f064",
+      "symbols": [
+        "DeliveryContractError",
+        "_validate_locator_values",
+        "DeliveryRequirement",
+        "router_stop_handoff_policy",
+        "review_realization_handoff_policy",
+        "_extract_exact_locator_prompt",
+        "validate_user_stop_delivery"
+      ],
+      "disposition": "REIMPLEMENT",
+      "target": "src/helper/",
+      "owners": [
+        "PWV3-S09"
+      ],
+      "transformation": "Original PWV3 implementation from accepted D12/P1/EP1 and native scenarios; no donor executable code import.",
+      "licence_notice": "No source code copied or ported. Root licence/notice not observed in these source trees; no permissive grant inferred. Any later code reuse requires rights/notice and purity audit plus revised applicable inventory/review.",
+      "tests": [
+        "test/slots/s09.test.mjs"
+      ]
+    },
+    {
+      "id": "DONOR-12",
+      "invariant": "Native checkpoint/immutable artifacts, never Board/phase-record transplant",
+      "repository": "elmakus/project_workflow_v2",
+      "commit": "d3ab917f02e4de91b7dbb17915c2287c2387333e",
+      "path": "tools/state_contract.py",
+      "blob": "da8107945ccbf284c5c5445378035592143bfefd",
+      "symbols": [
+        "ValidationError",
+        "_require",
+        "read_toml",
+        "read_project",
+        "reject_prohibited_keys",
+        "_safe_relative_path",
+        "validate_locator",
+        "validate_project",
+        "validate_workstream",
+        "validate_intake",
+        "validate_brainstorm",
+        "validate_research",
+        "validate_definition",
+        "_git_blob_subject_key",
+        "validate_planning",
+        "validate_plan_review",
+        "validate_tracker",
+        "parse_task_card",
+        "validate_board",
+        "validate_blocker",
+        "_review_subject_key",
+        "validate_review",
+        "validate_review_history",
+        "validate_external_effect",
+        "validate_bundle",
+        "main"
+      ],
+      "disposition": "REIMPLEMENT",
+      "target": "src/contracts/; src/checkpoint/",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S04"
+      ],
+      "transformation": "Original PWV3 implementation from accepted D12/P1/EP1 and native scenarios; no donor executable code import.",
+      "licence_notice": "No source code copied or ported. Root licence/notice not observed in these source trees; no permissive grant inferred. Any later code reuse requires rights/notice and purity audit plus revised applicable inventory/review.",
+      "tests": [
+        "test/slots/s01.test.mjs",
+        "test/slots/s04.test.mjs"
+      ]
+    },
+    {
+      "id": "DONOR-13",
+      "invariant": "One pure native derive-next and relational closure, no V2 graph",
+      "repository": "elmakus/project_workflow_v2",
+      "commit": "d3ab917f02e4de91b7dbb17915c2287c2387333e",
+      "path": "tools/router.py",
+      "blob": "309fa51dad9224794b711863eb933928a737a5ba",
+      "symbols": [
+        "RouteResult",
+        "Reads",
+        "result",
+        "recovery",
+        "classify_jit_refinement",
+        "refresh_ready_card",
+        "select_route",
+        "main"
+      ],
+      "disposition": "REIMPLEMENT",
+      "target": "src/kernel/",
+      "owners": [
+        "PWV3-S04"
+      ],
+      "transformation": "Original PWV3 implementation from accepted D12/P1/EP1 and native scenarios; no donor executable code import.",
+      "licence_notice": "No source code copied or ported. Root licence/notice not observed in these source trees; no permissive grant inferred. Any later code reuse requires rights/notice and purity audit plus revised applicable inventory/review.",
+      "tests": [
+        "test/slots/s04.test.mjs"
+      ]
+    },
+    {
+      "id": "DONOR-14",
+      "invariant": "Atomic base-fenced native final integration and target-side proof, no stacked policy",
+      "repository": "elmakus/project_workflow_v2",
+      "commit": "d3ab917f02e4de91b7dbb17915c2287c2387333e",
+      "path": "tools/close_contract.py",
+      "blob": "29dedcc22c6cc89fe9d7dcfd06910752fc78477f",
+      "symbols": [
+        "CloseContractError",
+        "RefreshSnapshot",
+        "classify_review_coverage",
+        "verify_pre_mutation_target",
+        "external_effect_recovery_action",
+        "tracker_pr_linkage",
+        "reconcile_issue_readback",
+        "verify_target_side_recovery",
+        "cleanup_branch_action",
+        "verify_terminal_unmerged_closure",
+        "close_continuation"
+      ],
+      "disposition": "REIMPLEMENT",
+      "target": "src/integration/; src/close/",
+      "owners": [
+        "PWV3-S08"
+      ],
+      "transformation": "Original PWV3 implementation from accepted D12/P1/EP1 and native scenarios; no donor executable code import.",
+      "licence_notice": "No source code copied or ported. Root licence/notice not observed in these source trees; no permissive grant inferred. Any later code reuse requires rights/notice and purity audit plus revised applicable inventory/review.",
+      "tests": [
+        "test/slots/s08.test.mjs"
+      ]
+    },
+    {
+      "id": "DONOR-15",
+      "invariant": "Reject scheduler/claims/fan-in entirely",
+      "repository": "elmakus/project_workflow_v2",
+      "commit": "dcf02ce9d385fe77104d70018f7a2b2a2aa7b20c",
+      "path": "tools/pwv22_parallel.py",
+      "blob": "69f89a665dfc68211acfc1bf97e92433d83a6d45",
+      "symbols": [
+        "_req",
+        "_claim_set",
+        "typed_admission",
+        "accepted_admission",
+        "typed_claims",
+        "admitted",
+        "parallel_legal",
+        "one_mutating_owner",
+        "compatible_fan_in"
+      ],
+      "disposition": "DROP",
+      "target": "none",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "transformation": "Do not import into runtime; retain removed-machinery negative scenario only.",
+      "licence_notice": "No source code copied or ported. Root licence/notice not observed in these source trees; no permissive grant inferred. Any later code reuse requires rights/notice and purity audit plus revised applicable inventory/review.",
+      "tests": [
+        "test/slots/s01.test.mjs",
+        "test/slots/s13.test.mjs"
+      ]
+    },
+    {
+      "id": "DONOR-16",
+      "invariant": "No ordinary legacy reader",
+      "repository": "elmakus/project_workflow_v2",
+      "commit": "d3ab917f02e4de91b7dbb17915c2287c2387333e",
+      "path": "tools/v1_migration.py",
+      "blob": "c3b17a2d3bc87af7d9e46c10dd6195a738587c6e",
+      "symbols": [
+        "MigrationInputError",
+        "_Line",
+        "_strip_comment",
+        "_tokenize",
+        "_scalar",
+        "_key_value",
+        "_parse_block",
+        "parse_bounded_yaml",
+        "_unknown_keys",
+        "_require_mapping",
+        "_require_list",
+        "validate_manifest",
+        "validate_board",
+        "_digest",
+        "_semantic_summary",
+        "dry_run",
+        "_authority_locators",
+        "_normalized_review_attempts",
+        "convert_dry_run",
+        "_main"
+      ],
+      "disposition": "DROP",
+      "target": "none",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "transformation": "Do not import into runtime; retain removed-machinery negative scenario only.",
+      "licence_notice": "No source code copied or ported. Root licence/notice not observed in these source trees; no permissive grant inferred. Any later code reuse requires rights/notice and purity audit plus revised applicable inventory/review.",
+      "tests": [
+        "test/slots/s01.test.mjs",
+        "test/slots/s13.test.mjs"
+      ]
+    },
+    {
+      "id": "DONOR-17",
+      "invariant": "No normal legacy migration/import",
+      "repository": "elmakus/project_workflow_v2",
+      "commit": "d3ab917f02e4de91b7dbb17915c2287c2387333e",
+      "path": "tools/migration_apply.py",
+      "blob": "ff7cef5873b56833432cea0902f2b5a6b1a28098",
+      "symbols": [
+        "MigrationApplyError",
+        "SimulatedMigrationCrash",
+        "authorization_for",
+        "_json_bytes",
+        "_sha256_bytes",
+        "_sha256_text",
+        "_verify_output_fingerprint",
+        "_validate_bundle",
+        "_verify_current_source",
+        "_toml_key",
+        "_toml_value",
+        "_render_toml",
+        "_relative_generated_path",
+        "_read_source_artifact",
+        "_migrated_result_payload",
+        "_stage_payloads",
+        "_stage_path",
+        "_read_record",
+        "_verify_materialized_root",
+        "readback_fixture_destination",
+        "rollback_fixture_staging",
+        "reconcile_uncertain_external_effect",
+        "apply_fixture_conversion"
+      ],
+      "disposition": "DROP",
+      "target": "none",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "transformation": "Do not import into runtime; retain removed-machinery negative scenario only.",
+      "licence_notice": "No source code copied or ported. Root licence/notice not observed in these source trees; no permissive grant inferred. Any later code reuse requires rights/notice and purity audit plus revised applicable inventory/review.",
+      "tests": [
+        "test/slots/s01.test.mjs",
+        "test/slots/s13.test.mjs"
+      ]
+    },
+    {
+      "id": "DONOR-18",
+      "invariant": "Fork-release product excluded",
+      "repository": "elmakus/project_workflow_v2",
+      "commit": "d3ab917f02e4de91b7dbb17915c2287c2387333e",
+      "path": "tools/fork_release_contract.py",
+      "blob": "0888b76687c072bf2cc053f5ed34e219b9450530",
+      "symbols": [
+        "ForkReleaseContractError",
+        "UpstreamLineage",
+        "parse_upstream_tag",
+        "parse_private_tag",
+        "module_for_operation",
+        "next_private_tag",
+        "canonical_order_key",
+        "select_latest_canonical",
+        "verify_history_immutable",
+        "validate_latest_alias"
+      ],
+      "disposition": "DROP",
+      "target": "none",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "transformation": "Do not import into runtime; retain removed-machinery negative scenario only.",
+      "licence_notice": "No source code copied or ported. Root licence/notice not observed in these source trees; no permissive grant inferred. Any later code reuse requires rights/notice and purity audit plus revised applicable inventory/review.",
+      "tests": [
+        "test/slots/s01.test.mjs",
+        "test/slots/s13.test.mjs"
+      ]
+    },
+    {
+      "id": "DONOR-19",
+      "invariant": "No broad mutable Board authority",
+      "repository": "elmakus/project_workflow_v2",
+      "commit": "d3ab917f02e4de91b7dbb17915c2287c2387333e",
+      "path": "templates/TASK_BOARD.toml",
+      "blob": "b1d279a4c35ab154f3a2a72b2cf1a439d162f771",
+      "symbols": [
+        "whole document/template"
+      ],
+      "disposition": "DROP",
+      "target": "none",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "transformation": "Do not import into runtime; retain removed-machinery negative scenario only.",
+      "licence_notice": "No source code copied or ported. Root licence/notice not observed in these source trees; no permissive grant inferred. Any later code reuse requires rights/notice and purity audit plus revised applicable inventory/review.",
+      "tests": [
+        "test/slots/s01.test.mjs",
+        "test/slots/s13.test.mjs"
+      ]
+    },
+    {
+      "id": "DONOR-20",
+      "invariant": "Use four-field untrusted locator principle; no literal source copy required",
+      "repository": "elmakus/project_workflow_v2",
+      "commit": "d3ab917f02e4de91b7dbb17915c2287c2387333e",
+      "path": "prompts/CHATGPT_FRESH_SESSION.md",
+      "blob": "71b2459a7c9528e43ed5d46a5b4b4d6c187bd914",
+      "symbols": [
+        "whole document/template"
+      ],
+      "disposition": "REIMPLEMENT",
+      "target": "hosts/; src/helper/",
+      "owners": [
+        "PWV3-S09",
+        "PWV3-S11",
+        "PWV3-S12"
+      ],
+      "transformation": "Original PWV3 implementation from accepted D12/P1/EP1 and native scenarios; no donor executable code import.",
+      "licence_notice": "No source code copied or ported. Root licence/notice not observed in these source trees; no permissive grant inferred. Any later code reuse requires rights/notice and purity audit plus revised applicable inventory/review.",
+      "tests": [
+        "test/slots/s09.test.mjs",
+        "test/slots/s11.test.mjs",
+        "test/slots/s12.test.mjs"
+      ]
+    },
+    {
+      "id": "RESEARCH-corpus",
+      "invariant": "Preserve surviving invariant/counterexample memory without importing superseded topology",
+      "repository": "elmakus/project-research",
+      "commit": "a2797f4b92ff932d66927b846e2f7ca17e691363",
+      "path": "projects/project_workflow_v2/successor-product/v3-defect-regression-corpus/FINAL_SYNTHESIS.md",
+      "blob": "1f29a31f6bfa0b2b9486654c2a20eb6c1258c1a6",
+      "symbols": [
+        "named invariant/scenario and donor-policy sections"
+      ],
+      "disposition": "TEST_ONLY",
+      "target": "test/corpus/; test/regressions/; docs/provenance/",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "transformation": "Local byte-preserved owner research evidence; independently author native test cases under D12/P1. Optional OP, deferred evolution, execution modes and SH0 historical recommendations are not current law.",
+      "licence_notice": "Preserve exact owner-repository document provenance; no embedded third-party executable fragment is licensed for copying by this record.",
+      "tests": [
+        "COVERAGE.json"
+      ],
+      "local_evidence": "snapshots/research/corpus.md"
+    },
+    {
+      "id": "RESEARCH-donor",
+      "invariant": "Preserve surviving invariant/counterexample memory without importing superseded topology",
+      "repository": "elmakus/project-research",
+      "commit": "ee2c9a1bcdda70444c1207404ab1dfb8524d5038",
+      "path": "projects/project_workflow_v2/successor-product/v3-donor-strategy/FINAL_SYNTHESIS.md",
+      "blob": "d6d6329bdb58196ba1127c6a98620bdedc299f56",
+      "symbols": [
+        "named invariant/scenario and donor-policy sections"
+      ],
+      "disposition": "TEST_ONLY",
+      "target": "test/corpus/; test/regressions/; docs/provenance/",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "transformation": "Local byte-preserved owner research evidence; independently author native test cases under D12/P1. Optional OP, deferred evolution, execution modes and SH0 historical recommendations are not current law.",
+      "licence_notice": "Preserve exact owner-repository document provenance; no embedded third-party executable fragment is licensed for copying by this record.",
+      "tests": [
+        "COVERAGE.json"
+      ],
+      "local_evidence": "snapshots/research/donor.md"
+    },
+    {
+      "id": "RESEARCH-r5",
+      "invariant": "Preserve surviving invariant/counterexample memory without importing superseded topology",
+      "repository": "elmakus/project-research",
+      "commit": "0bdfccd332b78caa0795283ec64d366def01b511",
+      "path": "projects/project_workflow_v2/successor-product/v3-r5-goal-execution-and-3x-consolidation-research-r1/FINAL_SYNTHESIS.md",
+      "blob": "94753f446542d03171f81a2827cb188420cf1df2",
+      "symbols": [
+        "named invariant/scenario and donor-policy sections"
+      ],
+      "disposition": "TEST_ONLY",
+      "target": "test/corpus/; test/regressions/; docs/provenance/",
+      "owners": [
+        "PWV3-S01",
+        "PWV3-S13"
+      ],
+      "transformation": "Local byte-preserved owner research evidence; independently author native test cases under D12/P1. Optional OP, deferred evolution, execution modes and SH0 historical recommendations are not current law.",
+      "licence_notice": "Preserve exact owner-repository document provenance; no embedded third-party executable fragment is licensed for copying by this record.",
+      "tests": [
+        "COVERAGE.json"
+      ],
+      "local_evidence": "snapshots/research/r5.md"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+workstream_id = "change-workflow-successor-product"
+plan_revision = "P1"
+planning_cycle = 1
+attempt = "P1-R01"
+verdict = "green"
+evidence_path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_P1_INDEPENDENT_PLAN_REVIEW_R01_2026-10-04.md"
+
+[subject]
+class = "git_blob"
+repository = "elmakus/project_workflow_v2"
+commit = "c67645f7cd0a0887003da178bc8eaaf44357668b"
+path = "planning/PWV3_3_0_MASTER_PLAN.md"
+blob = "ba2990d773cdd30673f2ce23a6bc74700c6c56cf"
+
+[acceptance]
+class = "authority"
+path = "requirements/PWV3_D12.md"
+
+[independence]
+materially_produced_or_repaired_subject = false
+basis = "Fresh semantically independent Main reviewed the exact immutable P1 subject; a separate bounded human owner direction waived OP realization only for this one PWV2 construction review."

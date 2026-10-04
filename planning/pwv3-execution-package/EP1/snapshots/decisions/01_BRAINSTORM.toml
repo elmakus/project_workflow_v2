@@ -1,0 +1,8 @@
+workstream_id = "change-workflow-successor-product"
+scope_id = "workflow-successor-product"
+revision = 6
+state = "promoted"
+challenge_audit = "green"
+explicit_user_stop = false
+promotion_state = "authorized"
+promotion_subject = "workflow-successor-product@6"
