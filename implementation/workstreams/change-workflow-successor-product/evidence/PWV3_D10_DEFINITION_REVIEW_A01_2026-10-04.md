@@ -35,12 +35,23 @@ Observed on 2026-10-04:
 - every declared lane output exists and descends from its claim;
 - the integration branch does not yet exist.
 
-The exact A01 attempt is therefore positively acknowledged as IN_PROGRESS. It remains non-terminal until the fresh independent integration result is durably published and read back.
+The exact A01 attempt is TERMINAL.
+
+Integrated caller-visible result:
+- repository: `elmakus/project-research`
+- integration branch: `review/pwv3-definition-d10-r1-integration`
+- integration commit: `722c321f3386fc8205257436420a985d70ff4370`
+- result path: `projects/project_workflow_v2/successor-product/v3-definition-review-d10-r1/FINAL_REVIEW.md`
+- result blob: `40beb0406bb0facfe6b79e9095bc200039a45f7f`
+- disposition: **RED**
+- admitted lanes: **8/8**
+
+The RED is exact-subject evidence for D10 and routes to Definition correction. It does not authorize Strategic Planning.
 
 
 ## Progress readback — 2026-10-04
 
-All eight required finite review lanes W00, L01-L06 and R00 have valid fenced claims from the exact common research base/tree and declared result outputs. The attempt remains IN_PROGRESS until the fresh integration context publishes and positively reads back exactly one caller-visible FINAL_REVIEW.md.
+All eight required finite review lanes W00, L01-L06 and R00 have valid fenced claims from the exact common research base/tree and declared result outputs. The integration result has now been positively read back and the attempt is TERMINAL RED.
 
 
 Observed execution evidence:
