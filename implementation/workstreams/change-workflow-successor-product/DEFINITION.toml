@@ -1,9 +1,9 @@
 workstream_id = "change-workflow-successor-product"
-source_scope_subject = "workflow-successor-product@4"
-revision = "D09"
-state = "green"
-completeness_audit = "green"
-premium_a = "due"
+source_scope_subject = "workflow-successor-product@6"
+revision = "D10"
+state = "active"
+completeness_audit = "pending_full_definition_review_d10"
+premium_a = "not_due"
 
 [requirements]
 class = "authority"
@@ -112,3 +112,31 @@ path = "implementation/workstreams/change-workflow-successor-product/evidence/PW
 [[decisions]]
 class = "authority"
 path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_D09_DEFINITION_GREEN_PREMIUM_A_DUE_2026-10-01.md"
+
+[[decisions]]
+class = "authority"
+path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_R5_GOAL_3X_RESEARCH_RECONCILIATION_2026-10-02.md"
+
+[[decisions]]
+class = "authority"
+path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_R5_FINAL_CHALLENGE_OWNER_DECISIONS_2026-10-02.md"
+
+[[decisions]]
+class = "authority"
+path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_R5_FINAL_CHALLENGE_GREEN_2026-10-02.md"
+
+[[decisions]]
+class = "authority"
+path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_R6_INVOCATION_DERIVED_EXECUTOR_OWNER_DIRECTION_2026-10-02.md"
+
+[[decisions]]
+class = "authority"
+path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_R6_FINAL_CHALLENGE_GREEN_2026-10-02.md"
+
+[[decisions]]
+class = "authority"
+path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_D10_CONSTRUCTION_HANDOFF_OWNER_DIRECTION_2026-10-04.md"
+
+[[decisions]]
+class = "authority"
+path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_R6_DEFINITION_D10_DELTA_2026-10-04.md"
