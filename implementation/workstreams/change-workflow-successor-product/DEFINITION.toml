@@ -162,3 +162,7 @@ path = "implementation/workstreams/change-workflow-successor-product/evidence/PW
 [[decisions]]
 class = "authority"
 path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_D11_A01_BOUNDED_REPAIR_2026-10-04.md"
+
+[[decisions]]
+class = "authority"
+path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_D11_DEFINITION_FOCUSED_REVALIDATION_R01_2026-10-04.md"
