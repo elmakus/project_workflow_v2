@@ -182,7 +182,7 @@ This does not weaken ordinary non-OP Review completeness or PWV3's responsibilit
 Recovery reconstructs durable truth and does not replay chat/session execution.
 
 - Durable accepted Result suppresses replay.
-- A pending/resolved post-OP owner gate and the exact current OP-attempt frontier for every dispatchable OP obligation are reconstructed from canonical durable state. Recovery never re-prompts a resolved gate, reapplies an old choice to a later result, relaunches an already-established attempt, mints a second attempt while occurrence is UNKNOWN, or falls back from a current non-advancing attempt/result to an older GREEN.
+- Every dispatchable OP obligation reconstructs its exact current OP-attempt frontier from canonical durable state. Where the boundary uses a post-OP owner gate, its pending/resolved gate is reconstructed as well; the Global Bug Hunt has deterministic result disposition and no routine post-CLEAR owner gate. Recovery never re-prompts a resolved gate, reapplies an old choice to a later result, relaunches an already-established attempt, mints a second attempt while occurrence is UNKNOWN, or falls back from a current non-advancing attempt/result to an older GREEN.
 - Local unpublished progress may continue only when the exact remote canonical predecessor/head against which that local attempt was based, together with the exact semantic authority inputs consumed by the attempt, is positively verified unchanged. If that relation cannot be proven, Recovery fails closed.
 - Remote canonical state wins over divergent stale local WIP.
 - No mandatory continuous WIP publication.
@@ -202,7 +202,7 @@ Required capabilities include:
 - derive version/evolution impact;
 - guarded publish/readback;
 - effect reconciliation;
-- exact reconstruction/validation of pending or resolved post-OP owner gate and the universal current OP-attempt frontier;
+- exact reconstruction/validation of the universal current OP-attempt frontier and, only where applicable, the pending/resolved post-OP owner gate;
 - health;
 - runtime/package doctor/handshake.
 
