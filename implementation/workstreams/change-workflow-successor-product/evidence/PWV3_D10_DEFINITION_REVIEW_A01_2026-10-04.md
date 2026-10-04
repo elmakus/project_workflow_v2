@@ -10,7 +10,7 @@ Definition blob: `597c38c3c4e9a05c0cf49336950e490afebe6393`
 Definition state blob: `0f5f702fa10c69899705628e3e29a306d144028a`
 
 Current attempt identity: `D10-OP-DEFREV-A01`
-Phase: `DUE`
+Phase: `IN_PROGRESS`
 
 Orchestration package:
 - repository: `elmakus/project-research`
@@ -25,3 +25,14 @@ This is the sole current first attempt for the exact D10 Definition Review oblig
 No prior D09 review result can advance D10. No second A01 may be minted while this attempt is DUE/IN_PROGRESS/UNKNOWN.
 
 The attempt becomes IN_PROGRESS after positive evidence that this exact package has begun. It becomes TERMINAL only when exactly one caller-visible integrated result is durably bound and positively read back.
+
+
+## Positive execution readback
+
+Observed on 2026-10-04:
+- all eight required lanes W00, L01-L06 and R00 have current manifest branches;
+- every lane has a valid fenced empty claim from the exact common research base/tree;
+- every declared lane output exists and descends from its claim;
+- the integration branch does not yet exist.
+
+The exact A01 attempt is therefore positively acknowledged as IN_PROGRESS. It remains non-terminal until the fresh independent integration result is durably published and read back.
