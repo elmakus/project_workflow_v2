@@ -4,7 +4,7 @@ Date: 2026-10-04
 Workstream: `change-workflow-successor-product`
 Definition subject: `workflow-successor-product@6`
 Definition revision: `D12`
-Status: **GREEN RESULT ACCEPTED / OWNER DISPOSITION PENDING**
+Status: **GREEN RESULT ACCEPTED / OWNER DISPOSITION = CONTINUE**
 
 ## Exact caller-visible OP result
 
@@ -30,7 +30,7 @@ Exactly one human owner disposition is required:
 - **CONTINUE** — consume this exact GREEN once for forward progress, complete Definition acceptance, make Definition GREEN and derive Premium A as the next canonical obligation;
 - **RUN OP AGAIN** — close this exact GREEN for forward authority while preserving it as immutable evidence, remain at the same Definition Review boundary and establish exactly one new current repeat attempt over the same applicable binding.
 
-Current disposition: **PENDING**
+Current disposition: **CONTINUE**
 
 Until resolved:
 - Definition remains active;
@@ -38,3 +38,17 @@ Until resolved:
 - Premium A is not yet due;
 - Strategic Planning remains unauthorized;
 - no earlier GREEN or prior owner choice may substitute for this exact gate.
+
+
+## Durable owner disposition
+
+Owner disposition: **CONTINUE**
+
+The human owner selected CONTINUE for the exact D12 GREEN result. This exact result is consumed once for forward progress. No repeat Definition Review frontier is created.
+
+Binding:
+- Definition subject: `workflow-successor-product@6`
+- Definition revision: `D12`
+- attempt: `D12-OP-DEFREV-R01`
+- review commit: `1704c68a3e2f2839f3dd83adbaece45281104dd2`
+- result blob: `e386fb1bc888fd671e99409cdf274e365a36303b`
