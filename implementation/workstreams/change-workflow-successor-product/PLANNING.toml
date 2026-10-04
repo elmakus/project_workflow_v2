@@ -15,6 +15,11 @@ premium_b_subject = "elmakus/project_workflow_v2@c67645f7cd0a0887003da178bc8eaaf
 premium_c = "satisfied"
 premium_c_subject = "elmakus/project_workflow_v2@c67645f7cd0a0887003da178bc8eaaf44357668b:planning/PWV3_3_0_MASTER_PLAN.md@ba2990d773cdd30673f2ce23a6bc74700c6c56cf"
 
+# Execution Prep recovery locator (evidence, not package acceptance or a second state owner):
+# implementation/workstreams/change-workflow-successor-product/evidence/PWV3_EP1_PACKAGE_REVIEW_BOUNDARY.md
+# P1/D12 require independent OP Package Review and owner disposition before external handoff.
+# No executable PWV2 Task Board is authorized for this construction package.
+
 [subject]
 repository = "elmakus/project_workflow_v2"
 commit = "c67645f7cd0a0887003da178bc8eaaf44357668b"
