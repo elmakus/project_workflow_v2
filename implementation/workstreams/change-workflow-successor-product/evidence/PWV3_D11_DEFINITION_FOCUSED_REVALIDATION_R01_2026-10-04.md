@@ -6,7 +6,7 @@ Boundary: mandatory OP Definition Review / focused revalidation
 Definition subject: `workflow-successor-product@6`
 Definition revision: `D11`
 Current attempt identity: `D11-OP-DEFREV-R01`
-Phase: **IN_PROGRESS**
+Phase: **TERMINAL**
 
 ## Exact obligation
 
@@ -94,3 +94,19 @@ The four RED lanes independently converge on the same bounded RG-A residual: D10
 This lane-level convergence is evidence only; it is not the caller-visible integrated OP result. The package's required one fresh integration chat must validate admission, deduplicate findings and publish/read back `FINAL_REVALIDATION.md`.
 
 The integration branch `review/pwv3-definition-d11-r1-integration` does not yet exist. Attempt phase is therefore **IN_PROGRESS**, not TERMINAL.
+
+
+## Terminal integration readback
+
+Observed on 2026-10-04:
+- integration branch: `review/pwv3-definition-d11-r1-integration`
+- integration commit: `0ed6975b2b9e8dad0aa949ceda0e60982025f4a2`
+- result path: `projects/project_workflow_v2/successor-product/v3-definition-revalidation-d11-r1/FINAL_REVALIDATION.md`
+- result blob: `f832e3e469c420dd6bdd233d8d8c482e43d3bdc0`
+- caller-visible disposition: **RED**
+- admitted lanes: **8/8**
+- D10-F01 and D10-F03..F09: CLOSED
+- sole canonical residual blocker: **D11-R01-F01 / D10-F02**
+- full-wave escalation: **NO**
+
+The exact terminal RED is consumed only as bounded Definition correction authority. It does not authorize Strategic Planning.

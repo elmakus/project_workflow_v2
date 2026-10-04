@@ -1,8 +1,8 @@
 workstream_id = "change-workflow-successor-product"
 source_scope_subject = "workflow-successor-product@6"
-revision = "D11"
+revision = "D12"
 state = "active"
-completeness_audit = "pending_focused_revalidation_d11_rg_a_through_d"
+completeness_audit = "pending_focused_revalidation_d12_f02_residual"
 premium_a = "not_due"
 
 [requirements]
@@ -166,3 +166,8 @@ path = "implementation/workstreams/change-workflow-successor-product/evidence/PW
 [[decisions]]
 class = "authority"
 path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_D11_DEFINITION_FOCUSED_REVALIDATION_R01_2026-10-04.md"
+
+
+[[decisions]]
+class = "authority"
+path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_D12_D11_R01_RED_CONSUMPTION_2026-10-04.md"

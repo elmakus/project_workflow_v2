@@ -1,8 +1,8 @@
 # Definition — Project Workflow V3 successor product
 
-Status: DRAFT / revision-11 bounded D10 A01 repair; pending focused independent OP revalidation; external execution bootstrap is non-authoritative  
+Status: DRAFT / revision-12 bounded D11 R01 residual repair; pending focused independent OP revalidation; external execution bootstrap is non-authoritative  
 Subject: `workflow-successor-product@6`  
-Definition revision: 11  
+Definition revision: 12  
 Initial product release: `3.0.0`
 
 ## Product outcome
@@ -300,7 +300,7 @@ Before qualified 3.0.0 GA:
 - live Pi/Paseo qualification is GREEN only when the exact frozen candidate demonstrates every applicable required Pi/Paseo realization semantic and declared blocker/failure behavior;
 - at least one real cross-host continuation is proven;
 - the mandatory internal Targeted Qualification Campaign covers the exact reviewed risk/acceptance surface and all required findings are dispositioned before pre-Global readiness;
-- one mandatory Global Bug Hunt OP obligation/result for the exact frozen qualification surface must reach the caller-visible terminal disposition required by the stable PWV3↔OP contract; profile breadth and internal notions of “fullness” remain OP Skill responsibility. Applicable CLEAR continues without a routine post-Global owner gate; explicit repeats remain legal before closure and a changed candidate/surface requires a new applicable Global result;
+- one mandatory Global Bug Hunt OP obligation/result for the exact frozen qualification surface must reach the caller-visible terminal disposition required by the stable PWV3↔OP contract; profile breadth and internal notions of “fullness” remain OP Skill responsibility. Applicable CLEAR continues without a routine post-Global owner gate; explicit same-binding repeats remain legal only until the durable final-integration intent/cut begins and are illegal after that cut in the qualification epoch; a changed candidate/surface requires a new applicable Global result;
 - every repair/revalidation obligation produced by the internal Targeted Qualification Campaign or exported by the applicable current Global Bug Hunt result and required for advancement is satisfied before qualification can advance; PWV3 does not independently reinterpret OP-internal Global finding admission;
 - representative PWV3-on-PWV3 dogfood reaches valid Close and exercises, at minimum, Research/Definition/Planning, Plan Review, Execution Prep, dependent sequential Cards, routine and independently reviewed Results, restart/host transition, guarded external effect/readback, ordinary Final Qualification, internal Targeted Qualification, external Global Bug Hunt, repair/revalidation, terminal acceptance, final integration/Close and fresh terminal reconstruction;
 - after the corrected exact final candidate QF and its current acceptance surface are fixed, and applicability of every required prior qualification item to that QF/current acceptance has been proven, a **newly produced post-QF terminal acceptance result** is required. An older acceptance result cannot satisfy this fresh terminal gate merely by later applicability proof;
@@ -524,7 +524,13 @@ Definition revision 11 is the bounded repair revision for A01:
 - F08 completes the abstract compatible-evolution current-writer transition and Recovery semantics;
 - F09 explicitly supersedes D07 OD-02/SH0 for this construction workstream.
 
-These repairs are bounded to RG-A through RG-D and preserve the accepted lifecycle, mandatory OP boundary set, supported runtimes, stable Card/Result/Review authority, versioning policy and PWV2 pre-execution construction handoff. Strategic Planning remains unauthorized until focused independent OP revalidation accepts D11, the required post-OP owner disposition is consumed, Definition becomes GREEN and Premium A is satisfied.
+These repairs are bounded to RG-A through RG-D and preserve the accepted lifecycle, mandatory OP boundary set, supported runtimes, stable Card/Result/Review authority, versioning policy and PWV2 pre-execution construction handoff. Strategic Planning remains unauthorized until focused independent OP revalidation accepts D12, the required post-OP owner disposition is consumed, Definition becomes GREEN and Premium A is satisfied.
+
+Revision 11 received focused independent OP revalidation R01. The integrated result was RED with exactly one bounded residual blocker, D11-R01-F01 / D10-F02: the detailed Global-repeat rule correctly encoded owner Option A, but the normative pre-GA summary still used the ambiguous phrase `before closure`. D10-F01 and D10-F03 through D10-F09 were closed, and no full-wave escalation trigger fired.
+
+Definition revision 12 applies only that residual repair: the pre-GA summary now uses the exact owner-fixed Option A boundary — same-binding Global repeats remain legal only until the durable final-integration intent/cut begins and are illegal after that cut in the qualification epoch. All existing automatic Global CLEAR continuation, no-routine-Global-gate, single-use repeat, applicability, supersession, successor-frontier/readback and no-stale-success semantics remain unchanged.
+
+Revision 12 requires only fresh independent focused OP revalidation of the D10-F02 direct seam: Global repeat eligibility/cut, terminal-acceptance supersession/no-stale-success, final-integration entry and Recovery/derive-next. No new full Definition review wave is required unless that focused revalidation exposes an escalation trigger.
 
 The external architecture Research for `elmakus/orchestration-protocol-skill` remains a separate product effort and is not a gate for authoring this Definition, though a compatible production OP capability remains a 3.0 implementation/qualification dependency.
 
