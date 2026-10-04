@@ -1,8 +1,8 @@
 workstream_id = "change-workflow-successor-product"
 source_scope_subject = "workflow-successor-product@6"
-revision = "D10"
+revision = "D11"
 state = "active"
-completeness_audit = "red_d10_a01_pending_owner_decision_f02_and_bounded_repairs"
+completeness_audit = "pending_focused_revalidation_d11_rg_a_through_d"
 premium_a = "not_due"
 
 [requirements]
@@ -154,3 +154,11 @@ path = "implementation/workstreams/change-workflow-successor-product/evidence/PW
 [[decisions]]
 class = "authority"
 path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_D10_A01_RED_PENDING_OWNER_DECISION_2026-10-04.md"
+
+[[decisions]]
+class = "authority"
+path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_D10_F02_GLOBAL_REPEAT_OWNER_DECISION_OPTION_A_2026-10-04.md"
+
+[[decisions]]
+class = "authority"
+path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_D11_A01_BOUNDED_REPAIR_2026-10-04.md"
