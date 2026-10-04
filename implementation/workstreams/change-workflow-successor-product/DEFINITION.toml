@@ -149,3 +149,8 @@ path = "implementation/workstreams/change-workflow-successor-product/evidence/PW
 [[decisions]]
 class = "authority"
 path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_D10_A01_RED_PENDING_GLOBAL_REPEAT_OWNER_DECISION_2026-10-04.md"
+
+
+[[decisions]]
+class = "authority"
+path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_D10_A01_RED_PENDING_OWNER_DECISION_2026-10-04.md"
