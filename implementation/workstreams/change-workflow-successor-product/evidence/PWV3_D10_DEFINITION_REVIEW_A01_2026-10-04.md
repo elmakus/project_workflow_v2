@@ -10,7 +10,7 @@ Definition blob: `597c38c3c4e9a05c0cf49336950e490afebe6393`
 Definition state blob: `0f5f702fa10c69899705628e3e29a306d144028a`
 
 Current attempt identity: `D10-OP-DEFREV-A01`
-Phase: `IN_PROGRESS`
+Phase: `TERMINAL`
 
 Orchestration package:
 - repository: `elmakus/project-research`
@@ -24,7 +24,7 @@ This is the sole current first attempt for the exact D10 Definition Review oblig
 
 No prior D09 review result can advance D10. No second A01 may be minted while this attempt is DUE/IN_PROGRESS/UNKNOWN.
 
-The attempt becomes IN_PROGRESS after positive evidence that this exact package has begun. It becomes TERMINAL only when exactly one caller-visible integrated result is durably bound and positively read back.
+The attempt becomes IN_PROGRESS after positive evidence that this exact package has begun. It is TERMINAL because exactly one caller-visible integrated result is durably bound and positively read back.
 
 
 ## Positive execution readback
@@ -48,3 +48,18 @@ Observed execution evidence:
 - all eight have valid fenced claims from the exact research base;
 - all eight declared outputs exist and are confined to their lane output paths;
 - integration branch is not yet present.
+
+
+## Terminal integration readback
+
+Observed on 2026-10-04:
+- integration branch: `review/pwv3-definition-d10-r1-integration`
+- integration commit: `722c321f3386fc8205257436420a985d70ff4370`
+- result path: `projects/project_workflow_v2/successor-product/v3-definition-review-d10-r1/FINAL_REVIEW.md`
+- result blob: `40beb0406bb0facfe6b79e9095bc200039a45f7f`
+- overall disposition: **RED**
+- all eight required lanes were admitted;
+- nine canonical blocking findings were integrated: D10-F01..D10-F09;
+- D10-F02 requires an owner decision; the other findings are bounded Definition repairs unless repair exposes a new owner choice.
+
+No historical GREEN may advance D10. Premium A remains not due and Strategic Planning remains unauthorized.
