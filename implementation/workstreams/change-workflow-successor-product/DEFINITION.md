@@ -1,8 +1,8 @@
 # Definition — Project Workflow V3 successor product
 
-Status: DRAFT / revision-10 promoted R6 product delta; pending fresh full Definition Review; external execution bootstrap is non-authoritative  
+Status: DRAFT / revision-11 bounded D10 A01 repair; pending focused independent OP revalidation; external execution bootstrap is non-authoritative  
 Subject: `workflow-successor-product@6`  
-Definition revision: 10  
+Definition revision: 11  
 Initial product release: `3.0.0`
 
 ## Product outcome
@@ -53,7 +53,7 @@ PWV3 owns:
 - single semantic consumption of an applicable result;
 - the mandatory post-OP accepted-result owner gate for non-Global OP boundaries;
 - deterministic Global Bug Hunt result disposition without a routine post-CLEAR owner gate;
-- canonical continuation only after an explicit owner CONTINUE choice.
+- canonical continuation after an explicit owner CONTINUE choice at non-Global OP boundaries; the Final Qualification Global Bug Hunt follows its explicit deterministic CLEAR/REPAIR_REQUIRED/BLOCKED/UNKNOWN rules without a routine post-CLEAR owner gate.
 
 For every OP-backed boundary, wrong-subject, stale, duplicate-as-new, incomplete, unsupported, BLOCKED or otherwise non-applicable evidence fails closed and cannot advance the lifecycle. Re-observing an already consumed exact result after restart is idempotent evidence, not permission to replay the semantic transition.
 
@@ -70,7 +70,11 @@ The **first** attempt frontier is established when an exact OP obligation first 
 
 For every OP-backed boundary other than the Final Qualification Global Bug Hunt, when the caller-visible terminal result is advance-permitting for that exact bound obligation, PWV3 must establish exactly one real human user/workstream-owner authority gate before forward continuation. No agent, runtime, semantic-stage owner or coordinator may infer, default or synthesize either choice.
 
-The Final Qualification Global Bug Hunt is the exception. The user explicitly launches the exact independent Global attempt. An applicable CLEAR result advances deterministically to fresh terminal acceptance without creating a routine CONTINUE / RUN OP AGAIN gate. REPAIR_REQUIRED returns bounded implementation-only findings to the current execution obligation; changed implementation invalidates all affected evidence and requires a new applicable Global result whenever the exact candidate or materially relevant acceptance surface changed. Findings that require Plan, Execution Package, Definition or owner-authority change route to the earliest upstream semantic owner. BLOCKED/UNKNOWN fails closed. A repeated same-binding Global attempt remains legal when explicitly requested before closure, but is not a mandatory continuation choice.
+The Final Qualification Global Bug Hunt is the exception. The user explicitly launches the exact independent Global attempt. An applicable CLEAR result advances deterministically to fresh terminal acceptance without creating a routine CONTINUE / RUN OP AGAIN gate. BLOCKED/UNKNOWN fails closed.
+
+An explicit same-binding Global repeat remains legal only until the durable final-integration intent/cut begins. Before that cut, an owner repeat request is a durable single-use transition: it first revalidates the exact candidate plus acceptance/coverage binding; then supersedes for forward authority the predecessor CLEAR and any terminal-acceptance frontier/result derived from it; then establishes and positively reads back exactly one successor Global attempt frontier on that same applicable binding. Superseded evidence remains immutable history only. The successor Global becomes the sole qualification-current frontier, and final integration is blocked until that Global and a fresh applicable terminal acceptance complete. After the durable final-integration intent/cut begins, a same-binding Global repeat is not legal in that qualification epoch. Recovery reconstructs only the newest applicable current frontier and never revives a predecessor CLEAR or superseded terminal success.
+
+Implementation-only findings from Targeted Qualification or Global REPAIR_REQUIRED are routed back under the already accepted stable-Card model, not to a new package-level repair object. The exact materially affected completed Card set is derived from finding attribution plus the declared dependency/acceptance affected cone. The earliest affected Card in the accepted total Card order becomes the sole current execution obligation; repair then proceeds through affected Cards in total order, reopening each stable Card identity only when it becomes current. Every changed Card produces a new immutable Result and reruns every invalidated deterministic check, Review and revalidation before that Card can re-complete. After the affected set is accepted again, pre-Global readiness and the exact candidate/acceptance surface are freshly re-established; a changed candidate or materially changed surface requires a new applicable Global result. Findings that require Plan, Execution Package, Definition or owner-authority change route instead to the earliest upstream semantic owner.
 
 That pending gate is a canonical durable non-derivable routing fact. It binds:
 - the exact PWV3 OP boundary;
@@ -146,7 +150,7 @@ This is single-review completeness, not orchestration. It does not imply lanes o
 - Execution Prep materializes stable Cards as refinements of the exact reviewed Plan.
 - The exact accepted reviewed Execution Package is the single portable direct execution artifact. It is semantically identical regardless of the supported runtime/executor that later realizes it.
 - The owner does not predeclare an execution mode/runtime/provider in the Plan or Execution Package. Execution realization is derived from the invocation environment only after Package Review.
-- The exact runtime/executor/provider bundle actually used is positively observed and recorded as execution provenance/readback after launch; it is not prior semantic authority and cannot alter the accepted package.
+- The exact runtime/executor/provider bundle actually used is positively observed and durably recorded with positive readback after launch/binding; it is not prior semantic authority and cannot alter the accepted package. The reconstructible binding-provenance cut must complete before the first Card mutation or externally visible effect for which executor/runtime currentness is material. Until that readback is proven, material execution/effects are forbidden; UNKNOWN publication/readback fails closed rather than permitting work to begin.
 - Card identity remains immutable after materialization, but 3.0 includes semantics-preserving runtime refinement beneath a Card into subordinate execution steps/subtasks when that refinement cannot alter Card scope, dependencies, acceptance, Review obligation or authority. Such subordinate refinement is execution mechanics, never replacement/reuse/splitting of the semantic Card.
 - Semantic changes return according to the deterministic upstream-owner rule above.
 - Exactly one Project Card owns the execution-stage current obligation at a time.
@@ -173,7 +177,7 @@ Prior Review evidence is immutable. Reuse is an applicability decision.
 
 Changed dependency, implementation/integration subject, shared contract or acceptance surface invalidates the exact transitive materially affected cone over declared material-input dependencies, acceptance/Review dependencies and relevant shared surfaces. Preserve evidence outside the proven cone. If the cone or impact cannot be bounded safely, widen revalidation to the full potentially affected current acceptance surface rather than assuming narrow applicability.
 
-For every OP-backed PWV3 boundary, PWV3 requires only the stable caller/result semantics defined in the Orchestration Protocol boundary: exact obligation/binding, an applicable caller-visible terminal result, fail-closed non-advancing outcomes, and the post-result owner gate. Discovery breadth, lane topology, integration, convergence, repair-loop realization, focused revalidation mechanics and any internal wave-count policy remain exclusively Orchestration Protocol Skill responsibility.
+For every OP-backed PWV3 boundary, PWV3 requires only the stable caller/result semantics defined in the Orchestration Protocol boundary: exact obligation/binding, an applicable caller-visible terminal result and fail-closed non-advancing outcomes. Non-Global OP boundaries additionally require the defined post-result owner gate; the Final Qualification Global Bug Hunt instead uses its explicit deterministic result-disposition rules and no routine post-CLEAR owner gate. Discovery breadth, lane topology, integration, convergence, repair-loop realization, focused revalidation mechanics and any internal wave-count policy remain exclusively Orchestration Protocol Skill responsibility.
 
 This does not weaken ordinary non-OP Review completeness or PWV3's responsibility to decide whether the caller-visible OP result permits semantic advancement.
 
@@ -231,6 +235,7 @@ The same exact accepted reviewed Execution Package is portable across supported 
 - The host realization is thin over the same deterministic helper/semantic contract used by PWV3; exact adapter, CLI/debug, bootstrap and package-component decomposition remain Strategic Planning/implementation choices unless a separately accepted stable external contract requires them.
 - Paseo owns runtime/child lifecycle; PWV3 owns semantics.
 - Generic Workers may be used for ordinary bounded work where permitted.
+- When invocation binds to a Pi/Paseo goal-capable autonomous realization, qualification requires both a positively verified qualified delegated-worker/subagent capability and actual delegated-worker use for bounded implementation work designated by the accepted execution contract as delegation-required. Delegation remains execution mechanics: delegates never own semantic workflow authority, cannot alter Card scope/dependencies/acceptance, and cannot substitute for mandatory OP.
 - Generic Workers are bounded non-recursive workers in 3.0 and do not spawn/delegate to further Generic Workers.
 - Generic Workers/child agents cannot substitute for mandatory OP.
 - No mandatory MCP/Paseo semantic plugin.
@@ -305,6 +310,8 @@ Before qualified 3.0.0 GA:
 - after an applicable Global CLEAR, a qualified semantically independent, read-only, non-authoring closure reviewer may execute the fresh terminal predicate automatically without a separate manual handoff; provider/runtime self-review or an authoring/repairing reviewer cannot satisfy semantic independence;
 - immutable publication/promotion and readback succeed.
 
+For this construction workstream, the D10 construction-handoff owner direction explicitly supersedes the earlier D07 A03 OD-02/SH0 mid-build authority-cut decision. Any remaining SH0/self-hosting terminology is qualification/dogfood semantics for a runnable PWV3 candidate only and does not restore partial-PWV3 construction authority.
+
 PWV3 construction for this workstream has no mid-implementation PWV2 -> partial-PWV3 semantic authority cut. PWV2 governs only through the accepted reviewed Execution Package. That exact package is then handed to an external qualified execution environment which performs implementation outside PWV2 governance. Runtime/provider choice and installation are outside PWV3 semantic artifacts.
 
 Self-hosting is still mandatory qualification/dogfood after a runnable PWV3 candidate exists. That qualification must prove the complete native lifecycle, Recovery/no-replay, external-effect safety, mandatory OP boundaries, Final Qualification, terminal acceptance, final integration and target-side Close from canonical PWV3 state.
@@ -337,18 +344,20 @@ Initial 3.0 includes the known compatibility/evolution machinery rather than int
 - machine-checkable release/artifact/helper/runtime compatibility matrix and downgrade refusal;
 - semantics-preserving subordinate runtime refinement beneath immutable Cards;
 - proof-based Review/evidence applicability reuse;
-- richer affected-cone diagnostics;
-- richer health/maintenance diagnostics and remediation guidance;
+- affected-cone diagnostics that expose, at minimum, the exact invalidated subjects/evidence, the dependency/acceptance edges that caused inclusion, the preserved-outside-cone boundary and the reason for full-surface widening when impact is UNKNOWN;
+- health/maintenance diagnostics that expose an objectively identifiable condition/code, exact affected identity/surface, deterministic severity/blocking class, current/next obligation and the allowed remediation class without inventing authority;
 - doctor/inspect/resume explanations that expose exact identity, mismatch, next obligation and recovery reason;
-- richer deterministic context packs;
+- deterministic context packs whose bytes/semantic contents are reproducible from the same exact canonical input identities and which carry enough exact pointers to reconstruct the intended bounded context without hidden session state;
 - Pi/Paseo bounded-worker ergonomics/allow-lists consistent with the runtime-neutral execution contract;
-- richer GitHub Issue mutation/reconciliation helpers while preserving Issues as non-authority except the narrow health predicate;
+- GitHub Issue mutation/reconciliation helpers that enforce canonical semantic non-authority, deterministic dedup keys, durable intent before duplicable mutation, authoritative readback after mutation, and fail-closed UNKNOWN occurrence;
 - deterministic anomaly dedup and file-and-continue only for explicitly nonblocking non-authoritative anomaly classes;
 - multi-generation reader/conversion framework;
 - reader retirement/compaction lifecycle metadata and removal conditions;
 - generalized within-PWV3 migration harness with exact-source binding, dry-run/proof/staging/readback/idempotence/forward-repair;
-- material-fingerprint optimization;
+- material-fingerprint optimization only as a semantics-preserving acceleration over canonically bound exact inputs. A fingerprint is never independent semantic authority and never erases immutable producing/subject identities. Incomplete input coverage, algorithm/version mismatch, collision ambiguity or UNKNOWN disables the optimization and falls back to the exact conservative applicability/affected-cone path;
 - qualified branch/worktree cleanup automation that preserves dirty/divergent/UNKNOWN state.
+
+The generalized compatible-evolution framework uses one abstract guarded forward transition for any supported same-line compatible adoption or future compatible durable-contract change. The transition durably binds the exact source package/helper/artifact-contract identity set, exact target identity set, compatibility/applicability proof and whether the transition is adoption-without-migration or migration-backed. Before the current-writer cut, the source writer remains current and any staged target artifacts are non-current. The current-writer cut is a single durable freshness-fenced transition followed by positive readback; after it, only the target writer contract is current while required historical readers/history remain preserved. Migration-backed adoption additionally requires exact-source dry-run/proof/staging and idempotent readback of migrated current state before the writer cut. Recovery is defined at pre-cut, cut-UNKNOWN and post-cut states; UNKNOWN never permits both writers, replay or blind downgrade. Downgrade is legal only when the exact resulting durable contract set is positively proven supported by the target downgrade identity.
 
 Concrete adapters/readers for future schemas that do not yet exist naturally arrive with those future schemas; their enabling framework and qualification harness belong to 3.0.
 
@@ -502,7 +511,20 @@ Revision 9 became GREEN for exact subject workflow-successor-product@4 and remai
 
 Definition revision 10 is a material promoted-scope update for workflow-successor-product@6. It incorporates the accepted R5/R6 product decisions: one portable reviewed Execution Package, invocation-derived execution realization with no user predeclaration, internal Targeted Qualification plus external Global Bug Hunt, the Global CLEAR no-routine-owner-gate exception, automatically executable semantically independent terminal closure, all previously planned later-3.x compatibility/evolution capabilities in 3.0, and the owner-fixed construction handoff in which PWV2 ends after accepted Execution Package Review and implementation runs externally.
 
-Because these changes alter lifecycle, qualification, release scope and construction-governance surfaces, D10 requires a fresh complete independent OP-backed Definition Review. D09 GREEN cannot approve D10. Strategic Planning remains unauthorized until the exact D10 Definition Review obligation reaches applicable advance-permitting acceptance, any required owner disposition is consumed, Definition becomes GREEN and Premium A is satisfied.
+Because these changes alter lifecycle, qualification, release scope and construction-governance surfaces, D10 required and received a fresh complete independent OP-backed Definition Review A01. A01 was RED with nine blocking findings D10-F01..D10-F09. The owner selected Option A for D10-F02: same-binding Global repeat remains legal until the durable final-integration intent/cut begins, with exact supersession/no-stale-success semantics.
+
+Definition revision 11 is the bounded repair revision for A01:
+- F01 narrows generic post-OP owner-gate wording to non-Global boundaries and keeps Global deterministic;
+- F02 encodes the owner-selected Global-repeat cut and precedence;
+- F03 routes implementation-only Final Qualification repair through the existing stable-Card model in deterministic total order;
+- F04 requires durable runtime-binding provenance/readback before first material mutation/effect;
+- F05 restores mandatory qualified delegation and actual delegated-worker use for goal-capable Pi/Paseo autonomous realization;
+- F06 makes the promoted diagnostic/context/Issue-helper capabilities objectively decidable;
+- F07 makes material fingerprints non-authoritative optimization with conservative fallback;
+- F08 completes the abstract compatible-evolution current-writer transition and Recovery semantics;
+- F09 explicitly supersedes D07 OD-02/SH0 for this construction workstream.
+
+These repairs are bounded to RG-A through RG-D and preserve the accepted lifecycle, mandatory OP boundary set, supported runtimes, stable Card/Result/Review authority, versioning policy and PWV2 pre-execution construction handoff. Strategic Planning remains unauthorized until focused independent OP revalidation accepts D11, the required post-OP owner disposition is consumed, Definition becomes GREEN and Premium A is satisfied.
 
 The external architecture Research for `elmakus/orchestration-protocol-skill` remains a separate product effort and is not a gate for authoring this Definition, though a compatible production OP capability remains a 3.0 implementation/qualification dependency.
 
