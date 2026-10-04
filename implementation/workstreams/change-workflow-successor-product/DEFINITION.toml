@@ -1,9 +1,9 @@
 workstream_id = "change-workflow-successor-product"
 source_scope_subject = "workflow-successor-product@6"
 revision = "D12"
-state = "active"
-completeness_audit = "green_pending_owner_gate_d12"
-premium_a = "not_due"
+state = "green"
+completeness_audit = "green"
+premium_a = "due"
 
 [requirements]
 class = "authority"
@@ -181,3 +181,8 @@ path = "implementation/workstreams/change-workflow-successor-product/evidence/PW
 [[decisions]]
 class = "authority"
 path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_D12_DEFINITION_REVALIDATION_GREEN_PENDING_OWNER_GATE_2026-10-04.md"
+
+
+[[decisions]]
+class = "authority"
+path = "implementation/workstreams/change-workflow-successor-product/evidence/PWV3_D12_DEFINITION_GREEN_PREMIUM_A_DUE_2026-10-04.md"
