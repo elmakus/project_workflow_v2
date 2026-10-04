@@ -30,7 +30,6 @@ path = "implementation/workstreams/change-workflow-successor-product/BRAINSTORM.
 class = "research"
 path = "implementation/workstreams/change-workflow-successor-product/RESEARCH.toml"
 
-
 [definition]
 class = "definition"
 path = "implementation/workstreams/change-workflow-successor-product/DEFINITION.toml"
@@ -38,3 +37,7 @@ path = "implementation/workstreams/change-workflow-successor-product/DEFINITION.
 [planning]
 class = "planning"
 path = "implementation/workstreams/change-workflow-successor-product/PLANNING.toml"
+
+[plan_review]
+class = "plan_review"
+path = "implementation/workstreams/change-workflow-successor-product/PLAN_REVIEW.toml"
