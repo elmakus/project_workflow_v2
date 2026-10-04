@@ -134,7 +134,7 @@ This is single-review completeness, not orchestration. It does not imply lanes o
 - Review attempts are append-only and bind exact subject + exact acceptance surface.
 - Canonical publication is freshness-fenced and followed by positive remote readback.
 - Required semantic independence is based on material authorship/repair of the exact subject, never merely a fresh session/model/runtime.
-- Independence-waiver eligibility is boundary-scoped. For **ordinary non-OP Review**, the default is owner-waivable: an explicit, durable, exact-scope human owner waiver may waive the independence requirement unless that exact Review boundary explicitly forbids waiver. The owner waiver exercises that global ordinary-Review default; no prior per-Card waiver-eligible marker is required. OP-backed boundaries and QF/SH0 terminal acceptance use their own explicit rules and are not broadened by this default. Any waived result must bind the exact waived scope and owner authorization honestly, must not be called independent GREEN, and uses **WAIVED_ACCEPTANCE** only when the applicable boundary defines waiver as acceptance-sufficient.
+- Independence-waiver eligibility is boundary-scoped. For **ordinary non-OP Review**, the default is owner-waivable: an explicit, durable, exact-scope human owner waiver may waive the independence requirement unless that exact Review boundary explicitly forbids waiver. The owner waiver exercises that global ordinary-Review default; no prior per-Card waiver-eligible marker is required. OP-backed boundaries and QF terminal acceptance use their own explicit rules and are not broadened by this default. Any waived result must bind the exact waived scope and owner authorization honestly, must not be called independent GREEN, and uses **WAIVED_ACCEPTANCE** only when the applicable boundary defines waiver as acceptance-sufficient.
 - The canonical confirmed-PWV3-defect health predicate is the sole narrow GitHub-Issue-based semantic-authority exception; all other Issue content remains bookkeeping/untrusted input.
 - UNKNOWN semantic/effect state fails closed.
 
@@ -167,7 +167,7 @@ Changed implementation creates a new Result.
 
 Independent Review is required where risk/semantic authority warrants it. Low-risk Cards may complete from deterministic Result/tests/readback only when their exact durable Review obligation says independent Review is not required. A context that materially authored or repaired an exact subject is ineligible to independently approve that subject. Fresh context/runtime/model identity alone does not prove independence.
 
-For ordinary non-OP Review, independence is globally owner-waivable by an explicit durable exact-scope human waiver unless the exact Review boundary explicitly forbids waiver. Silence therefore means waiver-eligible for ordinary non-OP Review only. A waiver does not relabel the outcome independent GREEN and does not alter OP-backed or QF/SH0 waiver semantics.
+For ordinary non-OP Review, independence is globally owner-waivable by an explicit durable exact-scope human waiver unless the exact Review boundary explicitly forbids waiver. Silence therefore means waiver-eligible for ordinary non-OP Review only. A waiver does not relabel the outcome independent GREEN and does not alter OP-backed or QF waiver semantics.
 
 Prior Review evidence is immutable. Reuse is an applicability decision.
 
@@ -235,7 +235,7 @@ The same exact accepted reviewed Execution Package is portable across supported 
 - Generic Workers/child agents cannot substitute for mandatory OP.
 - No mandatory MCP/Paseo semantic plugin.
 
-Specific third-party autonomous-execution extensions, `/goal` implementations, Superpowers, provider packages and local bootstrap configuration are outside PWV3 semantic Definition/Plan/Execution Package authority. They may be used externally to execute the accepted package only if the invocation environment satisfies the package's required capability/effect/currentness constraints.
+Specific third-party autonomous-execution extensions, provider packages and local bootstrap configuration are outside PWV3 semantic Definition/Plan/Execution Package authority. They may be used externally to execute the accepted package only if the invocation environment satisfies the package's required capability/effect/currentness constraints.
 
 ## Donor policy
 
@@ -302,6 +302,7 @@ Before qualified 3.0.0 GA:
 - the post-QF terminal-acceptance gate owns one exact **current acceptance-attempt frontier** bound to that exact QF + current acceptance surface. Establishing any later same-binding terminal-acceptance attempt must first durably supersede the prior current attempt; superseded attempts/results remain immutable history and cannot authorize advancement;
 - only the current acceptance attempt/result can satisfy the gate. A current RED/BLOCKED/UNKNOWN/stale/ambiguous attempt or result prevents any older INDEPENDENT_GREEN or WAIVED_ACCEPTANCE from remaining advancement-sufficient. Recovery reconstructs that one current acceptance-attempt frontier and never falls back to an older success;
 - the current newly produced post-QF terminal acceptance is sufficient when it is either **INDEPENDENT_GREEN** from a semantically independent reviewer or **WAIVED_ACCEPTANCE** produced under an explicit, durable, exact-scope human owner waiver for that exact QF/current acceptance surface. WAIVED_ACCEPTANCE is never labeled independent GREEN;
+- after an applicable Global CLEAR, a qualified semantically independent, read-only, non-authoring closure reviewer may execute the fresh terminal predicate automatically without a separate manual handoff; provider/runtime self-review or an authoring/repairing reviewer cannot satisfy semantic independence;
 - immutable publication/promotion and readback succeed.
 
 PWV3 construction for this workstream has no mid-implementation PWV2 -> partial-PWV3 semantic authority cut. PWV2 governs only through the accepted reviewed Execution Package. That exact package is then handed to an external qualified execution environment which performs implementation outside PWV2 governance. Runtime/provider choice and installation are outside PWV3 semantic artifacts.
