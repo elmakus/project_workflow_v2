@@ -1,0 +1,21 @@
+workstream_id = "change-workflow-successor-product"
+plan_revision = "P1"
+planning_cycle = 1
+attempt = "P1-R01"
+verdict = "pending"
+evidence_path = ""
+
+[subject]
+class = "git_blob"
+repository = "elmakus/project_workflow_v2"
+commit = "c67645f7cd0a0887003da178bc8eaaf44357668b"
+path = "planning/PWV3_3_0_MASTER_PLAN.md"
+blob = "ba2990d773cdd30673f2ce23a6bc74700c6c56cf"
+
+[acceptance]
+class = "authority"
+path = "requirements/PWV3_D12.md"
+
+[independence]
+materially_produced_or_repaired_subject = false
+basis = "Reviewer reconstructed the exact frozen subject from canonical Git state and did not materially produce or repair that subject."
