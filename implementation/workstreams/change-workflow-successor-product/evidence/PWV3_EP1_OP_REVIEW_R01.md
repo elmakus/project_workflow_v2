@@ -3,7 +3,7 @@
 Date: 2026-10-05
 Semantic owner: Execution Prep, under this workstream's PLANNING.toml.
 Current attempt ID: `PWV3-EP1-OP-PACKAGE-REVIEW-R01`.
-Phase at preparation: **DUE**. No worker dispatch/acknowledgement or terminal review result is claimed by this record.
+Current phase: **IN_PROGRESS**. Worker claims are acknowledged below; no terminal review result is claimed by this record.
 
 ## Owner request and bounded realization
 
@@ -52,3 +52,18 @@ If publication/dispatch occurrence is uncertain, query/read back this exact atte
 After applicable GREEN, create the distinct explicit human CONTINUE / RUN OP AGAIN gate; neither this request nor prior P1 approval resolves it. RED returns to the earliest required semantic owner. Package changes require a new exact subject and applicable review. Only after review, owner disposition and a separately frozen/read-back final handoff envelope may the external construction handoff complete. No executable PWV2 Task Board, native construction checkpoint, recipient code, product launch or package acceptance was created here.
 
 This record is the bounded attempt/evidence locator owned by Execution Prep, not an alternative project/state store. The original EP1 authoring/test/publication report remains `PWV3_EP1_PACKAGE_REVIEW_BOUNDARY.md`; it is not a review verdict.
+
+
+## Wave completion reconciliation — 2026-10-05
+
+After the owner reported that the launched chats had finished, Main performed completion-metadata readback only, without semantically integrating lane findings.
+
+Observed against the unchanged wave `research_base=26b58814b87a114f2f2bff971def67b782179072`:
+- 12 lanes have exactly two commits ahead of research_base and change only their declared output file: W00, R00, L01, L03, L04, L06, L07, L08, L09, L10, L11, L12.
+- L02 is durably `CLAIMED_INCOMPLETE`: branch `research/pwv3-ep1-op-review-r01-L02`, claim commit `009131f3564193e2b96654f77444d4837c12fea3`, unchanged base tree, sole parent research_base, no result-file diff.
+- L05 is durably `CLAIMED_INCOMPLETE`: branch `research/pwv3-ep1-op-review-r01-L05`, claim commit `baff26c300944ec9bea0f4d8dfbd9b533ea03fd0`, unchanged base tree, sole parent research_base, no result-file diff.
+- L13 is durably `CLAIMED_INCOMPLETE`: branch `research/pwv3-ep1-op-review-r01-L13`, claim commit `a1ba611e4b439c71841c1042a4017c4e2f7cf1c0`, unchanged base tree, sole parent research_base, no result-file diff.
+
+These three claims are not eligible for timeout reassignment. Resume the original owning worker contexts if available. Do not launch the integrator until valid result commits/outputs exist for all 15 manifest lanes. If an owning context is irrecoverable, perform the protocol's explicit reclaim or claim-generation-reset procedure only after another exact readback and durable authorization; preserve this wave's original research_base.
+
+The 12 structurally completed lanes are not individually interpreted as GREEN/RED here. Their semantic dispositions remain for the independent integrator after the wave is complete.
