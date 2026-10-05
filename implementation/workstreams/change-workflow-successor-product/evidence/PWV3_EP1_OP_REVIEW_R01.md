@@ -31,9 +31,12 @@ Positive remote readback before preparation observed consumer head `2628a625bb6c
 
 Repository: `elmakus/project-research`.
 Package branch: `research/pwv3-ep1-op-review-r01-package`.
-Immutable package commit: `e67676cfdec4f6eca1b3c104c41577ed8d63cc2e`.
+Generation 1 package commit (superseded for allocation only): `e67676cfdec4f6eca1b3c104c41577ed8d63cc2e`.
 Root: `projects/project_workflow_v2/successor-product/ep1-op-review-r01`.
-Manifest: `<root>/MANIFEST.json`, blob `66c396b39484e886fe6e235422889ce5b636acd5`.
+Current package generation: `2`.
+Current immutable package commit: `5d99c609f821a4aff43f55abb6e9cbfa45a57e5f`.
+Current package tree: `c2b7c2830586b5c7ec67a2f1d76a75f83630d389`.
+Manifest: `<root>/MANIFEST.json`, blob `b9fc157c87ec8cb817ec4f8fe9076bf1ceee7d64`.
 Worker launcher: `<root>/AUTO_PROMPT.md`.
 Coverage: `<root>/COVERAGE_MATRIX.md` and `<root>/COMMON_REVIEW.md`.
 Integration: `<root>/INTEGRATION_PROMPT.md`.
@@ -67,3 +70,29 @@ Observed against the unchanged wave `research_base=26b58814b87a114f2f2bff971def6
 These three claims are not eligible for timeout reassignment. Resume the original owning worker contexts if available. Do not launch the integrator until valid result commits/outputs exist for all 15 manifest lanes. If an owning context is irrecoverable, perform the protocol's explicit reclaim or claim-generation-reset procedure only after another exact readback and durable authorization; preserve this wave's original research_base.
 
 The 12 structurally completed lanes are not individually interpreted as GREEN/RED here. Their semantic dispositions remain for the independent integrator after the wave is complete.
+
+
+## Authorized partial claim-generation reset — generation 2
+
+The owner explicitly authorized resetting the three unidentified incomplete lanes and requested a fresh launcher.
+
+Immediately before reset, exact readback reconfirmed:
+- L02 generation-1 branch `research/pwv3-ep1-op-review-r01-L02` at claim `009131f3564193e2b96654f77444d4837c12fea3`: one commit ahead of research_base, no changed files, no `lanes/L02.md`;
+- L05 generation-1 branch `research/pwv3-ep1-op-review-r01-L05` at claim `baff26c300944ec9bea0f4d8dfbd9b533ea03fd0`: one commit ahead, no changed files, no `lanes/L05.md`;
+- L13 generation-1 branch `research/pwv3-ep1-op-review-r01-L13` at claim `a1ba611e4b439c71841c1042a4017c4e2f7cf1c0`: one commit ahead, no changed files, no `lanes/L13.md`.
+
+Branch deletion is unavailable in the current GitHub connector surface, so the protocol-authorized claim-generation-reset path was used. The three generation-1 claims remain durable non-current recovery evidence and MUST NOT be resumed or counted by current allocation/integration.
+
+Current generation-2 package/control-plane commit: `elmakus/project-research@5d99c609f821a4aff43f55abb6e9cbfa45a57e5f`, tree `c2b7c2830586b5c7ec67a2f1d76a75f83630d389`.
+Current manifest blob: `b9fc157c87ec8cb817ec4f8fe9076bf1ceee7d64`.
+Current launcher blob: `72a592f3c662dd9d1028a481612ff5104051203d`.
+Current integration prompt blob: `d9988b086bd03191270bac049e817f3a7b72f98f`.
+
+Generation 2 preserves the original wave `research_base=26b58814b87a114f2f2bff971def67b782179072` and retains the twelve completed generation-1 lanes. Only L02, L05 and L13 are replacement claims:
+- `research/pwv3-ep1-op-review-r01-g2-L02`;
+- `research/pwv3-ep1-op-review-r01-g2-L05`;
+- `research/pwv3-ep1-op-review-r01-g2-L13`.
+
+Readback before launch found none of those three generation-2 branches present. The reusable launcher at the current package commit scans only these three `claimable_lanes`. After all three are complete, the integrator must consume the current manifest's mixed-generation set of exactly 15 lanes, all rooted at the same research_base.
+
+This reset does not create a new OP attempt, change the EP1 subject/acceptance, accept any lane, or authorize construction.
